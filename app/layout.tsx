@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: "Gestão inteligente de operações para infoprodutores",
   generator: "v0.app",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icon.png",
     apple: "/apple-icon.png",
   },
 };
