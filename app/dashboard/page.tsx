@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +21,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { getDateRange, formatCurrency, cn } from "@/lib/utils";
-import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode } from "@/types";
+import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode, Profile } from "@/types";
 import {
   AreaChart,
   Area,
@@ -66,6 +67,34 @@ export default function DashboardPage() {
   const [range, setRange] = useState<DateRange>(getDateRange("7d"));
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [mode, setMode] = useState<OperationalMode>("all");
+
+  // Perfil do usuario logado (mesmo padrao usado em settings/sidebar)
+  const { data: profileData } = useSWR<{ profile: Profile }>(
+    "/api/profile",
+    fetcher
+  );
+  const profile = profileData?.profile;
+  const firstName =
+    (profile?.full_name || profile?.name || "").trim().split(/\s+/)[0] || "";
+
+  // Saudacao e data calculadas no cliente (horario do navegador).
+  // Evita mismatch de hidratacao so atualizando apos montar.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
+
+  const greeting = (() => {
+    if (!now) return "";
+    const h = now.getHours();
+    if (h >= 5 && h < 12) return "Bom dia";
+    if (h >= 12 && h < 18) return "Boa tarde";
+    return "Boa noite";
+  })();
+
+  const formattedDate = now
+    ? format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
+    : "";
 
   const from = format(range.from, "yyyy-MM-dd'T'00:00:00");
   const to = format(range.to, "yyyy-MM-dd'T'23:59:59");
@@ -160,6 +189,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Saudacao personalizada */}
+      {greeting && (
+        <div className="fade-up">
+          <h2 className="text-2xl font-bold text-foreground sm:text-3xl text-balance">
+            {greeting}
+            {firstName ? `, ${firstName}` : ""} {"\u{1F44B}"}
+          </h2>
+          {formattedDate && (
+            <p className="mt-1 text-sm capitalize text-muted-foreground">
+              {formattedDate}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
