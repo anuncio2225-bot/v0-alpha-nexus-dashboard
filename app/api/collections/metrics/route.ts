@@ -73,6 +73,9 @@ export async function GET() {
   const byAttendant: Record<string, { count: number; pending: number; received: number }> =
     {};
   const byProduct: Record<string, { count: number; pending: number }> = {};
+  // Crosstab atendente x status (igual planilha): { atendente: { status: count } }
+  const attendantStatus: Record<string, Record<string, number>> = {};
+  const statusNames = new Set<string>();
 
   for (const c of list) {
     const st = c.status_name || "Sem status";
@@ -85,6 +88,10 @@ export async function GET() {
     byAttendant[at].count += 1;
     byAttendant[at].pending += isPaid(c) ? 0 : Number(c.remaining_value) || 0;
     byAttendant[at].received += Number(c.paid_value) || 0;
+
+    statusNames.add(st);
+    attendantStatus[at] = attendantStatus[at] || {};
+    attendantStatus[at][st] = (attendantStatus[at][st] || 0) + 1;
 
     const pr = c.product_name || "Sem produto";
     byProduct[pr] = byProduct[pr] || { count: 0, pending: 0 };
@@ -105,6 +112,8 @@ export async function GET() {
       by_status: byStatus,
       by_attendant: byAttendant,
       by_product: byProduct,
+      attendant_status: attendantStatus,
+      status_names: Array.from(statusNames),
     },
   });
 }

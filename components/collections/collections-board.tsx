@@ -38,15 +38,17 @@ import type {
   CollectionPlatform,
 } from "@/types";
 import { StatusBadge } from "./status-badge";
+import { AttendantBadge } from "./attendant-badge";
 import { NewClientDialog } from "./new-client-dialog";
 import { CollectionsKanban } from "./collections-kanban";
 import { ClientDrawer } from "./client-drawer";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-interface Attendant {
-  id: string;
-  name: string;
+interface SuggestionsResponse {
+  products: string[];
+  attendants: { id: string | null; name: string }[];
+  payment_methods: string[];
 }
 
 export function CollectionsBoard() {
@@ -61,7 +63,7 @@ export function CollectionsBoard() {
   const query = new URLSearchParams();
   if (search) query.set("search", search);
   if (statusFilter !== "all") query.set("status_id", statusFilter);
-  if (attendantFilter !== "all") query.set("attendant_id", attendantFilter);
+  if (attendantFilter !== "all") query.set("attendant", attendantFilter);
   query.set("page_size", "200");
 
   const { data, isLoading, mutate } = useSWR<{
@@ -77,15 +79,15 @@ export function CollectionsBoard() {
     "/api/collections/platforms",
     fetcher
   );
-  const { data: attendantData } = useSWR<{ attendants: Attendant[] }>(
-    "/api/attendants",
+  const { data: suggestions } = useSWR<SuggestionsResponse>(
+    "/api/collections/suggestions",
     fetcher
   );
 
   const clients = data?.clients || [];
   const statuses = statusData?.statuses || [];
   const platforms = platformData?.platforms || [];
-  const attendants = attendantData?.attendants || [];
+  const attendants = suggestions?.attendants || [];
 
   const statusColorMap = useMemo(() => {
     const m: Record<string, string> = {};
@@ -177,7 +179,7 @@ export function CollectionsBoard() {
               <SelectContent>
                 <SelectItem value="all">Todos atendentes</SelectItem>
                 {attendants.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
+                  <SelectItem key={a.id ? `id:${a.id}` : `src:${a.name}`} value={a.name}>
                     {a.name}
                   </SelectItem>
                 ))}
@@ -257,14 +259,22 @@ export function CollectionsBoard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients.map((c) => (
+                {clients.map((c) => {
+                  const statusColor = c.status_id ? statusColorMap[c.status_id] : null;
+                  const remaining = Number(c.remaining_value) || 0;
+                  return (
                   <TableRow
                     key={c.id}
                     onClick={() => setSelectedId(c.id)}
                     className="cursor-pointer border-border"
+                    style={
+                      statusColor
+                        ? { backgroundColor: `${statusColor}1a` }
+                        : undefined
+                    }
                   >
-                    <TableCell className="text-muted-foreground">
-                      {c.attendant_name || "—"}
+                    <TableCell>
+                      <AttendantBadge name={c.attendant_name || c.src} />
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-foreground">{c.name}</div>
@@ -281,13 +291,21 @@ export function CollectionsBoard() {
                     <TableCell className="text-right text-success">
                       <SensitiveValue>{formatCurrency(Number(c.paid_value) || 0)}</SensitiveValue>
                     </TableCell>
-                    <TableCell className="text-right font-medium text-brand">
-                      <SensitiveValue>{formatCurrency(Number(c.remaining_value) || 0)}</SensitiveValue>
+                    <TableCell className="text-right">
+                      {remaining > 0 ? (
+                        <span className="font-bold text-destructive">
+                          <SensitiveValue>{formatCurrency(remaining)}</SensitiveValue>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                          Quitado
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <StatusBadge
                         name={c.status_name}
-                        color={c.status_id ? statusColorMap[c.status_id] : null}
+                        color={statusColor}
                       />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -296,7 +314,8 @@ export function CollectionsBoard() {
                         : "—"}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -308,7 +327,7 @@ export function CollectionsBoard() {
         onOpenChange={setNewOpen}
         statuses={statuses}
         platforms={platforms}
-        attendants={attendants}
+        attendants={[]}
         onCreated={mutate}
       />
 
@@ -318,6 +337,7 @@ export function CollectionsBoard() {
         onOpenChange={(o) => !o && setSelectedId(null)}
         statuses={statuses}
         onChanged={mutate}
+        onDeleted={() => setSelectedId(null)}
       />
     </div>
   );

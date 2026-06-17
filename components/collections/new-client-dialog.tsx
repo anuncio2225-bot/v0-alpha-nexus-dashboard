@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,12 @@ interface Attendant {
   name: string;
 }
 
+interface SuggestionsResponse {
+  products: string[];
+  attendants: { id: string | null; name: string }[];
+  payment_methods: string[];
+}
+
 interface NewClientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,20 +42,46 @@ interface NewClientDialogProps {
   onCreated: () => void;
 }
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export function NewClientDialog({
   open,
   onOpenChange,
   statuses,
   platforms,
-  attendants,
   onCreated,
 }: NewClientDialogProps) {
   const [loading, setLoading] = useState(false);
+  // valor do atendente selecionado: "id:<uuid>" para cadastrado ou "src:<nome>"
+  const [attendantValue, setAttendantValue] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+
+  const { data: suggestions } = useSWR<SuggestionsResponse>(
+    open ? "/api/collections/suggestions" : null,
+    fetcher
+  );
+
+  const products = suggestions?.products || [];
+  const attendantOptions = suggestions?.attendants || [];
+  const paymentMethods = suggestions?.payment_methods || [];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
+
+    // Resolve atendente: id cadastrado OU nome (src)
+    let attendant_id: string | null = null;
+    let attendant_name: string | null = null;
+    if (attendantValue.startsWith("id:")) {
+      const id = attendantValue.slice(3);
+      attendant_id = id;
+      attendant_name =
+        attendantOptions.find((a) => a.id === id)?.name || null;
+    } else if (attendantValue.startsWith("src:")) {
+      attendant_name = attendantValue.slice(4);
+    }
+
     const payload = {
       name: fd.get("name"),
       phone: fd.get("phone") || null,
@@ -56,11 +89,12 @@ export function NewClientDialog({
       document: fd.get("document") || null,
       product_name: fd.get("product_name") || null,
       platform_id: fd.get("platform_id") || null,
-      attendant_id: fd.get("attendant_id") || null,
+      attendant_id,
+      attendant_name,
       status_id: fd.get("status_id") || null,
       total_value: parseFloat(fd.get("total_value") as string) || 0,
       paid_value: parseFloat(fd.get("paid_value") as string) || 0,
-      payment_method: fd.get("payment_method") || null,
+      payment_method: paymentMethod || null,
       payment_link: fd.get("payment_link") || null,
       next_collection_date: fd.get("next_collection_date") || null,
       notes: fd.get("notes") || null,
@@ -73,6 +107,8 @@ export function NewClientDialog({
       });
       if (!res.ok) throw new Error();
       toast.success("Cliente adicionado");
+      setAttendantValue("");
+      setPaymentMethod("");
       onOpenChange(false);
       onCreated();
     } catch {
@@ -111,7 +147,18 @@ export function NewClientDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="product_name">Produto</Label>
-            <Input id="product_name" name="product_name" className="bg-card-elevated border-border" />
+            <Input
+              id="product_name"
+              name="product_name"
+              list="product-suggestions"
+              placeholder="Selecione ou digite um novo"
+              className="bg-card-elevated border-border"
+            />
+            <datalist id="product-suggestions">
+              {products.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -133,7 +180,13 @@ export function NewClientDialog({
                 <SelectContent>
                   {statuses.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: s.color || "#6b7280" }}
+                        />
+                        {s.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -158,14 +211,20 @@ export function NewClientDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Atendente</Label>
-              <Select name="attendant_id">
+              <Select value={attendantValue} onValueChange={setAttendantValue}>
                 <SelectTrigger className="bg-card-elevated border-border">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {attendants.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                  {attendantOptions.map((a) => (
+                    <SelectItem
+                      key={a.id ? `id:${a.id}` : `src:${a.name}`}
+                      value={a.id ? `id:${a.id}` : `src:${a.name}`}
+                    >
                       {a.name}
+                      {!a.id && (
+                        <span className="ml-1 text-xs text-muted-foreground">(SRC)</span>
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -178,8 +237,19 @@ export function NewClientDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="payment_method">Forma de pagamento</Label>
-              <Input id="payment_method" name="payment_method" placeholder="PIX, Boleto..." className="bg-card-elevated border-border" />
+              <Label>Forma de pagamento</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="bg-card-elevated border-border">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethods.map((pm) => (
+                    <SelectItem key={pm} value={pm}>
+                      {pm}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="payment_link">Link de pagamento</Label>

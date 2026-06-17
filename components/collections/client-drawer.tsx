@@ -39,7 +39,19 @@ import {
   User,
   ArrowRightLeft,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type {
   CollectionClient,
   CollectionStatus,
@@ -52,6 +64,7 @@ interface ClientDrawerProps {
   onOpenChange: (open: boolean) => void;
   statuses: CollectionStatus[];
   onChanged: () => void;
+  onDeleted?: () => void;
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -71,6 +84,7 @@ export function ClientDrawer({
   onOpenChange,
   statuses,
   onChanged,
+  onDeleted,
 }: ClientDrawerProps) {
   const { data, mutate: mutateClient } = useSWR<{
     client: CollectionClient;
@@ -89,6 +103,25 @@ export function ClientDrawer({
   function refresh() {
     mutateClient();
     onChanged();
+  }
+
+  async function handleDelete() {
+    if (!clientId) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/collections/${clientId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Removido da Cobranca");
+      onChanged();
+      onOpenChange(false);
+      onDeleted?.();
+    } catch {
+      toast.error("Erro ao remover");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function changeStatus(statusId: string) {
@@ -224,6 +257,37 @@ export function ClientDrawer({
                     Link de pagamento
                   </Button>
                 )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto gap-1.5 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                      Excluir
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir da Cobranca?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {client.name} sera removido apenas do modulo de Cobranca.
+                        A venda original na tabela de transacoes NAO sera afetada e
+                        o cliente pode ser reimportado depois.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </SheetHeader>
 

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, Users, Package, DollarSign } from "lucide-react";
+import { AttendantStatusReport } from "@/components/collections/attendant-status-report";
 import type { CollectionMetrics } from "@/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -58,6 +59,8 @@ export default function CollectionsReportsPage() {
               value={String(m.total_clients)}
             />
           </div>
+
+          <AttendantStatusReport metrics={m} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
