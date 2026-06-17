@@ -337,6 +337,7 @@ export function CollectionsBoard() {
         onOpenChange={(o) => !o && setSelectedId(null)}
         statuses={statuses}
         onChanged={mutate}
+        onDeleted={() => setSelectedId(null)}
       />
     </div>
   );
