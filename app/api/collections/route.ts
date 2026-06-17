@@ -35,6 +35,9 @@ export async function GET(request: Request) {
   if (statusId) query = query.eq("status_id", statusId);
   if (attendantId) query = query.eq("attendant_id", attendantId);
   if (product) query = query.eq("product_name", product);
+  if (searchParams.get("has_schedule") === "1") {
+    query = query.not("next_collection_date", "is", null);
+  }
   if (from) query = query.gte("order_date", from);
   if (to) query = query.lte("order_date", to);
   if (search) {
