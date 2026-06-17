@@ -4,6 +4,11 @@ import { normalizeKiwify, isKiwifyPayload } from "./normalizers/kiwify";
 import { normalizePayt, isPaytPayload } from "./normalizers/payt";
 import { normalizePag2Pay, isPag2PayPayload } from "./normalizers/pag2pay";
 import { normalizeGeneric } from "./normalizers/generic";
+import {
+  buildAttendantMap,
+  buildStatusMap,
+  syncTransactionToCollection,
+} from "@/lib/collections/sync";
 import type { NormalizedEvent, ProcessResult, WebhookGateway } from "./types";
 
 export interface ProcessOptions {
@@ -404,6 +409,49 @@ export async function processWebhook(
     // ARCHITECTURE RULE: webhook NEVER feeds the cashflow table automatically.
     // Cashflow is reserved for MANUAL entries only (controle financeiro interno).
     // Webhook events update only the transactions table and dashboard metrics.
+
+    // 6b. Sincroniza automaticamente com o modulo de Cobranca.
+    // Cria um collection_client novo (ou atualiza o status do existente quando o
+    // webhook manda uma mudanca de status, ex.: agendado -> pago). NUNCA altera a
+    // tabela transactions a partir daqui. E nao bloqueia o retorno do webhook.
+    try {
+      const collectionTx = {
+        id: upserted?.id as string,
+        customer_name: event.customer_name || null,
+        customer_phone: event.customer_phone || null,
+        customer_email: event.customer_email || null,
+        customer_doc: event.customer_doc || null,
+        product_name: event.product_name || null,
+        product_id: event.product_id || null,
+        gateway: event.gateway || null,
+        src: event.src || null,
+        attendant_id: null,
+        status: event.status || null,
+        affiliate_commission: event.affiliate_commission ?? 0,
+        commission: event.commission ?? 0,
+        total_value: event.total_value ?? event.amount ?? 0,
+        amount: event.amount ?? 0,
+        sale_date: event.sale_date || null,
+        created_at: event.sale_date || new Date().toISOString(),
+        payment_method: event.payment_method || null,
+        tracking_code: event.tracking_code || null,
+      };
+
+      await supabase.rpc("seed_collection_defaults", { p_user_id: userId });
+      const [statusMap, attMap] = await Promise.all([
+        buildStatusMap(supabase, userId),
+        buildAttendantMap(supabase, userId),
+      ]);
+      await syncTransactionToCollection(
+        supabase,
+        userId,
+        collectionTx,
+        statusMap,
+        attMap
+      );
+    } catch (collErr) {
+      console.error("[v0] collection sync error (non-blocking):", collErr);
+    }
 
     // 7. Mark log as processed
     if (logRowId) {

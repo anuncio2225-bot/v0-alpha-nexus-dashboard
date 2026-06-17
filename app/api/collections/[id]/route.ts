@@ -136,6 +136,9 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 // DELETE /api/collections/[id]
+// Remove o cliente SOMENTE da Cobranca (collection_clients + collection_history).
+// NUNCA toca na tabela transactions — a transacao original permanece intacta e o
+// cliente pode ser re-importado depois pelo "Importar do Webhook".
 export async function DELETE(_request: Request, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
@@ -145,6 +148,13 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Remove o historico vinculado primeiro (caso nao haja cascade no banco)
+  await supabase
+    .from("collection_history")
+    .delete()
+    .eq("client_id", id)
+    .eq("user_id", user.id);
 
   const { error } = await supabase
     .from("collection_clients")

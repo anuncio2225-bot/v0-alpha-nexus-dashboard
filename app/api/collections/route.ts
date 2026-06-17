@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")?.trim();
   const statusId = searchParams.get("status_id");
   const attendantId = searchParams.get("attendant_id");
+  const attendant = searchParams.get("attendant")?.trim();
   const product = searchParams.get("product");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
@@ -34,6 +35,12 @@ export async function GET(request: Request) {
 
   if (statusId) query = query.eq("status_id", statusId);
   if (attendantId) query = query.eq("attendant_id", attendantId);
+  // Filtro por atendente identificado pelo nome (cobre cadastrados e SRCs)
+  if (attendant) {
+    query = query.or(
+      `attendant_name.eq.${attendant},src.eq.${attendant}`
+    );
+  }
   if (product) query = query.eq("product_name", product);
   if (searchParams.get("has_schedule") === "1") {
     query = query.not("next_collection_date", "is", null);

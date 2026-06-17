@@ -548,4 +548,6 @@ export interface CollectionMetrics {
   by_status: Record<string, { count: number; value: number }>;
   by_attendant: Record<string, { count: number; pending: number; received: number }>;
   by_product: Record<string, { count: number; pending: number }>;
-}
+  attendant_status: Record<string, Record<string, number>>;
+  status_names: string[];
+  }
