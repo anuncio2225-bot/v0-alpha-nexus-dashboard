@@ -445,3 +445,107 @@ export const DEFAULT_INCOME_CATEGORIES = [
   "Investimentos",
   "Outros",
 ] as const;
+
+// ============================================================
+// Modulo de Cobranca (CRM)
+// ============================================================
+export interface CollectionStatus {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+  position: number;
+  is_default: boolean;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionPlatform {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string | null;
+  is_system: boolean;
+  created_at: string;
+}
+
+export interface CollectionClient {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  document: string | null;
+  product_name: string | null;
+  product_id: string | null;
+  platform_id: string | null;
+  platform_name: string | null;
+  attendant_id: string | null;
+  attendant_name: string | null;
+  src: string | null;
+  transaction_id: string | null;
+  total_value: number;
+  paid_value: number;
+  remaining_value: number;
+  payment_method: string | null;
+  payment_link: string | null;
+  status_id: string | null;
+  status_name: string | null;
+  order_date: string | null;
+  negotiation_date: string | null;
+  next_collection_date: string | null;
+  tracking_code: string | null;
+  last_contact_at: string | null;
+  days_without_response: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CollectionHistoryType =
+  | "note"
+  | "status_change"
+  | "payment"
+  | "call"
+  | "message"
+  | "schedule";
+
+export interface CollectionHistoryEvent {
+  id: string;
+  user_id: string;
+  client_id: string;
+  type: CollectionHistoryType;
+  description: string;
+  old_status: string | null;
+  new_status: string | null;
+  payment_amount: number | null;
+  payment_method: string | null;
+  scheduled_date: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface CollectionCalendarEmail {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CollectionMetrics {
+  total_due_today: number;
+  received_today: number;
+  scheduled_today: number;
+  no_response_count: number;
+  recovery_rate: number;
+  total_clients: number;
+  total_received: number;
+  total_pending: number;
+  by_status: Record<string, { count: number; value: number }>;
+  by_attendant: Record<string, { count: number; pending: number; received: number }>;
+  by_product: Record<string, { count: number; pending: number }>;
+}
