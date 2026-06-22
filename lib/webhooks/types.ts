@@ -40,6 +40,10 @@ export interface NormalizedEvent {
 
   // Payment
   payment_method?: string;
+  payment_link?: string; // trans_payment_link_checkout (Braip) - link para o cliente pagar
+
+  // Address
+  address_full?: string;
 
   // Dates
   sale_date?: string; // ISO
@@ -49,7 +53,8 @@ export interface NormalizedEvent {
   // Tracking (for STATUS_ALTERADO + TRACKING events)
   tracking_code?: string;
   tracking_url?: string;
-  shipping_status?: string;
+  shipping_status?: string; // last_status_delivery (Braip) - status de entrega
+  shipping_company?: string;
 
   // Marketing / attribution
   utm_source?: string;

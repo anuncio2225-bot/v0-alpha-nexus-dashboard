@@ -11,8 +11,10 @@ function todaySaoPaulo(): string {
   }).format(new Date());
 }
 
-// GET /api/collections/metrics
-export async function GET() {
+// GET /api/collections/metrics — aceita os MESMOS filtros da tabela/kanban
+// (search, status_id, attendant, product), garantindo que os KPIs do topo
+// reflitam exatamente a lista filtrada que o usuario esta vendo (Melhoria 3).
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,23 +23,50 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const search = searchParams.get("search")?.trim();
+  const statusId = searchParams.get("status_id");
+  const attendant = searchParams.get("attendant")?.trim();
+  const product = searchParams.get("product")?.trim();
+
   const today = todaySaoPaulo();
 
-  const { data: clients } = await supabase
+  let clientsQuery = supabase
     .from("collection_clients")
     .select(
       "id, status_name, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
     .eq("user_id", user.id);
 
-  // Pagamentos registrados hoje
-  const { data: paymentsToday } = await supabase
-    .from("collection_history")
-    .select("payment_amount, created_at")
-    .eq("user_id", user.id)
-    .eq("type", "payment")
-    .gte("created_at", `${today}T00:00:00`)
-    .lte("created_at", `${today}T23:59:59.999`);
+  if (statusId) clientsQuery = clientsQuery.eq("status_id", statusId);
+  if (attendant) {
+    clientsQuery = clientsQuery.or(
+      `attendant_name.eq.${attendant},src.eq.${attendant}`
+    );
+  }
+  if (product) clientsQuery = clientsQuery.eq("product_name", product);
+  if (search) {
+    clientsQuery = clientsQuery.or(
+      `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%`
+    );
+  }
+
+  const { data: clients } = await clientsQuery;
+
+  // Pagamentos registrados hoje — restritos aos clientes filtrados
+  const clientIds = (clients || []).map((c) => c.id);
+  let paymentsToday: { payment_amount: number | null }[] | null = [];
+  if (clientIds.length > 0) {
+    const { data } = await supabase
+      .from("collection_history")
+      .select("payment_amount, created_at, client_id")
+      .eq("user_id", user.id)
+      .eq("type", "payment")
+      .in("client_id", clientIds)
+      .gte("created_at", `${today}T00:00:00`)
+      .lte("created_at", `${today}T23:59:59.999`);
+    paymentsToday = data;
+  }
 
   const list = clients || [];
   const isPaid = (c: { status_name: string | null }) =>

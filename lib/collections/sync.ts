@@ -55,10 +55,13 @@ interface TxRow {
   customer_doc?: string | null;
   product_name?: string | null;
   product_id?: string | null;
+  plan_name?: string | null;
   gateway?: string | null;
   src?: string | null;
   attendant_id?: string | null;
   status?: string | null;
+  status_code?: string | null;
+  original_status?: string | null;
   affiliate_commission?: number | null;
   commission?: number | null;
   total_value?: number | null;
@@ -66,7 +69,45 @@ interface TxRow {
   sale_date?: string | null;
   created_at?: string | null;
   payment_method?: string | null;
+  payment_link?: string | null;
   tracking_code?: string | null;
+  tracking_url?: string | null;
+  shipping_status?: string | null;
+  shipping_company?: string | null;
+  address_full?: string | null;
+}
+
+// Codigo numerico Braip -> rotulo legivel (camada automatica "braip_status")
+const BRAIP_CODE_LABEL: Record<string, string> = {
+  "1": "Aguardando Pagamento",
+  "2": "Pagamento Aprovado",
+  "3": "Cancelada",
+  "4": "Chargeback",
+  "5": "Devolvida",
+  "6": "Em Analise",
+  "7": "Estorno Pendente",
+  "8": "Em Processamento",
+  "9": "Parcialmente Pago",
+  "10": "Pagamento Atrasado",
+  "11": "Agendado",
+  "12": "Frustrada",
+};
+
+// Deriva o rotulo da Braip (texto) a partir do status_code ou do status canonico
+export function braipStatusLabel(t: TxRow): string | null {
+  const code = (t.status_code || "").trim();
+  if (code && BRAIP_CODE_LABEL[code]) return BRAIP_CODE_LABEL[code];
+  if (t.original_status) return t.original_status;
+  const canonical = (t.status || "").toLowerCase();
+  const map: Record<string, string> = {
+    pago: "Pagamento Aprovado",
+    aguardando: "Aguardando Pagamento",
+    agendado: "Agendado",
+    cancelado: "Cancelada",
+    devolvido: "Devolvida",
+    frustrado: "Frustrada",
+  };
+  return map[canonical] || (t.status ? t.status : null);
 }
 
 // Normaliza o src removendo sujeira (ex.: "Gabriela]" -> "Gabriela")
@@ -171,10 +212,14 @@ export async function syncTransactionToCollection(
   // Ja existe um collection_client para essa transacao?
   const { data: existing } = await supabase
     .from("collection_clients")
-    .select("id, status_id, status_name, paid_value")
+    .select("id, status_id, status_name, paid_value, braip_status")
     .eq("user_id", userId)
     .eq("transaction_id", t.id)
     .maybeSingle();
+
+  // braip_status / braip_status_code: camada AUTOMATICA (sempre do webhook)
+  const braipStatus = braipStatusLabel(t);
+  const braipStatusCode = t.status_code ? parseInt(t.status_code, 10) : null;
 
   const baseFields = {
     name: t.customer_name || "Cliente sem nome",
@@ -183,12 +228,19 @@ export async function syncTransactionToCollection(
     document: t.customer_doc || null,
     product_name: t.product_name || null,
     product_id: t.product_id || null,
+    plan_name: t.plan_name || null,
     platform_name: t.gateway || null,
     attendant_id,
     attendant_name,
     src: cleanSrc(t.src),
     payment_method: t.payment_method || null,
+    payment_link: t.payment_link || null,
     tracking_code: t.tracking_code || null,
+    delivery_status: t.shipping_status || null,
+    shipping_company: t.shipping_company || null,
+    address_full: t.address_full || null,
+    braip_status: braipStatus,
+    braip_status_code: Number.isFinite(braipStatusCode) ? braipStatusCode : null,
     order_date: t.sale_date || t.created_at || null,
   };
 
@@ -211,8 +263,15 @@ export async function syncTransactionToCollection(
   const currentName = (existing.status_name as string | null) || "";
   const currentIsManual = !SYSTEM_STATUS.has(currentName);
 
+  // Em updates, NAO sobrescrevemos dados existentes com null/vazio (ex.: webhook
+  // que so traz mudanca de status nao deve apagar telefone/endereco/link ja salvos).
+  const enriched: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(baseFields)) {
+    if (v !== null && v !== undefined && v !== "") enriched[k] = v;
+  }
+
   const updates: Record<string, unknown> = {
-    ...baseFields,
+    ...enriched,
     total_value: value,
     updated_at: new Date().toISOString(),
   };
@@ -239,6 +298,19 @@ export async function syncTransactionToCollection(
     .update(updates)
     .eq("id", existing.id)
     .eq("user_id", userId);
+
+  // Registra no historico quando o status automatico da Braip muda (Melhoria 7)
+  const prevBraip = (existing.braip_status as string | null) || null;
+  if (!error && braipStatus && braipStatus !== prevBraip) {
+    await supabase.from("collection_history").insert({
+      user_id: userId,
+      client_id: existing.id,
+      type: "status_change",
+      description: `Status atualizado automaticamente: ${prevBraip || "—"} → ${braipStatus}`,
+      old_status: prevBraip,
+      new_status: braipStatus,
+    });
+  }
 
   return error ? "skipped" : "updated";
 }

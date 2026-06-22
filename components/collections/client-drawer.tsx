@@ -40,7 +40,22 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   Trash2,
+  Truck,
+  MapPin,
+  CreditCard,
+  CalendarDays,
+  ExternalLink,
+  Tag,
+  Building2,
 } from "lucide-react";
+import {
+  buildWhatsappUrl,
+  correiosTrackingUrl,
+  deliveryStatusLabel,
+  formatDocument,
+  formatPhoneDisplay,
+} from "@/lib/collections/whatsapp";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,

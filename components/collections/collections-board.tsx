@@ -39,6 +39,7 @@ import type {
 } from "@/types";
 import { StatusBadge } from "./status-badge";
 import { AttendantBadge } from "./attendant-badge";
+import type { CollectionFilters } from "@/app/dashboard/collections/page";
 import { NewClientDialog } from "./new-client-dialog";
 import { CollectionsKanban } from "./collections-kanban";
 import { ClientDrawer } from "./client-drawer";
@@ -51,14 +52,29 @@ interface SuggestionsResponse {
   payment_methods: string[];
 }
 
-export function CollectionsBoard() {
+interface CollectionsBoardProps {
+  filters: CollectionFilters;
+  onFiltersChange: (
+    updater: (prev: CollectionFilters) => CollectionFilters
+  ) => void;
+}
+
+export function CollectionsBoard({
+  filters,
+  onFiltersChange,
+}: CollectionsBoardProps) {
   const [view, setView] = useState<"table" | "kanban">("table");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [attendantFilter, setAttendantFilter] = useState<string>("all");
   const [newOpen, setNewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const { search, statusId: statusFilter, attendant: attendantFilter } = filters;
+  const setSearch = (v: string) =>
+    onFiltersChange((p) => ({ ...p, search: v }));
+  const setStatusFilter = (v: string) =>
+    onFiltersChange((p) => ({ ...p, statusId: v }));
+  const setAttendantFilter = (v: string) =>
+    onFiltersChange((p) => ({ ...p, attendant: v }));
 
   const query = new URLSearchParams();
   if (search) query.set("search", search);
