@@ -211,9 +211,14 @@ export function ClientDrawer({
         body: JSON.stringify({ scheduled_date: scheduleDate }),
       });
       if (!res.ok) throw new Error();
+      const json = await res.json().catch(() => null);
       setScheduleDate("");
       toast.success("Cobranca agendada");
       refresh();
+      // Abre o Google Calendar para criar o lembrete (Melhoria 6)
+      if (json?.calendar_url) {
+        window.open(json.calendar_url, "_blank");
+      }
     } catch {
       toast.error("Erro ao agendar");
     } finally {
@@ -222,13 +227,14 @@ export function ClientDrawer({
   }
 
   function openWhatsApp() {
-    if (!client?.phone) {
+    if (!client) return;
+    if (!client.phone) {
       toast.error("Cliente sem telefone cadastrado");
       return;
     }
-    const digits = client.phone.replace(/\D/g, "");
-    const phone = digits.startsWith("55") ? digits : `55${digits}`;
-    window.open(`https://wa.me/${phone}`, "_blank");
+    // Mensagem pre-preenchida de acordo com o status atual (Melhoria 5)
+    const url = buildWhatsappUrl(client);
+    if (url) window.open(url, "_blank");
   }
 
   return (
@@ -331,24 +337,59 @@ export function ClientDrawer({
                       accent="text-destructive"
                     />
                   </div>
+                  {client.braip_status && (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">
+                        Status na plataforma
+                      </span>
+                      <Badge variant="secondary" className="font-medium">
+                        {client.braip_status}
+                      </Badge>
+                    </div>
+                  )}
                   <Separator />
                   <dl className="space-y-3 text-sm">
-                    <InfoRow icon={Phone} label="Telefone" value={client.phone} />
+                    <InfoRow
+                      icon={Phone}
+                      label="Telefone"
+                      value={formatPhoneDisplay(client.phone)}
+                    />
                     <InfoRow icon={Mail} label="Email" value={client.email} />
                     <InfoRow
                       icon={FileText}
                       label="Documento"
-                      value={client.document}
+                      value={formatDocument(client.document)}
                     />
                     <InfoRow
                       icon={Package}
                       label="Produto"
                       value={client.product_name}
                     />
+                    {client.plan_name && (
+                      <InfoRow
+                        icon={Tag}
+                        label="Plano"
+                        value={client.plan_name}
+                      />
+                    )}
                     <InfoRow
                       icon={User}
                       label="Atendente"
-                      value={client.attendant_name}
+                      value={client.attendant_name || client.src}
+                    />
+                    <InfoRow
+                      icon={CreditCard}
+                      label="Pagamento"
+                      value={client.payment_method}
+                    />
+                    <InfoRow
+                      icon={CalendarDays}
+                      label="Data do pedido"
+                      value={
+                        client.order_date
+                          ? format(new Date(client.order_date), "dd/MM/yyyy")
+                          : null
+                      }
                     />
                     <InfoRow
                       icon={CalendarClock}
@@ -362,12 +403,68 @@ export function ClientDrawer({
                           : null
                       }
                     />
-                    {client.tracking_code && (
+                    {client.shipping_company && (
                       <InfoRow
-                        icon={Package}
-                        label="Rastreio"
-                        value={client.tracking_code}
+                        icon={Building2}
+                        label="Transportadora"
+                        value={client.shipping_company}
                       />
+                    )}
+                    {client.delivery_status && (
+                      <InfoRow
+                        icon={Truck}
+                        label="Entrega"
+                        value={deliveryStatusLabel(client.delivery_status)}
+                      />
+                    )}
+                    {client.tracking_code && (
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="flex items-center gap-2 text-muted-foreground">
+                          <Package className="size-4" />
+                          Rastreio
+                        </dt>
+                        <dd className="text-right">
+                          <a
+                            href={correiosTrackingUrl(client.tracking_code) ?? "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                          >
+                            {client.tracking_code}
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        </dd>
+                      </div>
+                    )}
+                    {client.address_full && (
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="flex items-center gap-2 text-muted-foreground">
+                          <MapPin className="size-4" />
+                          Endereco
+                        </dt>
+                        <dd className="text-right text-foreground">
+                          {client.address_full}
+                        </dd>
+                      </div>
+                    )}
+                    {client.payment_link && (
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="flex items-center gap-2 text-muted-foreground">
+                          <CreditCard className="size-4" />
+                          Link de pagamento
+                        </dt>
+                        <dd className="text-right">
+                          <a
+                            href={client.payment_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                          >
+                            Abrir
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        </dd>
+                      </div>
                     )}
                   </dl>
                   {client.notes && (
