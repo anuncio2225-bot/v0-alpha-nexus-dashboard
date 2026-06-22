@@ -546,6 +546,8 @@ export interface CollectionMetrics {
   total_due_today: number;
   received_today: number;
   scheduled_today: number;
+  braip_scheduled_count: number;
+  braip_scheduled_value: number;
   no_response_count: number;
   recovery_rate: number;
   total_clients: number;
