@@ -29,26 +29,35 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  ShieldCheck,
 } from "lucide-react";
-import type { Profile } from "@/types";
+import type { Profile, TeamPermissionKey } from "@/types";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useHideValues } from "@/contexts/hide-values-context";
+import { useTeamPermissions } from "@/hooks/use-team-permissions";
 
 interface SidebarProps {
   profile: Profile | null;
 }
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone },
-  { href: "/dashboard/connect", label: "Integrações", icon: Link2 },
-  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook },
-  { href: "/dashboard/attendants", label: "Atendentes", icon: Users },
-  { href: "/dashboard/collections", label: "Cobrança", icon: PhoneCall },
-  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet },
-  { href: "/dashboard/cashflow", label: "Fluxo de Caixa", icon: ArrowLeftRight },
-  { href: "/dashboard/logs", label: "Logs", icon: FileText },
-  { href: "/dashboard/settings", label: "Configurações", icon: Settings },
+const navItems: {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  perm: TeamPermissionKey;
+  ownerOnly?: boolean;
+}[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard" },
+  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone, perm: "investimento_ads" },
+  { href: "/dashboard/connect", label: "Integrações", icon: Link2, perm: "integracoes" },
+  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook, perm: "webhooks" },
+  { href: "/dashboard/attendants", label: "Atendentes", icon: Users, perm: "atendentes" },
+  { href: "/dashboard/collections", label: "Cobrança", icon: PhoneCall, perm: "cobranca" },
+  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet, perm: "financeiro" },
+  { href: "/dashboard/cashflow", label: "Fluxo de Caixa", icon: ArrowLeftRight, perm: "cashflow" },
+  { href: "/dashboard/logs", label: "Logs", icon: FileText, perm: "logs" },
+  { href: "/dashboard/team", label: "Equipe", icon: ShieldCheck, perm: "equipe", ownerOnly: true },
+  { href: "/dashboard/settings", label: "Configurações", icon: Settings, perm: "settings" },
 ];
 
 export function Sidebar({ profile }: SidebarProps) {
@@ -56,6 +65,17 @@ export function Sidebar({ profile }: SidebarProps) {
   const router = useRouter();
   const { isCollapsed, isHydrated, toggle } = useSidebar();
   const { hidden: valuesHidden, toggle: toggleValues } = useHideValues();
+  const { isOwner, isMember, permissions, ownerName, isLoading } =
+    useTeamPermissions();
+
+  // Itens visiveis: dono ve tudo; membro ve apenas o que tem permissao.
+  // "Equipe" e exclusivo do dono. Enquanto carrega, mostramos tudo (evita flash
+  // para donos); membros so escondem itens apos resolver o contexto.
+  const visibleItems = navItems.filter((item) => {
+    if (item.ownerOnly) return isOwner;
+    if (isOwner || isLoading || !isMember) return true;
+    return permissions?.[item.perm] === true;
+  });
 
   async function handleLogout() {
     const supabase = createClient();
@@ -119,9 +139,24 @@ export function Sidebar({ profile }: SidebarProps) {
           </Tooltip>
         </div>
 
+        {/* Selo de membro de equipe */}
+        {isMember && !isCollapsed && (
+          <div className="mx-3 mb-1 flex items-center gap-2 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-brand" />
+            <div className="overflow-hidden">
+              <p className="text-[11px] font-medium leading-tight text-brand">
+                Acesso de equipe
+              </p>
+              <p className="truncate text-[11px] leading-tight text-sidebar-foreground/60">
+                {ownerName ? `Conta de ${ownerName}` : "Conta compartilhada"}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));

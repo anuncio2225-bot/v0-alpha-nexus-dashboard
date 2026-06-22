@@ -29,11 +29,11 @@ function resolveRoute(pathname: string) {
 
 export function RouteAccessGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isOwner, isMember, permissions, loading } = useTeamPermissions();
+  const { isOwner, isMember, permissions, isLoading } = useTeamPermissions();
 
   // Donos (e qualquer usuario que nao seja membro) tem acesso total — sem
   // bloqueio nenhum. Isso garante que nada muda para quem ja usa o sistema.
-  if (loading || isOwner || !isMember) {
+  if (isLoading || isOwner || !isMember) {
     return <>{children}</>;
   }
 
