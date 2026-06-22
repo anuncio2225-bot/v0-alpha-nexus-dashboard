@@ -46,16 +46,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   UserPlus,
   MoreHorizontal,
-  Copy,
   Pencil,
   Ban,
   Users,
   Clock,
   Activity,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   PermissionsForm,
   type PermissionsFormValue,
+  type AttendantOption,
 } from "@/components/team/permissions-form";
 import { ROLE_LABELS, resolveRolePreset } from "@/lib/team/roles";
 import { ALL_PERMISSIONS_TRUE } from "@/types";
@@ -71,6 +73,10 @@ function defaultFormValue(): PermissionsFormValue {
     can_edit: preset.can_edit,
     can_delete: preset.can_delete,
     can_export: preset.can_export,
+    scope_mode: "all",
+    attendant_id: null,
+    attendant_src: null,
+    src_areas: { cobranca: true, financeiro: true },
   };
 }
 
@@ -89,16 +95,38 @@ export function TeamClient() {
   );
   const members = useMemo(() => data?.members || [], [data]);
 
+  // Atendentes / SRC disponiveis para vincular
+  const { data: attData } = useSWR<{
+    attendants: { id: string | null; name: string; src: string | null }[];
+    detectedSrcs: string[];
+  }>("/api/team/attendants", fetcher);
+
+  const attendantOptions: AttendantOption[] = useMemo(() => {
+    const map = new Map<string, AttendantOption>();
+    for (const a of attData?.attendants || []) {
+      if (a.src && a.src.trim()) {
+        map.set(a.src, { id: a.id, name: a.name, src: a.src });
+      }
+    }
+    for (const src of attData?.detectedSrcs || []) {
+      if (!map.has(src)) map.set(src, { id: null, name: src, src });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [attData]);
+
   // Convite
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState<PermissionsFormValue>(defaultFormValue());
   const [submitting, setSubmitting] = useState(false);
 
   // Edicao
   const [editTarget, setEditTarget] = useState<TeamMember | null>(null);
   const [editForm, setEditForm] = useState<PermissionsFormValue>(defaultFormValue());
+  const [editPassword, setEditPassword] = useState("");
 
   // Revogar
   const [revokeTarget, setRevokeTarget] = useState<TeamMember | null>(null);
@@ -119,6 +147,14 @@ export function TeamClient() {
       toast.error("Informe um email válido");
       return;
     }
+    if (password.length < 6) {
+      toast.error("A senha deve ter no mínimo 6 caracteres");
+      return;
+    }
+    if (form.scope_mode === "attendant" && !form.attendant_src) {
+      toast.error("Selecione o atendente (SRC) para a visão restrita");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/team", {
@@ -127,25 +163,28 @@ export function TeamClient() {
         body: JSON.stringify({
           email,
           name,
+          password,
           role: form.role,
           permissions: form.permissions,
           can_edit: form.can_edit,
           can_delete: form.can_delete,
           can_export: form.can_export,
+          scope_mode: form.scope_mode,
+          attendant_id: form.attendant_id,
+          attendant_src: form.attendant_src,
+          src_areas: form.src_areas,
         }),
       });
       const json = await res.json();
       if (!res.ok) {
-        toast.error(json.error || "Erro ao convidar");
+        toast.error(json.error || "Erro ao criar acesso");
         return;
       }
-      await navigator.clipboard
-        .writeText(json.inviteLink)
-        .catch(() => {});
-      toast.success("Convite criado! Link copiado para a área de transferência.");
+      toast.success("Acesso criado! A pessoa já pode entrar com email e senha.");
       setInviteOpen(false);
       setEmail("");
       setName("");
+      setPassword("");
       setForm(defaultFormValue());
       mutate();
     } finally {
@@ -155,17 +194,30 @@ export function TeamClient() {
 
   function openEdit(member: TeamMember) {
     setEditTarget(member);
+    setEditPassword("");
     setEditForm({
       role: member.role,
       permissions: { ...ALL_PERMISSIONS_TRUE, ...member.permissions },
       can_edit: member.can_edit,
       can_delete: member.can_delete,
       can_export: member.can_export,
+      scope_mode: member.scope_mode || "all",
+      attendant_id: member.attendant_id ?? null,
+      attendant_src: member.attendant_src ?? null,
+      src_areas: member.src_areas || { cobranca: true, financeiro: true },
     });
   }
 
   async function handleSaveEdit() {
     if (!editTarget) return;
+    if (editForm.scope_mode === "attendant" && !editForm.attendant_src) {
+      toast.error("Selecione o atendente (SRC) para a visão restrita");
+      return;
+    }
+    if (editPassword && editPassword.length < 6) {
+      toast.error("A nova senha deve ter no mínimo 6 caracteres");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/team/${editTarget.id}`, {
@@ -177,6 +229,11 @@ export function TeamClient() {
           can_edit: editForm.can_edit,
           can_delete: editForm.can_delete,
           can_export: editForm.can_export,
+          scope_mode: editForm.scope_mode,
+          attendant_id: editForm.attendant_id,
+          attendant_src: editForm.attendant_src,
+          src_areas: editForm.src_areas,
+          ...(editPassword ? { password: editPassword } : {}),
         }),
       });
       const json = await res.json();
@@ -184,7 +241,7 @@ export function TeamClient() {
         toast.error(json.error || "Erro ao salvar");
         return;
       }
-      toast.success("Permissões atualizadas");
+      toast.success("Acesso atualizado");
       setEditTarget(null);
       mutate();
     } finally {
@@ -197,18 +254,12 @@ export function TeamClient() {
     const res = await fetch(`/api/team/${revokeTarget.id}`, { method: "DELETE" });
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      toast.error(json.error || "Erro ao revogar");
+      toast.error(json.error || "Erro ao remover");
       return;
     }
-    toast.success("Acesso revogado");
+    toast.success("Membro removido. O email foi liberado para uso próprio.");
     setRevokeTarget(null);
     mutate();
-  }
-
-  async function copyInviteLink(member: TeamMember) {
-    const link = `${window.location.origin}/auth/team-invite?token=${member.invite_token}`;
-    await navigator.clipboard.writeText(link).catch(() => {});
-    toast.success("Link de convite copiado");
   }
 
   return (

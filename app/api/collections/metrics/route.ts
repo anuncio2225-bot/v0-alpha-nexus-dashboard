@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // Data de "hoje" no fuso de Sao Paulo (YYYY-MM-DD)
@@ -43,13 +43,19 @@ export async function GET(request: Request) {
     .filter(Boolean);
 
   const today = todaySaoPaulo();
+  const scope = await getTeamDataScope(supabase, user.id);
 
   let clientsQuery = supabase
     .from("collection_clients")
     .select(
       "id, status_name, braip_status, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
-    .eq("user_id", await getEffectiveUserId(supabase, user.id));
+    .eq("user_id", scope.ownerId);
+
+  // Membro restrito a um atendente: KPIs refletem so o SRC dele.
+  if (scope.srcFilter && scope.srcAreas.cobranca) {
+    clientsQuery = clientsQuery.eq("src", scope.srcFilter);
+  }
 
   if (statusIds.length > 0) clientsQuery = clientsQuery.in("status_id", statusIds);
   else if (statusId) clientsQuery = clientsQuery.eq("status_id", statusId);

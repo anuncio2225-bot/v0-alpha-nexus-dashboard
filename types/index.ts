@@ -36,6 +36,15 @@ export type TeamPermissions = Record<TeamPermissionKey, boolean>;
 export type TeamRole = "admin" | "editor" | "viewer" | "custom";
 export type TeamMemberStatus = "pending" | "active" | "revoked";
 
+// Modo de visao do membro: "all" ve tudo da conta; "attendant" ve so o SRC dele
+export type TeamScopeMode = "all" | "attendant";
+
+// Areas onde o filtro por SRC (atendente) se aplica
+export interface TeamSrcAreas {
+  cobranca: boolean;
+  financeiro: boolean;
+}
+
 export interface TeamMember {
   id: string;
   owner_id: string;
@@ -49,11 +58,24 @@ export interface TeamMember {
   can_edit: boolean;
   can_delete: boolean;
   can_export: boolean;
+  // Vinculo com atendente / escopo por SRC
+  attendant_id: string | null;
+  attendant_src: string | null;
+  scope_mode: TeamScopeMode;
+  src_areas: TeamSrcAreas;
   invited_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
   last_access_at: string | null;
   updated_at: string;
+}
+
+// Escopo de DADOS resolvido para o usuario logado (usado nas rotas de API)
+export interface TeamDataScope {
+  ownerId: string;
+  // Quando definido, filtra os dados das areas marcadas por este SRC
+  srcFilter: string | null;
+  srcAreas: TeamSrcAreas;
 }
 
 // Contexto de equipe resolvido para o usuario logado

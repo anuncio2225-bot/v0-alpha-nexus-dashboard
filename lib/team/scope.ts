@@ -1,4 +1,51 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TeamDataScope, TeamSrcAreas } from "@/types";
+
+const DEFAULT_SRC_AREAS: TeamSrcAreas = { cobranca: true, financeiro: true };
+
+/**
+ * Resolve o escopo de DADOS completo do usuario logado:
+ * - ownerId: de quem sao os dados (dono = proprio id; membro = id do dono)
+ * - srcFilter: se o membro esta limitado a um atendente (SRC), o valor do SRC.
+ *   Para donos ou membros com visao total, e null (sem restricao).
+ * - srcAreas: em quais areas o filtro por SRC se aplica.
+ *
+ * Nunca lanca: em falha, devolve escopo de dono (sem restricao).
+ */
+export async function getTeamDataScope(
+  supabase: SupabaseClient,
+  fallbackUserId: string
+): Promise<TeamDataScope> {
+  const ownerId = await getEffectiveUserId(supabase, fallbackUserId);
+
+  try {
+    const { data: membership } = await supabase
+      .from("team_members")
+      .select("scope_mode, attendant_src, src_areas, status")
+      .eq("member_user_id", fallbackUserId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (
+      membership &&
+      membership.scope_mode === "attendant" &&
+      membership.attendant_src
+    ) {
+      return {
+        ownerId,
+        srcFilter: membership.attendant_src as string,
+        srcAreas: {
+          ...DEFAULT_SRC_AREAS,
+          ...((membership.src_areas as Partial<TeamSrcAreas>) || {}),
+        },
+      };
+    }
+  } catch {
+    // ignora — cai no escopo de dono
+  }
+
+  return { ownerId, srcFilter: null, srcAreas: DEFAULT_SRC_AREAS };
+}
 
 /**
  * Retorna o ID de usuario para escopo de DADOS.
