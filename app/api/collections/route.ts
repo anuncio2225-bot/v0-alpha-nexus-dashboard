@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // GET /api/collections — lista clientes com filtros e paginacao
@@ -12,8 +12,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Escopo de dados (dono x membro) + eventual restricao por SRC do atendente
+  const scope = await getTeamDataScope(supabase, user.id);
+
   // Garante que os status/plataformas padrao existam para o usuario
-  await supabase.rpc("seed_collection_defaults", { p_user_id: await getEffectiveUserId(supabase, user.id) });
+  await supabase.rpc("seed_collection_defaults", { p_user_id: scope.ownerId });
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
@@ -47,7 +50,12 @@ export async function GET(request: Request) {
   let query = supabase
     .from("collection_clients")
     .select("*", { count: "exact" })
-    .eq("user_id", await getEffectiveUserId(supabase, user.id));
+    .eq("user_id", scope.ownerId);
+
+  // Membro restrito a um atendente: so ve os clientes com o SRC dele.
+  if (scope.srcFilter && scope.srcAreas.cobranca) {
+    query = query.eq("src", scope.srcFilter);
+  }
 
   if (statusIds.length > 0) query = query.in("status_id", statusIds);
   else if (statusId) query = query.eq("status_id", statusId);
