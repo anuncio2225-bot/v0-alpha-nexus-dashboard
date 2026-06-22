@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
   validateToken,
@@ -31,7 +32,7 @@ export async function GET() {
     .select(
       "is_connected, connected_at, token_expires_at, validation_status, last_sync_at, sync_status, sync_error, app_id"
     )
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   return NextResponse.json({
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     // 3 + 4. Salvar protegido + marcar conectado
     const { error: upsertError } = await supabase.from("meta_config").upsert(
       {
-        user_id: user.id,
+        user_id: await getEffectiveUserId(supabase, user.id),
         access_token: token, // TODO: encrypt at rest (ENCRYPTION_KEY)
         app_id: app_id || detectedAppId || null,
         token_expires_at: expiresAt,
@@ -143,8 +144,8 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await supabase.from("meta_config").delete().eq("user_id", user.id);
-  await supabase.from("meta_ad_accounts").delete().eq("user_id", user.id);
+  await supabase.from("meta_config").delete().eq("user_id", await getEffectiveUserId(supabase, user.id));
+  await supabase.from("meta_ad_accounts").delete().eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   return NextResponse.json({ success: true });
 }

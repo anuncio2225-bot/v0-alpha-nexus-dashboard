@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("settings")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (error && error.code !== "PGRST116") {
@@ -46,7 +47,7 @@ export async function PATCH(request: Request) {
   } = body;
 
   const updates: Record<string, unknown> = {
-    user_id: user.id,
+    user_id: await getEffectiveUserId(supabase, user.id),
     updated_at: new Date().toISOString(),
   };
   if (meta_tax_multiplier !== undefined) updates.meta_tax_multiplier = meta_tax_multiplier;

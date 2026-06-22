@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("ad_investments")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("date", { ascending: false });
 
   if (from) query = query.gte("date", from);
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("ad_investments")
     .insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       date,
       platform: platform || "meta_ads",
       campaign_name: campaign_name || null,
@@ -93,7 +94,7 @@ export async function PATCH(request: NextRequest) {
     .from("ad_investments")
     .update(updatePayload)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -117,7 +118,7 @@ export async function DELETE(request: NextRequest) {
     .from("ad_investments")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

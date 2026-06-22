@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,7 +39,7 @@ export async function POST(_req: NextRequest) {
     const { data: allWebhooks, error: allErr } = await supabase
       .from("webhooks")
       .select("id, name, source, operational_type")
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
     if (allErr) {
       return NextResponse.json({ error: allErr.message }, { status: 500 });
@@ -53,7 +54,7 @@ export async function POST(_req: NextRequest) {
         .from("webhook_logs")
         .select("id, payload")
         .eq("webhook_id", wh.id)
-        .eq("user_id", user.id)
+        .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -77,7 +78,7 @@ export async function POST(_req: NextRequest) {
           .from("webhooks")
           .update({ source: "payt" })
           .eq("id", wh.id)
-          .eq("user_id", user.id);
+          .eq("user_id", await getEffectiveUserId(supabase, user.id));
         if (!fixErr) {
           results.push(
             `Webhook "${wh.name}": source ${src} -> payt (payloads Payt detectados nos logs)`
@@ -90,7 +91,7 @@ export async function POST(_req: NextRequest) {
     const { data: webhooks, error: whErr } = await supabase
       .from("webhooks")
       .select("id, name, source, operational_type")
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
     if (whErr) {
       return NextResponse.json({ error: whErr.message }, { status: 500 });
@@ -113,7 +114,7 @@ export async function POST(_req: NextRequest) {
       const { data: txRows, error: txErr } = await supabase
         .from("transactions")
         .select("id, gateway, source, sale_type")
-        .eq("user_id", user.id)
+        .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .eq("webhook_id", wh.id);
 
       if (txErr) {
@@ -137,7 +138,7 @@ export async function POST(_req: NextRequest) {
             .from("transactions")
             .update(updates)
             .eq("id", tx.id)
-            .eq("user_id", user.id);
+            .eq("user_id", await getEffectiveUserId(supabase, user.id));
           if (!upErr) {
             transactionsFixed += 1;
             whTxFixed += 1;
@@ -150,7 +151,7 @@ export async function POST(_req: NextRequest) {
         const { data: logRows, error: logErr } = await supabase
           .from("webhook_logs")
           .select("id, gateway")
-          .eq("user_id", user.id)
+          .eq("user_id", await getEffectiveUserId(supabase, user.id))
           .eq("webhook_id", wh.id);
 
         if (logErr) {
@@ -162,7 +163,7 @@ export async function POST(_req: NextRequest) {
                 .from("webhook_logs")
                 .update({ gateway: source })
                 .eq("id", log.id)
-                .eq("user_id", user.id);
+                .eq("user_id", await getEffectiveUserId(supabase, user.id));
               if (!upErr) {
                 logsFixed += 1;
                 whLogsFixed += 1;

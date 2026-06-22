@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -13,7 +14,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("collection_calendar_emails")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("created_at");
 
   if (error) {
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("collection_calendar_emails")
-    .insert({ user_id: user.id, email: body.email, name: body.name || null })
+    .insert({ user_id: await getEffectiveUserId(supabase, user.id), email: body.email, name: body.name || null })
     .select()
     .single();
 

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { randomBytes } from "crypto";
 
 export async function PATCH(
@@ -42,7 +43,7 @@ export async function PATCH(
     .from("webhooks")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select("id, name, product_name, source, token, is_active, operational_type, created_at, updated_at")
     .single();
 
@@ -67,7 +68,7 @@ export async function DELETE(
     .from("webhooks")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

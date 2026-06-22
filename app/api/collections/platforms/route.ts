@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -10,12 +11,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await supabase.rpc("seed_collection_defaults", { p_user_id: user.id });
+  await supabase.rpc("seed_collection_defaults", { p_user_id: await getEffectiveUserId(supabase, user.id) });
 
   const { data, error } = await supabase
     .from("collection_platforms")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("name");
 
   if (error) {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("collection_platforms")
-    .insert({ user_id: user.id, name: body.name, color: body.color || null })
+    .insert({ user_id: await getEffectiveUserId(supabase, user.id), name: body.name, color: body.color || null })
     .select()
     .single();
 

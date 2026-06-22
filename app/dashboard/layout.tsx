@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
+import { RouteAccessGuard } from "@/components/team/route-access-guard";
 import { HideValuesProvider } from "@/contexts/hide-values-context";
 import type { Profile } from "@/types";
 
@@ -31,7 +32,7 @@ export default async function DashboardLayout({
       <div className="flex min-h-screen bg-background">
         <Sidebar profile={profile as Profile | null} />
         <main className="flex-1 min-h-screen p-6 transition-all duration-300">
-          {children}
+          <RouteAccessGuard>{children}</RouteAccessGuard>
         </main>
       </div>
     </HideValuesProvider>

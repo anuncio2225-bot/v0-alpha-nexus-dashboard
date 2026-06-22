@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 /**
@@ -25,10 +26,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const scopedId = await getEffectiveUserId(supabase, user.id);
+
   // Update each account's position based on its index in the order array
   const updates = order.map((id, index) => ({
     id,
-    user_id: user.id,
+    user_id: scopedId,
     position: index + 1,
     updated_at: new Date().toISOString(),
   }));
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
       .from("bank_accounts")
       .update({ position: u.position, updated_at: u.updated_at })
       .eq("id", u.id)
-      .eq("user_id", user.id);
+      .eq("user_id", scopedId);
 
     if (error) {
       console.error("[v0] Reorder error:", error);

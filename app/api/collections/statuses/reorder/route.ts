@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // PATCH /api/collections/statuses/reorder
@@ -20,13 +21,14 @@ export async function PATCH(request: Request) {
   }
 
   // Atualiza posicao de cada status (escopado ao usuario por seguranca)
+  const scopedId = await getEffectiveUserId(supabase, user.id);
   const results = await Promise.all(
     order.map((id, index) =>
       supabase
         .from("collection_statuses")
         .update({ position: index, updated_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", user.id)
+        .eq("user_id", scopedId)
     )
   );
 

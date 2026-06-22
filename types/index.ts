@@ -13,6 +13,89 @@ export interface Profile {
   updated_at: string;
 }
 
+// ============================================================================
+// EQUIPE / ACESSO
+// ============================================================================
+
+// Chaves de permissao por pagina (espelham a sidebar)
+export type TeamPermissionKey =
+  | "dashboard"
+  | "investimento_ads"
+  | "integracoes"
+  | "webhooks"
+  | "atendentes"
+  | "cobranca"
+  | "financeiro"
+  | "cashflow"
+  | "logs"
+  | "settings"
+  | "equipe";
+
+export type TeamPermissions = Record<TeamPermissionKey, boolean>;
+
+export type TeamRole = "admin" | "editor" | "viewer" | "custom";
+export type TeamMemberStatus = "pending" | "active" | "revoked";
+
+export interface TeamMember {
+  id: string;
+  owner_id: string;
+  invited_email: string;
+  invited_name: string | null;
+  invite_token: string;
+  member_user_id: string | null;
+  role: TeamRole;
+  status: TeamMemberStatus;
+  permissions: TeamPermissions;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_export: boolean;
+  invited_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  last_access_at: string | null;
+  updated_at: string;
+}
+
+// Contexto de equipe resolvido para o usuario logado
+export interface TeamContext {
+  isOwner: boolean;
+  isMember: boolean;
+  permissions: TeamPermissions;
+  canEdit: boolean;
+  canDelete: boolean;
+  canExport: boolean;
+  ownerName: string | null;
+  ownerId: string;
+}
+
+export const ALL_PERMISSIONS_TRUE: TeamPermissions = {
+  dashboard: true,
+  investimento_ads: true,
+  integracoes: true,
+  webhooks: true,
+  atendentes: true,
+  cobranca: true,
+  financeiro: true,
+  cashflow: true,
+  logs: true,
+  settings: true,
+  equipe: true,
+};
+
+export const ALL_PERMISSIONS_FALSE: TeamPermissions = {
+  dashboard: false,
+  investimento_ads: false,
+  integracoes: false,
+  webhooks: false,
+  atendentes: false,
+  cobranca: false,
+  financeiro: false,
+  cashflow: false,
+  logs: false,
+  settings: false,
+  equipe: false,
+};
+
 export interface Settings {
   id: string;
   user_id: string;

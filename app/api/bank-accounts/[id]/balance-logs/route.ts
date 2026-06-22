@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 /**
@@ -22,7 +23,7 @@ export async function GET(
     .from("account_balance_logs")
     .select("*")
     .eq("account_id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("changed_at", { ascending: false })
     .limit(50);
 

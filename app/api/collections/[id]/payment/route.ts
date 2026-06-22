@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -24,7 +25,7 @@ export async function POST(request: Request, { params }: Params) {
     .from("collection_clients")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (!client) {
@@ -40,7 +41,7 @@ export async function POST(request: Request, { params }: Params) {
   const { data: targetStatus } = await supabase
     .from("collection_statuses")
     .select("id, name")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .ilike("name", targetName)
     .limit(1)
     .maybeSingle();
@@ -61,7 +62,7 @@ export async function POST(request: Request, { params }: Params) {
     .from("collection_clients")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -71,7 +72,7 @@ export async function POST(request: Request, { params }: Params) {
 
   // Registra no historico
   await supabase.from("collection_history").insert({
-    user_id: user.id,
+    user_id: await getEffectiveUserId(supabase, user.id),
     client_id: id,
     type: "payment",
     description: `Pagamento registrado de R$ ${amount.toFixed(2)}${

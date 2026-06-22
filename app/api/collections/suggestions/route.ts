@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { cleanSrc } from "@/lib/collections/sync";
 
@@ -20,11 +21,11 @@ export async function GET() {
     supabase
       .from("transactions")
       .select("product_name, src")
-      .eq("user_id", user.id),
+      .eq("user_id", await getEffectiveUserId(supabase, user.id)),
     supabase
       .from("attendants")
       .select("id, name")
-      .eq("user_id", user.id),
+      .eq("user_id", await getEffectiveUserId(supabase, user.id)),
   ]);
 
   const txs = txRes.data || [];

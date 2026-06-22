@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { format, eachDayOfInterval, parseISO } from "date-fns";
 import {
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
       .select(
         "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_name, product_id, attendant_id, sale_date, payment_date, webhook_id, created_at"
       )
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
     // Filter by date range using OR: sale_date in range OR (sale_date is null AND created_at in range)
     txQuery = txQuery.or(
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
       const { data: modeWebhooks } = await supabase
         .from("webhooks")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .eq("operational_type", mode);
 
       const modeWebhookIds = new Set((modeWebhooks || []).map((w) => w.id));
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
     const { data: allProductsRaw } = await supabase
       .from("transactions")
       .select("product_id, product_name, webhook_id, sale_date, created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .not("product_name", "is", null)
       .or(
         `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
     const { data: webhooksRaw } = await supabase
       .from("webhooks")
       .select("id, name, product_name, is_active, operational_type")
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
     const webhookById = new Map<string, { name: string; productName: string | null; operationalType: string }>();
     (webhooksRaw || []).forEach((w) => {
@@ -201,7 +202,7 @@ export async function GET(request: Request) {
       .select(
         "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_id, product_name, payment_date"
       )
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("status", "pago")
       .not("payment_date", "is", null)
       .gte("payment_date", from)
@@ -222,7 +223,7 @@ export async function GET(request: Request) {
     const { data: adInvestments } = await supabase
       .from("ad_investments")
       .select("investment_value, date, platform, campaign_name")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .gte("date", dateFrom)
       .lte("date", dateTo);
 
@@ -234,7 +235,7 @@ export async function GET(request: Request) {
     const { data: activeMetaAccounts } = await supabase
       .from("meta_ad_accounts")
       .select("account_id")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
 
     const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
@@ -246,7 +247,7 @@ export async function GET(request: Request) {
       const { data: metaPerf } = await supabase
         .from("meta_ads_performance")
         .select("date, spend")
-        .eq("user_id", user.id)
+        .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .in("ad_account_id", activeMetaIds)
         .gte("date", dateFrom)
         .lte("date", dateTo);
@@ -265,7 +266,7 @@ export async function GET(request: Request) {
     const { data: settings } = await supabase
       .from("settings")
       .select("meta_tax_multiplier, ads_tax_percentage")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .maybeSingle();
 
     const adsTaxPercent = settings?.ads_tax_percentage ?? 6;
@@ -637,7 +638,7 @@ export async function GET(request: Request) {
     const { data: attendantsRaw } = await supabase
       .from("attendants")
       .select("id, name, monthly_goal")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("status", "active");
 
     const attendants: AttendantRanking[] = (attendantsRaw || [])

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("cashflow")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("date", { ascending: false });
 
   if (error) {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("cashflow")
     .insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       type,
       category,
       description,
@@ -87,7 +88,7 @@ export async function PATCH(request: Request) {
       notes,
     })
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -117,7 +118,7 @@ export async function DELETE(request: Request) {
     .from("cashflow")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

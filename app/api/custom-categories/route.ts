@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 
 // GET: list user's custom categories
 export async function GET() {
@@ -15,7 +16,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("custom_categories")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("name");
 
   if (error) {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from("custom_categories")
       .insert({
-        user_id: user.id,
+        user_id: await getEffectiveUserId(supabase, user.id),
         name: name.trim(),
         type,
       })
@@ -96,7 +97,7 @@ export async function DELETE(request: NextRequest) {
     .from("custom_categories")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
