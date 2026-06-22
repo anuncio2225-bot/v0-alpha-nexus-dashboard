@@ -262,6 +262,9 @@ export function ClientDrawer({
                   color={
                     statuses.find((s) => s.id === client.status_id)?.color
                   }
+                  system={
+                    statuses.find((s) => s.id === client.status_id)?.is_system
+                  }
                 />
               </div>
               <div className="flex flex-wrap gap-2">
@@ -502,6 +505,11 @@ export function ClientDrawer({
                         {statuses.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}
+                            {s.is_system && (
+                              <span className="ml-1 text-muted-foreground">
+                                (sistema)
+                              </span>
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>

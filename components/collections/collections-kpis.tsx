@@ -25,6 +25,8 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
     query.set("status_ids", filters.statusIds.join(","));
   if (filters.attendants.length > 0)
     query.set("attendants", filters.attendants.join(","));
+  if (filters.products.length > 0)
+    query.set("products", filters.products.join(","));
   const qs = query.toString();
 
   const { data, isLoading } = useSWR<{ metrics: CollectionMetrics }>(

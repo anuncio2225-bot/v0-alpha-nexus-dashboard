@@ -37,6 +37,10 @@ export async function GET(request: Request) {
     .map((s) => s.trim())
     .filter(Boolean);
   const product = searchParams.get("product")?.trim();
+  const products = (searchParams.get("products") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const today = todaySaoPaulo();
 
@@ -57,7 +61,8 @@ export async function GET(request: Request) {
         .join(",")
     );
   }
-  if (product) clientsQuery = clientsQuery.eq("product_name", product);
+  if (products.length > 0) clientsQuery = clientsQuery.in("product_name", products);
+  else if (product) clientsQuery = clientsQuery.eq("product_name", product);
   if (search) {
     clientsQuery = clientsQuery.or(
       `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%`

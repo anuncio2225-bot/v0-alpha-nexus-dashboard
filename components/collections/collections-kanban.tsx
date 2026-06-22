@@ -216,6 +216,11 @@ function SortableColumn({
           />
           <span className="truncate text-sm font-medium text-foreground">
             {status.name}
+            {status.is_system && (
+              <span className="ml-1 font-normal text-muted-foreground">
+                (sistema)
+              </span>
+            )}
           </span>
           <span className="text-xs text-muted-foreground">{count}</span>
         </div>
