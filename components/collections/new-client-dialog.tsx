@@ -186,6 +186,11 @@ export function NewClientDialog({
                           style={{ backgroundColor: s.color || "#6b7280" }}
                         />
                         {s.name}
+                        {s.is_system && (
+                          <span className="text-muted-foreground">
+                            (sistema)
+                          </span>
+                        )}
                       </span>
                     </SelectItem>
                   ))}
@@ -202,6 +207,11 @@ export function NewClientDialog({
                   {platforms.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
+                      {p.is_system && (
+                        <span className="ml-1 text-muted-foreground">
+                          (sistema)
+                        </span>
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>

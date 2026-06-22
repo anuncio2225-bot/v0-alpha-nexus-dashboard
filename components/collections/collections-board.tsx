@@ -64,19 +64,28 @@ export function CollectionsBoard({
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { search, statusIds, attendants: attendantFilters } = filters;
+  const {
+    search,
+    statusIds,
+    attendants: attendantFilters,
+    products: productFilters,
+  } = filters;
   const setSearch = (v: string) =>
     onFiltersChange((p) => ({ ...p, search: v }));
   const setStatusIds = (v: string[]) =>
     onFiltersChange((p) => ({ ...p, statusIds: v }));
   const setAttendantFilters = (v: string[]) =>
     onFiltersChange((p) => ({ ...p, attendants: v }));
+  const setProductFilters = (v: string[]) =>
+    onFiltersChange((p) => ({ ...p, products: v }));
 
   const query = new URLSearchParams();
   if (search) query.set("search", search);
   if (statusIds.length > 0) query.set("status_ids", statusIds.join(","));
   if (attendantFilters.length > 0)
     query.set("attendants", attendantFilters.join(","));
+  if (productFilters.length > 0)
+    query.set("products", productFilters.join(","));
   query.set("page_size", "200");
 
   const { data, isLoading, mutate } = useSWR<{
@@ -100,10 +109,17 @@ export function CollectionsBoard({
   const statuses = statusData?.statuses || [];
   const platforms = platformData?.platforms || [];
   const attendants = suggestions?.attendants || [];
+  const products = suggestions?.products || [];
 
   const statusColorMap = useMemo(() => {
     const m: Record<string, string> = {};
     for (const s of statuses) m[s.id] = s.color;
+    return m;
+  }, [statuses]);
+
+  const statusSystemMap = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const s of statuses) m[s.id] = s.is_system;
     return m;
   }, [statuses]);
 
@@ -211,7 +227,7 @@ export function CollectionsBoard({
               onChange={setStatusIds}
               options={statuses.map((s) => ({
                 value: s.id,
-                label: s.name,
+                label: s.is_system ? `${s.name} (sistema)` : s.name,
                 color: s.color,
               }))}
             />
@@ -223,6 +239,16 @@ export function CollectionsBoard({
               options={attendants.map((a) => ({
                 value: a.name,
                 label: a.name,
+              }))}
+            />
+            <MultiSelectFilter
+              placeholder="Produto"
+              className="sm:w-44"
+              selected={productFilters}
+              onChange={setProductFilters}
+              options={products.map((p) => ({
+                value: p,
+                label: p,
               }))}
             />
           </div>
@@ -354,6 +380,7 @@ export function CollectionsBoard({
                       <StatusBadge
                         name={c.status_name}
                         color={statusColor}
+                        system={c.status_id ? statusSystemMap[c.status_id] : false}
                       />
                     </TableCell>
                     <TableCell className="text-muted-foreground">

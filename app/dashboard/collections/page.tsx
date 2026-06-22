@@ -9,12 +9,14 @@ export interface CollectionFilters {
   search: string;
   statusIds: string[];
   attendants: string[];
+  products: string[];
 }
 
 const DEFAULT_FILTERS: CollectionFilters = {
   search: "",
   statusIds: [],
   attendants: [],
+  products: [],
 };
 
 export default function CollectionsPage() {

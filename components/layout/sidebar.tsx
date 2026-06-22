@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -30,6 +32,8 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { Profile, TeamPermissionKey } from "@/types";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -67,6 +71,10 @@ export function Sidebar({ profile }: SidebarProps) {
   const { hidden: valuesHidden, toggle: toggleValues } = useHideValues();
   const { isOwner, isMember, permissions, ownerName, isLoading } =
     useTeamPermissions();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = resolvedTheme !== "light";
 
   // Itens visiveis: dono ve tudo; membro ve apenas o que tem permissao.
   // "Equipe" e exclusivo do dono. Enquanto carrega, mostramos tudo (evita flash
@@ -236,6 +244,29 @@ export function Sidebar({ profile }: SidebarProps) {
                 {profile?.email}
               </p>
             </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTheme(isDark ? "light" : "dark")}
+                  className={cn(
+                    "h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground shrink-0",
+                    isCollapsed && "mx-auto"
+                  )}
+                  aria-label="Alternar tema"
+                >
+                  {mounted && !isDark ? (
+                    <Moon className="h-4 w-4" />
+                  ) : (
+                    <Sun className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {isDark ? "Tema claro" : "Tema escuro"}
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

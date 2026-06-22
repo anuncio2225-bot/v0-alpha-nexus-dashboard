@@ -31,6 +31,11 @@ export async function GET(request: Request) {
     .map((s) => s.trim())
     .filter(Boolean);
   const product = searchParams.get("product");
+  // Multi-selecao: lista de produtos (por nome) separados por virgula
+  const products = (searchParams.get("products") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -56,7 +61,8 @@ export async function GET(request: Request) {
       .join(",");
     query = query.or(ors);
   }
-  if (product) query = query.eq("product_name", product);
+  if (products.length > 0) query = query.in("product_name", products);
+  else if (product) query = query.eq("product_name", product);
   if (searchParams.get("has_schedule") === "1") {
     query = query.not("next_collection_date", "is", null);
   }

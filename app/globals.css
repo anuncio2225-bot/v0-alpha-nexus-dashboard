@@ -69,9 +69,67 @@
   --radius: 0.625rem;
 }
 
-/* Force dark mode always */
 .dark {
   color-scheme: dark;
+}
+
+/* ============================================================================
+   LIGHT THEME — neutros claros + marca esmeralda
+   ============================================================================ */
+.light {
+  color-scheme: light;
+
+  /* Background layers (lightest to slightly tinted) */
+  --background: #fafafa;
+  --card: #ffffff;
+  --card-elevated: #f4f4f5;
+
+  /* Foreground */
+  --foreground: #18181b;
+  --foreground-muted: #52525b;
+
+  /* Brand - Emerald (tom levemente mais escuro p/ contraste no claro) */
+  --brand: #059669;
+  --brand-foreground: #ffffff;
+  --brand-muted: rgba(16, 185, 129, 0.12);
+
+  /* Semantic colors */
+  --success: #16a34a;
+  --success-foreground: #f0fdf4;
+  --warning: #d97706;
+  --warning-foreground: #fffbeb;
+  --danger: #dc2626;
+  --danger-foreground: #fef2f2;
+
+  /* UI elements */
+  --border: #e4e4e7;
+  --border-muted: #efeff1;
+  --input: #ffffff;
+  --ring: #10b981;
+
+  /* Shadcn compatibility */
+  --primary: #059669;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #18181b;
+  --sidebar-primary: #059669;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #10b981;
 }
 
 @theme inline {
@@ -135,7 +193,6 @@
   
   html {
     @apply bg-background;
-    color-scheme: dark;
   }
   
   body {
@@ -238,7 +295,7 @@
 
   /* Glass card */
   .glass {
-    background: rgba(20, 20, 20, 0.7);
+    background: color-mix(in srgb, var(--card) 70%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     @apply border border-border/60;
