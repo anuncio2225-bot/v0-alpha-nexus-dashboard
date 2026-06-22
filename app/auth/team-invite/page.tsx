@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -15,7 +15,7 @@ interface InviteInfo {
   status: string;
 }
 
-export default function TeamInvitePage() {
+function TeamInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
@@ -192,5 +192,19 @@ export default function TeamInvitePage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function TeamInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <TeamInviteContent />
+    </Suspense>
   );
 }
