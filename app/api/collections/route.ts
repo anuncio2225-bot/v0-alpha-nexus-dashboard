@@ -17,8 +17,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
   const statusId = searchParams.get("status_id");
+  // Multi-selecao: lista de status_ids separados por virgula
+  const statusIds = (searchParams.get("status_ids") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const attendantId = searchParams.get("attendant_id");
   const attendant = searchParams.get("attendant")?.trim();
+  // Multi-selecao: lista de atendentes (por nome) separados por virgula
+  const attendants = (searchParams.get("attendants") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const product = searchParams.get("product");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
@@ -33,13 +43,17 @@ export async function GET(request: Request) {
     .select("*", { count: "exact" })
     .eq("user_id", user.id);
 
-  if (statusId) query = query.eq("status_id", statusId);
+  if (statusIds.length > 0) query = query.in("status_id", statusIds);
+  else if (statusId) query = query.eq("status_id", statusId);
   if (attendantId) query = query.eq("attendant_id", attendantId);
-  // Filtro por atendente identificado pelo nome (cobre cadastrados e SRCs)
-  if (attendant) {
-    query = query.or(
-      `attendant_name.eq.${attendant},src.eq.${attendant}`
-    );
+  // Filtro por atendente identificado pelo nome (cobre cadastrados e SRCs).
+  // Multi-selecao: aceita varios nomes via OR (attendant_name OU src).
+  const attNames = attendants.length > 0 ? attendants : attendant ? [attendant] : [];
+  if (attNames.length > 0) {
+    const ors = attNames
+      .flatMap((n) => [`attendant_name.eq.${n}`, `src.eq.${n}`])
+      .join(",");
+    query = query.or(ors);
   }
   if (product) query = query.eq("product_name", product);
   if (searchParams.get("has_schedule") === "1") {

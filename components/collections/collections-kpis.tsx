@@ -21,8 +21,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
   const query = new URLSearchParams();
   if (filters.search) query.set("search", filters.search);
-  if (filters.statusId !== "all") query.set("status_id", filters.statusId);
-  if (filters.attendant !== "all") query.set("attendant", filters.attendant);
+  if (filters.statusIds.length > 0)
+    query.set("status_ids", filters.statusIds.join(","));
+  if (filters.attendants.length > 0)
+    query.set("attendants", filters.attendants.join(","));
   const qs = query.toString();
 
   const { data, isLoading } = useSWR<{ metrics: CollectionMetrics }>(

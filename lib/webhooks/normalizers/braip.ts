@@ -465,8 +465,22 @@ export function normalizeBraip(
     pickFirst(payload, ["utm_campaign"]) || pickFirst(meta, ["utm_campaign"])
   );
 
+  // O atendente vem no parametro src/SRC. Pode estar direto no payload/meta ou,
+  // muito comum na Braip, embutido no link de checkout (ex.: "...&src=Bruna" ou
+  // "...&SRC=Gabriela"). Extraimos do link como fallback robusto.
+  const srcFromLink = (() => {
+    if (!paymentLink) return null;
+    const m = paymentLink.match(/[?&][sS][rR][cC]=([^&]+)/);
+    if (!m) return null;
+    try {
+      return decodeURIComponent(m[1]).replace(/[[\]]/g, "").trim() || null;
+    } catch {
+      return m[1].replace(/[[\]]/g, "").trim() || null;
+    }
+  })();
+
   const src = safeString(
-    pickFirst(payload, ["src"]) || pickFirst(meta, ["src"])
+    pickFirst(payload, ["src"]) || pickFirst(meta, ["src"]) || srcFromLink
   );
 
   const fbclid = safeString(
