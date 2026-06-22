@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 import { syncUser, tryAcquireSyncLock } from "@/lib/meta/sync";
 import type { InsightLevel } from "@/lib/meta/graph";
 
+// Importacao de historico pode ser longa: damos ate 300s para a funcao.
+// (A Vercel limita conforme o plano; valores acima do permitido sao reduzidos.)
+export const maxDuration = 300;
+
 // ============================================================================
 // /api/meta/sync — sync manual disparado pelo usuario.
 //
@@ -37,11 +41,15 @@ export async function POST(request: Request) {
         ? body.until
         : undefined;
 
+    // ID efetivo (dono da conta). Para donos = proprio id; membros = id do dono.
+    // Tudo (config, lock, contas, performance) e chaveado por esse id.
+    const effectiveId = await getEffectiveUserId(supabase, user.id);
+
     // Config + token
     const { data: config } = await supabase
       .from("meta_config")
       .select("access_token, is_connected, validation_status")
-      .eq("user_id", await getEffectiveUserId(supabase, user.id))
+      .eq("user_id", effectiveId)
       .single();
 
     if (!config?.is_connected || !config?.access_token) {
@@ -51,8 +59,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Lock de concorrencia
-    const acquired = await tryAcquireSyncLock(supabase, user.id);
+    // Lock de concorrencia (libera automaticamente locks presos/stale)
+    const acquired = await tryAcquireSyncLock(supabase, effectiveId);
     if (!acquired) {
       return NextResponse.json(
         { error: "Ja existe uma sincronizacao em andamento." },
@@ -61,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     const result = await syncUser(supabase, {
-      userId: user.id,
+      userId: effectiveId,
       token: config.access_token,
       level,
       lookbackDays,
@@ -78,7 +86,12 @@ export async function POST(request: Request) {
     // Garante que o status nao fique preso em 'syncing'
     await supabase
       .from("meta_config")
-      .update({ sync_status: "error", updated_at: new Date().toISOString() })
+      .update({
+        sync_status: "error",
+        sync_error:
+          error instanceof Error ? error.message : "Falha na sincronizacao.",
+        updated_at: new Date().toISOString(),
+      })
       .eq("user_id", await getEffectiveUserId(supabase, user.id));
     return NextResponse.json({ error: "Falha na sincronizacao." }, { status: 500 });
   }

@@ -7,6 +7,7 @@ import {
   MetaApiError,
   friendlyMetaMessage,
 } from "@/lib/meta/graph";
+import { isSyncLockStale } from "@/lib/meta/sync";
 
 // ============================================================================
 // /api/meta/connect — Conexao via System User Token (substitui o fluxo OAuth)
@@ -27,13 +28,32 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveId = await getEffectiveUserId(supabase, user.id);
   const { data: config } = await supabase
     .from("meta_config")
     .select(
-      "is_connected, connected_at, token_expires_at, validation_status, last_sync_at, sync_status, sync_error, app_id"
+      "is_connected, connected_at, token_expires_at, validation_status, last_sync_at, sync_status, sync_error, app_id, updated_at"
     )
-    .eq("user_id", await getEffectiveUserId(supabase, user.id))
+    .eq("user_id", effectiveId)
     .single();
+
+  // Auto-recuperacao: se um sync ficou preso em 'syncing' (timeout antigo),
+  // destravamos para a UI nao ficar eternamente em "Sincronizando...".
+  let syncStatus = config?.sync_status || "idle";
+  let syncError = config?.sync_error || null;
+  if (isSyncLockStale(config?.sync_status, config?.updated_at)) {
+    syncStatus = "error";
+    syncError =
+      "A ultima sincronizacao demorou demais e foi interrompida. Tente novamente (de preferencia importando periodos menores).";
+    await supabase
+      .from("meta_config")
+      .update({
+        sync_status: "error",
+        sync_error: syncError,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", effectiveId);
+  }
 
   return NextResponse.json({
     connected: config?.is_connected || false,
@@ -41,8 +61,8 @@ export async function GET() {
     expiresAt: config?.token_expires_at || null, // null = nunca expira
     validationStatus: config?.validation_status || null,
     lastSyncAt: config?.last_sync_at || null,
-    syncStatus: config?.sync_status || "idle",
-    syncError: config?.sync_error || null,
+    syncStatus,
+    syncError,
     appId: config?.app_id || null,
   });
 }
