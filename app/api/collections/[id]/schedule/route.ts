@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const body = await request.json();
-  const date: string | undefined = body.date;
+  const date: string | undefined = body.date || body.scheduled_date;
   if (!date) {
     return NextResponse.json({ error: "Data obrigatoria" }, { status: 400 });
   }

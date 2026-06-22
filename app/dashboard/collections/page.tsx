@@ -1,10 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { CollectionsTabs } from "@/components/collections/collections-tabs";
 import { CollectionsKpis } from "@/components/collections/collections-kpis";
 import { CollectionsBoard } from "@/components/collections/collections-board";
 
+export interface CollectionFilters {
+  search: string;
+  statusId: string;
+  attendant: string;
+}
+
+const DEFAULT_FILTERS: CollectionFilters = {
+  search: "",
+  statusId: "all",
+  attendant: "all",
+};
+
 export default function CollectionsPage() {
+  const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_FILTERS);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -17,8 +32,8 @@ export default function CollectionsPage() {
       </div>
 
       <CollectionsTabs />
-      <CollectionsKpis />
-      <CollectionsBoard />
+      <CollectionsKpis filters={filters} />
+      <CollectionsBoard filters={filters} onFiltersChange={setFilters} />
     </div>
   );
 }

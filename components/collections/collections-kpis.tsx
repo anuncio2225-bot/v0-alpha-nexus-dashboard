@@ -7,12 +7,19 @@ import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency } from "@/lib/utils";
 import type { CollectionMetrics } from "@/types";
 import { Wallet, CheckCircle2, CalendarClock, PhoneOff, TrendingUp } from "lucide-react";
+import type { CollectionFilters } from "@/app/dashboard/collections/page";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function CollectionsKpis() {
+export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
+  const query = new URLSearchParams();
+  if (filters.search) query.set("search", filters.search);
+  if (filters.statusId !== "all") query.set("status_id", filters.statusId);
+  if (filters.attendant !== "all") query.set("attendant", filters.attendant);
+  const qs = query.toString();
+
   const { data, isLoading } = useSWR<{ metrics: CollectionMetrics }>(
-    "/api/collections/metrics",
+    `/api/collections/metrics${qs ? `?${qs}` : ""}`,
     fetcher,
     { refreshInterval: 60000 }
   );

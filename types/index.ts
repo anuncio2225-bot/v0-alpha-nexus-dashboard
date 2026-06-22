@@ -480,6 +480,7 @@ export interface CollectionClient {
   document: string | null;
   product_name: string | null;
   product_id: string | null;
+  plan_name: string | null;
   platform_id: string | null;
   platform_name: string | null;
   attendant_id: string | null;
@@ -493,10 +494,15 @@ export interface CollectionClient {
   payment_link: string | null;
   status_id: string | null;
   status_name: string | null;
+  braip_status: string | null;
+  braip_status_code: number | null;
   order_date: string | null;
   negotiation_date: string | null;
   next_collection_date: string | null;
   tracking_code: string | null;
+  delivery_status: string | null;
+  shipping_company: string | null;
+  address_full: string | null;
   last_contact_at: string | null;
   days_without_response: number;
   notes: string | null;

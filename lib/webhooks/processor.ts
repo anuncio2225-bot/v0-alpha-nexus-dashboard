@@ -343,6 +343,9 @@ export async function processWebhook(
       currency: event.currency ?? "BRL",
 
       payment_method: event.payment_method || null,
+      payment_link: event.payment_link || null,
+      address_full: event.address_full || null,
+      shipping_company: event.shipping_company || null,
       sale_date: event.sale_date || new Date().toISOString(),
       payment_date:
         event.payment_date ||
@@ -423,10 +426,12 @@ export async function processWebhook(
         customer_doc: event.customer_doc || null,
         product_name: event.product_name || null,
         product_id: event.product_id || null,
+        plan_name: event.plan_name || null,
         gateway: event.gateway || null,
         src: event.src || null,
         attendant_id: null,
         status: event.status || null,
+        status_code: event.status_code || null,
         affiliate_commission: event.affiliate_commission ?? 0,
         commission: event.commission ?? 0,
         total_value: event.total_value ?? event.amount ?? 0,
@@ -434,7 +439,11 @@ export async function processWebhook(
         sale_date: event.sale_date || null,
         created_at: event.sale_date || new Date().toISOString(),
         payment_method: event.payment_method || null,
+        payment_link: event.payment_link || null,
         tracking_code: event.tracking_code || null,
+        shipping_status: event.shipping_status || null,
+        shipping_company: event.shipping_company || null,
+        address_full: event.address_full || null,
       };
 
       await supabase.rpc("seed_collection_defaults", { p_user_id: userId });

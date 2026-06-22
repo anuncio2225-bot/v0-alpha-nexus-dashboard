@@ -57,6 +57,7 @@ const BRAIP_PAYMENT_MAP: Record<string, string> = {
   // Numeric codes
   "1": "boleto",
   "2": "credit_card",
+  "3": "boleto", // boleto parcelado
   "5": "pix",
   "6": "cod", // cash on delivery
 
@@ -390,8 +391,49 @@ export function normalizeBraip(
   );
 
   const shippingStatus = safeString(
-    pickFirst(payload, ["shipping_status", "status_envio", "status_entrega"])
+    pickFirst(payload, [
+      "last_status_delivery",
+      "shipping_status",
+      "status_envio",
+      "status_entrega",
+      "delivery_status",
+    ])
   );
+
+  const shippingCompany = safeString(
+    pickFirst(payload, [
+      "shipping_company",
+      "transportadora",
+      "carrier",
+      "shipping_carrier",
+    ])
+  );
+
+  // Link de pagamento (ESSENCIAL: usado no WhatsApp para o cliente pagar)
+  const paymentLink = safeString(
+    pickFirst(payload, [
+      "trans_payment_link_checkout",
+      "payment_link",
+      "checkout_url",
+      "payment_url",
+      "link_pagamento",
+      "url_checkout",
+    ])
+  );
+
+  // Endereco completo - monta a partir de campos comuns da Braip se houver
+  const addressParts = [
+    pickFirst(payload, ["client_address", "address", "endereco", "client_street"]),
+    pickFirst(payload, ["client_address_number", "address_number", "numero"]),
+    pickFirst(payload, ["client_address_comp", "address_complement", "complemento"]),
+    pickFirst(payload, ["client_neighborhood", "neighborhood", "bairro"]),
+    pickFirst(payload, ["client_city", "city", "cidade"]),
+    pickFirst(payload, ["client_state", "state", "uf", "estado"]),
+    pickFirst(payload, ["client_zip_code", "zip_code", "cep"]),
+  ]
+    .map((v) => safeString(v))
+    .filter(Boolean);
+  const addressFull = addressParts.join(", ");
 
   // UTM / Source tracking (can be nested in meta)
   const meta = (payload.meta || {}) as Record<string, unknown>;
@@ -440,6 +482,9 @@ export function normalizeBraip(
     currency: "BRL",
 
     payment_method: normalizePayment(rawPayment) || undefined,
+    payment_link: paymentLink || undefined,
+
+    address_full: addressFull || undefined,
 
     sale_date: saleDate || undefined,
     payment_date: paymentDate || undefined,
@@ -448,6 +493,7 @@ export function normalizeBraip(
     tracking_code: trackingCode || undefined,
     tracking_url: trackingUrl || undefined,
     shipping_status: shippingStatus || undefined,
+    shipping_company: shippingCompany || undefined,
 
     utm_source: utmSource || undefined,
     utm_campaign: utmCampaign || undefined,

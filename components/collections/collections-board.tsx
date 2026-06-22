@@ -31,6 +31,7 @@ import {
   LayoutGrid,
   TableIcon,
   PhoneCall,
+  MessageCircle,
 } from "lucide-react";
 import type {
   CollectionClient,
@@ -39,6 +40,8 @@ import type {
 } from "@/types";
 import { StatusBadge } from "./status-badge";
 import { AttendantBadge } from "./attendant-badge";
+import { buildWhatsappUrl } from "@/lib/collections/whatsapp";
+import type { CollectionFilters } from "@/app/dashboard/collections/page";
 import { NewClientDialog } from "./new-client-dialog";
 import { CollectionsKanban } from "./collections-kanban";
 import { ClientDrawer } from "./client-drawer";
@@ -51,14 +54,29 @@ interface SuggestionsResponse {
   payment_methods: string[];
 }
 
-export function CollectionsBoard() {
+interface CollectionsBoardProps {
+  filters: CollectionFilters;
+  onFiltersChange: (
+    updater: (prev: CollectionFilters) => CollectionFilters
+  ) => void;
+}
+
+export function CollectionsBoard({
+  filters,
+  onFiltersChange,
+}: CollectionsBoardProps) {
   const [view, setView] = useState<"table" | "kanban">("table");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [attendantFilter, setAttendantFilter] = useState<string>("all");
   const [newOpen, setNewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const { search, statusId: statusFilter, attendant: attendantFilter } = filters;
+  const setSearch = (v: string) =>
+    onFiltersChange((p) => ({ ...p, search: v }));
+  const setStatusFilter = (v: string) =>
+    onFiltersChange((p) => ({ ...p, statusId: v }));
+  const setAttendantFilter = (v: string) =>
+    onFiltersChange((p) => ({ ...p, attendant: v }));
 
   const query = new URLSearchParams();
   if (search) query.set("search", search);
@@ -251,11 +269,13 @@ export function CollectionsBoard() {
                   <TableHead>Atendente</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Produto</TableHead>
+                  <TableHead>Pedido</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Pago</TableHead>
                   <TableHead className="text-right">Pendente</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Próx. Cobrança</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -285,6 +305,11 @@ export function CollectionsBoard() {
                     <TableCell className="max-w-[180px] truncate text-muted-foreground">
                       {c.product_name || "—"}
                     </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {c.order_date
+                        ? new Date(c.order_date).toLocaleDateString("pt-BR")
+                        : "—"}
+                    </TableCell>
                     <TableCell className="text-right">
                       <SensitiveValue>{formatCurrency(Number(c.total_value) || 0)}</SensitiveValue>
                     </TableCell>
@@ -312,6 +337,24 @@ export function CollectionsBoard() {
                       {c.next_collection_date
                         ? new Date(c.next_collection_date + "T00:00:00").toLocaleDateString("pt-BR")
                         : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {c.phone && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-8 text-success hover:text-success"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = buildWhatsappUrl(c);
+                            if (url) window.open(url, "_blank");
+                          }}
+                          title="Enviar WhatsApp"
+                        >
+                          <MessageCircle className="size-4" />
+                          <span className="sr-only">Enviar WhatsApp</span>
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                   );
