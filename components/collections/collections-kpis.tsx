@@ -6,7 +6,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency } from "@/lib/utils";
 import type { CollectionMetrics } from "@/types";
-import { Wallet, CheckCircle2, CalendarClock, PhoneOff, TrendingUp } from "lucide-react";
+import {
+  Wallet,
+  CheckCircle2,
+  CalendarClock,
+  CalendarCheck,
+  PhoneOff,
+  TrendingUp,
+} from "lucide-react";
 import type { CollectionFilters } from "@/app/dashboard/collections/page";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -47,6 +54,12 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
       color: "text-warn",
     },
     {
+      label: "Agendados (Braip)",
+      value: m ? String(m.braip_scheduled_count ?? 0) : "—",
+      icon: CalendarCheck,
+      color: "text-brand",
+    },
+    {
       label: "Sem resposta +3d",
       value: m ? String(m.no_response_count) : "—",
       icon: PhoneOff,
@@ -61,7 +74,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
       {items.map((it) => (
         <Card key={it.label} className="bg-card border-border p-4">
           <div className="flex items-center justify-between">

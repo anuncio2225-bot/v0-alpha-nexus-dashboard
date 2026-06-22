@@ -119,8 +119,13 @@ export function CollectionsBoard({
       const res = await fetch("/api/collections/import", { method: "POST" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      if (json.imported > 0) {
-        toast.success(`${json.imported} cliente(s) importado(s) do webhook`);
+      const importedCount = json.imported || 0;
+      const updatedCount = json.updated || 0;
+      if (importedCount > 0 || updatedCount > 0) {
+        const parts: string[] = [];
+        if (importedCount > 0) parts.push(`${importedCount} novo(s)`);
+        if (updatedCount > 0) parts.push(`${updatedCount} atualizado(s)`);
+        toast.success(`Sincronizado: ${parts.join(" e ")}`);
         mutate();
       } else {
         toast.info("Nenhuma transação encontrada para importar");
@@ -185,7 +190,13 @@ export function CollectionsBoard({
                 <SelectItem value="all">Todos os status</SelectItem>
                 {statuses.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name}
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block size-2.5 rounded-full"
+                        style={{ backgroundColor: s.color }}
+                      />
+                      {s.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

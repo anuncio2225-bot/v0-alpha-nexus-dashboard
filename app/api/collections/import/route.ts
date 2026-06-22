@@ -6,9 +6,11 @@ import {
   syncTransactionToCollection,
 } from "@/lib/collections/sync";
 
-// POST /api/collections/import — importa TODAS as transacoes para a cobranca
-// (independente de sale_type/status). Nao duplica: pula as que ja possuem
-// um collection_client vinculado pelo transaction_id.
+// POST /api/collections/import — importa/atualiza TODAS as transacoes para a
+// cobranca (independente de sale_type/status). Nao duplica (vinculo por
+// transaction_id): cria os novos e ATUALIZA os existentes que estao com dados
+// faltando (telefone, email, CPF, link de pagamento, atendente, etc.), sem
+// sobrescrever status manual nem dados ja preenchidos.
 export async function POST() {
   const supabase = await createClient();
   const {
@@ -36,27 +38,17 @@ export async function POST() {
     return NextResponse.json({ imported: 0 });
   }
 
-  // Transacoes ja vinculadas (para nao duplicar)
-  const { data: existing } = await supabase
-    .from("collection_clients")
-    .select("transaction_id")
-    .eq("user_id", user.id)
-    .not("transaction_id", "is", null);
-  const linked = new Set((existing || []).map((c) => c.transaction_id));
-
-  const pending = txs.filter((t) => !linked.has(t.id));
-  if (pending.length === 0) {
-    return NextResponse.json({ imported: 0 });
-  }
-
   // Mapas compartilhados (status por nome, atendentes por nome)
   const [statusMap, attMap] = await Promise.all([
     buildStatusMap(supabase, user.id),
     buildAttendantMap(supabase, user.id),
   ]);
 
+  // Processa TODAS as transacoes: o sync cria os novos e atualiza os existentes
+  // (preenchendo campos faltantes) sem duplicar nem sobrescrever status manual.
   let imported = 0;
-  for (const t of pending) {
+  let updated = 0;
+  for (const t of txs) {
     const res = await syncTransactionToCollection(
       supabase,
       user.id,
@@ -65,7 +57,8 @@ export async function POST() {
       attMap
     );
     if (res === "inserted") imported++;
+    else if (res === "updated") updated++;
   }
 
-  return NextResponse.json({ imported });
+  return NextResponse.json({ imported, updated });
 }

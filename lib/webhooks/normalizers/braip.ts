@@ -283,29 +283,48 @@ export function normalizeBraip(
   >;
 
   const customerName = safeString(
-    pickFirst(payload, ["client_name", "customer_name", "nome_cliente"]) ||
-      pickFirst(customer, ["name", "nome", "full_name"])
+    pickFirst(payload, [
+      "client_name",
+      "customer_name",
+      "customer.name",
+      "nome_cliente",
+    ]) || pickFirst(customer, ["name", "nome", "full_name"])
   );
-
+  
   const customerEmail = safeString(
-    pickFirst(payload, ["client_email", "customer_email", "email_cliente"]) ||
-      pickFirst(customer, ["email"])
+    pickFirst(payload, [
+      "client_email",
+      "customer_email",
+      "customer.email",
+      "email_cliente",
+    ]) || pickFirst(customer, ["email"])
   );
 
   const customerPhone = safeString(
     pickFirst(payload, [
+      "client_cel", // campo REAL da Braip (celular do cliente)
       "client_phone",
+      "client_tel",
       "customer_phone",
+      "customer.phone", // formato novo (chave achatada)
       "telefone_cliente",
       "phone",
       "telefone",
       "celular",
-    ]) || pickFirst(customer, ["phone", "telefone", "celular"])
+    ]) || pickFirst(customer, ["phone", "telefone", "celular", "cel"])
   );
 
   const customerDoc = safeString(
-    pickFirst(payload, ["client_doc", "cpf", "document", "doc", "cpf_cliente"]) ||
-      pickFirst(customer, ["doc", "cpf", "document"])
+    pickFirst(payload, [
+      "client_documment", // campo REAL da Braip (CPF/CNPJ) - grafia com 2 m
+      "client_document",
+      "client_doc",
+      "customer.doc", // formato novo (chave achatada)
+      "cpf",
+      "document",
+      "doc",
+      "cpf_cliente",
+    ]) || pickFirst(customer, ["doc", "cpf", "document"])
   );
 
   // Payment method

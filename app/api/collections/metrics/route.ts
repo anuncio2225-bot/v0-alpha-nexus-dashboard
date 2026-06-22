@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   let clientsQuery = supabase
     .from("collection_clients")
     .select(
-      "id, status_name, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
+      "id, status_name, braip_status, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
     .eq("user_id", user.id);
 
@@ -97,6 +97,17 @@ export async function GET(request: Request) {
   const totalValue = list.reduce((s, c) => s + (Number(c.total_value) || 0), 0);
   const recoveryRate = totalValue > 0 ? (totalReceived / totalValue) * 100 : 0;
 
+  // "Agendado" = status do proprio sistema da Braip (igual ao dashboard principal).
+  // Conta clientes cujo braip_status normalizado e "Agendado".
+  const scheduledBraip = list.filter(
+    (c) => (c.braip_status || "").toLowerCase() === "agendado"
+  );
+  const scheduledBraipCount = scheduledBraip.length;
+  const scheduledBraipValue = scheduledBraip.reduce(
+    (s, c) => s + (Number(c.remaining_value) || 0),
+    0
+  );
+
   // Agrupamentos
   const byStatus: Record<string, { count: number; value: number }> = {};
   const byAttendant: Record<string, { count: number; pending: number; received: number }> =
@@ -133,6 +144,8 @@ export async function GET(request: Request) {
       total_due_today: totalDueToday,
       received_today: receivedToday,
       scheduled_today: dueToday.length,
+      braip_scheduled_count: scheduledBraipCount,
+      braip_scheduled_value: scheduledBraipValue,
       no_response_count: noResponse.length,
       recovery_rate: recoveryRate,
       total_clients: list.length,
