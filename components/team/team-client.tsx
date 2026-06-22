@@ -27,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -47,7 +48,7 @@ import {
   UserPlus,
   MoreHorizontal,
   Pencil,
-  Ban,
+  Trash2,
   Users,
   Clock,
   Activity,
@@ -387,15 +388,14 @@ export function TeamClient() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar acesso
                           </DropdownMenuItem>
-                          {m.status !== "revoked" && (
-                            <DropdownMenuItem
-                              onClick={() => setRevokeTarget(m)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Ban className="mr-2 h-4 w-4" />
-                              Remover membro
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setRevokeTarget(m)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Apagar membro
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
