@@ -5,20 +5,40 @@ import { Card } from "@/components/ui/card";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { CollectionClient, CollectionStatus } from "@/types";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, GripVertical } from "lucide-react";
 
 interface KanbanProps {
   clients: CollectionClient[];
   statuses: CollectionStatus[];
   onCardClick: (client: CollectionClient) => void;
   onMove: (clientId: string, statusId: string) => void;
+  onReorder?: (orderedIds: string[]) => void;
 }
 
-export function CollectionsKanban({ clients, statuses, onCardClick, onMove }: KanbanProps) {
+export function CollectionsKanban({
+  clients,
+  statuses,
+  onCardClick,
+  onMove,
+  onReorder,
+}: KanbanProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  // Drag de COLUNA (reordenacao) — separado do drag de card
+  const [dragColId, setDragColId] = useState<string | null>(null);
+  const [overColHeader, setOverColHeader] = useState<string | null>(null);
 
   const ordered = [...statuses].sort((a, b) => a.position - b.position);
+
+  function reorderColumns(fromId: string, toId: string) {
+    if (fromId === toId || !onReorder) return;
+    const ids = ordered.map((s) => s.id);
+    const fromIdx = ids.indexOf(fromId);
+    const toIdx = ids.indexOf(toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
+    onReorder(ids);
+  }
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-4">
@@ -33,21 +53,50 @@ export function CollectionsKanban({ clients, statuses, onCardClick, onMove }: Ka
             key={status.id}
             className={cn(
               "flex w-72 shrink-0 flex-col rounded-lg border bg-card/50 transition-colors",
-              overCol === status.id ? "border-brand" : "border-border"
+              overCol === status.id && "border-brand",
+              overColHeader === status.id && "border-brand border-dashed",
+              !overCol && overColHeader !== status.id && "border-border"
             )}
             onDragOver={(e) => {
               e.preventDefault();
-              setOverCol(status.id);
+              if (dragColId) setOverColHeader(status.id);
+              else setOverCol(status.id);
             }}
-            onDragLeave={() => setOverCol((c) => (c === status.id ? null : c))}
+            onDragLeave={() => {
+              setOverCol((c) => (c === status.id ? null : c));
+              setOverColHeader((c) => (c === status.id ? null : c));
+            }}
             onDrop={() => {
-              if (dragId) onMove(dragId, status.id);
+              if (dragColId) {
+                reorderColumns(dragColId, status.id);
+              } else if (dragId) {
+                onMove(dragId, status.id);
+              }
               setDragId(null);
+              setDragColId(null);
               setOverCol(null);
+              setOverColHeader(null);
             }}
           >
-            <div className="flex items-center justify-between border-b border-border p-3">
+            <div
+              draggable={!!onReorder}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                setDragColId(status.id);
+              }}
+              onDragEnd={() => {
+                setDragColId(null);
+                setOverColHeader(null);
+              }}
+              className={cn(
+                "flex items-center justify-between border-b border-border p-3",
+                onReorder && "cursor-grab active:cursor-grabbing"
+              )}
+            >
               <div className="flex items-center gap-2">
+                {onReorder && (
+                  <GripVertical className="size-3.5 text-muted-foreground/50" />
+                )}
                 <span
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: status.color }}

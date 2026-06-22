@@ -71,7 +71,11 @@ export function buildWhatsappMessage(client: CollectionClient): string {
   const produto = [client.product_name, client.plan_name]
     .filter(Boolean)
     .join(" - ");
-  const pendente = brl(client.remaining_value);
+  // Mensagens de cobranca usam o VALOR CHEIO do kit (o quanto o cliente paga),
+  // nao a comissao do afiliado. Cai para remaining_value se nao houver valor cheio.
+  const valorCobranca =
+    Number(client.order_total_value) || Number(client.remaining_value) || 0;
+  const pendente = brl(valorCobranca);
   const pago = brl(client.paid_value);
   const link = client.payment_link?.trim() || "";
   const rastreio = client.tracking_code?.trim() || "";

@@ -488,6 +488,7 @@ export interface CollectionClient {
   src: string | null;
   transaction_id: string | null;
   total_value: number;
+  order_total_value: number | null;
   paid_value: number;
   remaining_value: number;
   payment_method: string | null;
