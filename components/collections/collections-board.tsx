@@ -15,13 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency, cn } from "@/lib/utils";
 import {
@@ -42,6 +35,7 @@ import { StatusBadge } from "./status-badge";
 import { AttendantBadge } from "./attendant-badge";
 import { buildWhatsappUrl } from "@/lib/collections/whatsapp";
 import type { CollectionFilters } from "@/app/dashboard/collections/page";
+import { MultiSelectFilter } from "./multi-select-filter";
 import { NewClientDialog } from "./new-client-dialog";
 import { CollectionsKanban } from "./collections-kanban";
 import { ClientDrawer } from "./client-drawer";
@@ -70,18 +64,19 @@ export function CollectionsBoard({
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { search, statusId: statusFilter, attendant: attendantFilter } = filters;
+  const { search, statusIds, attendants: attendantFilters } = filters;
   const setSearch = (v: string) =>
     onFiltersChange((p) => ({ ...p, search: v }));
-  const setStatusFilter = (v: string) =>
-    onFiltersChange((p) => ({ ...p, statusId: v }));
-  const setAttendantFilter = (v: string) =>
-    onFiltersChange((p) => ({ ...p, attendant: v }));
+  const setStatusIds = (v: string[]) =>
+    onFiltersChange((p) => ({ ...p, statusIds: v }));
+  const setAttendantFilters = (v: string[]) =>
+    onFiltersChange((p) => ({ ...p, attendants: v }));
 
   const query = new URLSearchParams();
   if (search) query.set("search", search);
-  if (statusFilter !== "all") query.set("status_id", statusFilter);
-  if (attendantFilter !== "all") query.set("attendant", attendantFilter);
+  if (statusIds.length > 0) query.set("status_ids", statusIds.join(","));
+  if (attendantFilters.length > 0)
+    query.set("attendants", attendantFilters.join(","));
   query.set("page_size", "200");
 
   const { data, isLoading, mutate } = useSWR<{
@@ -209,38 +204,27 @@ export function CollectionsBoard({
                 className="bg-card-elevated border-border pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="bg-card-elevated border-border sm:w-44">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {statuses.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block size-2.5 rounded-full"
-                        style={{ backgroundColor: s.color }}
-                      />
-                      {s.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={attendantFilter} onValueChange={setAttendantFilter}>
-              <SelectTrigger className="bg-card-elevated border-border sm:w-44">
-                <SelectValue placeholder="Atendente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos atendentes</SelectItem>
-                {attendants.map((a) => (
-                  <SelectItem key={a.id ? `id:${a.id}` : `src:${a.name}`} value={a.name}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              placeholder="Status"
+              className="sm:w-44"
+              selected={statusIds}
+              onChange={setStatusIds}
+              options={statuses.map((s) => ({
+                value: s.id,
+                label: s.name,
+                color: s.color,
+              }))}
+            />
+            <MultiSelectFilter
+              placeholder="Atendente"
+              className="sm:w-44"
+              selected={attendantFilters}
+              onChange={setAttendantFilters}
+              options={attendants.map((a) => ({
+                value: a.name,
+                label: a.name,
+              }))}
+            />
           </div>
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-border p-0.5">

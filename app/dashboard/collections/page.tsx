@@ -7,14 +7,14 @@ import { CollectionsBoard } from "@/components/collections/collections-board";
 
 export interface CollectionFilters {
   search: string;
-  statusId: string;
-  attendant: string;
+  statusIds: string[];
+  attendants: string[];
 }
 
 const DEFAULT_FILTERS: CollectionFilters = {
   search: "",
-  statusId: "all",
-  attendant: "all",
+  statusIds: [],
+  attendants: [],
 };
 
 export default function CollectionsPage() {

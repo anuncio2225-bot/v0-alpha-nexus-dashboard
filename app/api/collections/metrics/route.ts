@@ -26,7 +26,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
   const statusId = searchParams.get("status_id");
+  const statusIds = (searchParams.get("status_ids") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const attendant = searchParams.get("attendant")?.trim();
+  const attendants = (searchParams.get("attendants") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const product = searchParams.get("product")?.trim();
 
   const today = todaySaoPaulo();
@@ -38,10 +46,14 @@ export async function GET(request: Request) {
     )
     .eq("user_id", user.id);
 
-  if (statusId) clientsQuery = clientsQuery.eq("status_id", statusId);
-  if (attendant) {
+  if (statusIds.length > 0) clientsQuery = clientsQuery.in("status_id", statusIds);
+  else if (statusId) clientsQuery = clientsQuery.eq("status_id", statusId);
+  const attNames = attendants.length > 0 ? attendants : attendant ? [attendant] : [];
+  if (attNames.length > 0) {
     clientsQuery = clientsQuery.or(
-      `attendant_name.eq.${attendant},src.eq.${attendant}`
+      attNames
+        .flatMap((n) => [`attendant_name.eq.${n}`, `src.eq.${n}`])
+        .join(",")
     );
   }
   if (product) clientsQuery = clientsQuery.eq("product_name", product);
