@@ -198,6 +198,25 @@ export async function syncUser(
   return result;
 }
 
+/**
+ * Tempo (min) apos o qual um lock 'syncing' e considerado "preso" (stale).
+ * Se uma sincronizacao estourar o tempo limite da funcao serverless, o status
+ * nunca volta para 'idle'. Passado esse limite, liberamos o lock automaticamente
+ * para a UI nao ficar travada em "Sincronizando..." para sempre.
+ */
+export const STALE_LOCK_MINUTES = 10;
+
+/** Verdadeiro se o lock 'syncing' esta preso ha mais de STALE_LOCK_MINUTES. */
+export function isSyncLockStale(
+  syncStatus: string | null | undefined,
+  updatedAt: string | null | undefined
+): boolean {
+  if (syncStatus !== "syncing") return false;
+  if (!updatedAt) return true; // sem timestamp confiavel => tratar como preso
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  return ageMs > STALE_LOCK_MINUTES * 60 * 1000;
+}
+
 /** Marca sync_status='syncing' apenas se nao houver outro em andamento. */
 export async function tryAcquireSyncLock(
   supabase: SupabaseLike,
@@ -205,11 +224,16 @@ export async function tryAcquireSyncLock(
 ): Promise<boolean> {
   const { data: config } = await supabase
     .from("meta_config")
-    .select("sync_status")
+    .select("sync_status, updated_at")
     .eq("user_id", userId)
     .single();
 
-  if (config?.sync_status === "syncing") {
+  // Lock em andamento e ainda fresco => nao adquire (evita sync concorrente).
+  // Lock preso (stale) => liberamos e seguimos, recuperando de timeouts antigos.
+  if (
+    config?.sync_status === "syncing" &&
+    !isSyncLockStale(config.sync_status, config.updated_at)
+  ) {
     return false;
   }
 

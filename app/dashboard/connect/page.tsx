@@ -72,11 +72,16 @@ export default function ConnectPage() {
   const [appId, setAppId] = useState("");
   const [showToken, setShowToken] = useState(false);
 
-  // Status da conexao tambem alimenta o estado de sync (polling leve a cada 60s)
+  // Status da conexao tambem alimenta o estado de sync.
+  // Enquanto sincroniza, sondamos rapido (5s) para refletir o fim do sync;
+  // ocioso, sondamos devagar (60s).
   const { data: metaStatus, mutate: mutateStatus } = useSWR(
     "/api/meta/connect",
     fetcher,
-    { refreshInterval: 60000 }
+    {
+      refreshInterval: (latest) =>
+        latest?.syncStatus === "syncing" ? 5000 : 60000,
+    }
   );
   const { data: accountsData, mutate: mutateAccounts } = useSWR(
     metaStatus?.connected ? "/api/meta/accounts" : null,

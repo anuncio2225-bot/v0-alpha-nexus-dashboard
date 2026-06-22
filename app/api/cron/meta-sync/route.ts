@@ -2,6 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { syncUser } from "@/lib/meta/sync";
 
+// O cron percorre todos os usuarios; damos mais tempo para concluir.
+export const maxDuration = 300;
+
 // ============================================================================
 // /api/cron/meta-sync — Vercel Cron que sincroniza o Meta de todos os usuarios.
 //
