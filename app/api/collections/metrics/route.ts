@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeamDataScope } from "@/lib/team/scope";
+import { getEffectiveUserId, getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // Data de "hoje" no fuso de Sao Paulo (YYYY-MM-DD)

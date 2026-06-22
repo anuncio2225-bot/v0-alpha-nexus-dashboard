@@ -385,21 +385,15 @@ export function TeamClient() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEdit(m)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Editar permissões
+                            Editar acesso
                           </DropdownMenuItem>
-                          {m.status === "pending" && (
-                            <DropdownMenuItem onClick={() => copyInviteLink(m)}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Copiar link de convite
-                            </DropdownMenuItem>
-                          )}
                           {m.status !== "revoked" && (
                             <DropdownMenuItem
                               onClick={() => setRevokeTarget(m)}
                               className="text-destructive focus:text-destructive"
                             >
                               <Ban className="mr-2 h-4 w-4" />
-                              Revogar acesso
+                              Remover membro
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
@@ -417,10 +411,10 @@ export function TeamClient() {
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Convidar membro</DialogTitle>
+            <DialogTitle>Adicionar membro</DialogTitle>
             <DialogDescription>
-              O convidado faz login com a própria conta e vê os dados da sua
-              conta, conforme as permissões escolhidas.
+              Você define o email e a senha. A pessoa entra direto pela tela de
+              login e vê os dados da sua conta, conforme as permissões abaixo.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -443,14 +437,46 @@ export function TeamClient() {
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <PermissionsForm value={form} onChange={setForm} />
+            <div className="space-y-2">
+              <Label htmlFor="invite-password">Senha de acesso</Label>
+              <div className="relative">
+                <Input
+                  id="invite-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Informe essa senha à pessoa. Ela poderá alterá-la depois.
+              </p>
+            </div>
+            <PermissionsForm
+              value={form}
+              onChange={setForm}
+              attendantOptions={attendantOptions}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleInvite} disabled={submitting}>
-              {submitting ? "Criando..." : "Criar convite"}
+              {submitting ? "Criando..." : "Criar acesso"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -460,12 +486,43 @@ export function TeamClient() {
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Editar permissões</DialogTitle>
+            <DialogTitle>Editar acesso</DialogTitle>
             <DialogDescription>
               {editTarget?.invited_email}
             </DialogDescription>
           </DialogHeader>
-          <PermissionsForm value={editForm} onChange={setEditForm} />
+          <div className="space-y-4">
+            <PermissionsForm
+              value={editForm}
+              onChange={setEditForm}
+              attendantOptions={attendantOptions}
+            />
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label htmlFor="edit-password">Redefinir senha (opcional)</Label>
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Deixe em branco para manter a atual"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)}>
               Cancelar
@@ -484,10 +541,11 @@ export function TeamClient() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revogar acesso?</AlertDialogTitle>
+            <AlertDialogTitle>Remover membro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza? {revokeTarget?.invited_name || revokeTarget?.invited_email}{" "}
-              perderá todo o acesso imediatamente.
+              {revokeTarget?.invited_name || revokeTarget?.invited_email} perderá
+              o acesso imediatamente e o email será liberado para criar uma conta
+              própria. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -496,7 +554,7 @@ export function TeamClient() {
               onClick={handleRevoke}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Revogar
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
