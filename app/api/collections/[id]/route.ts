@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -18,7 +19,7 @@ export async function GET(_request: Request, { params }: Params) {
     .from("collection_clients")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (error) {
@@ -46,7 +47,7 @@ export async function PATCH(request: Request, { params }: Params) {
     .from("collection_clients")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (!current) {
@@ -102,7 +103,7 @@ export async function PATCH(request: Request, { params }: Params) {
       .from("collection_statuses")
       .select("name")
       .eq("id", body.status_id)
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
     newStatusName = st?.name || null;
     updates.status_name = newStatusName;
@@ -112,7 +113,7 @@ export async function PATCH(request: Request, { params }: Params) {
     .from("collection_clients")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -123,7 +124,7 @@ export async function PATCH(request: Request, { params }: Params) {
   // Registra mudanca de status no historico
   if (statusChanged) {
     await supabase.from("collection_history").insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       client_id: id,
       type: "status_change",
       description: `Status alterado para ${newStatusName || "—"}`,
@@ -154,13 +155,13 @@ export async function DELETE(_request: Request, { params }: Params) {
     .from("collection_history")
     .delete()
     .eq("client_id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   const { error } = await supabase
     .from("collection_clients")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

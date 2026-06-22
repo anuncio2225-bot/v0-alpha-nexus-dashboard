@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { syncUser, tryAcquireSyncLock } from "@/lib/meta/sync";
 import type { InsightLevel } from "@/lib/meta/graph";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     const { data: config } = await supabase
       .from("meta_config")
       .select("access_token, is_connected, validation_status")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
 
     if (!config?.is_connected || !config?.access_token) {
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     await supabase
       .from("meta_config")
       .update({ sync_status: "error", updated_at: new Date().toISOString() })
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
     return NextResponse.json({ error: "Falha na sincronizacao." }, { status: 500 });
   }
 }
@@ -97,7 +98,7 @@ export async function GET() {
   const { data: config } = await supabase
     .from("meta_config")
     .select("last_sync_at, sync_status, sync_error")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   return NextResponse.json({

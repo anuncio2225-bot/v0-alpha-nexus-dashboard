@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("bank_accounts")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("position", { ascending: true })
     .order("name", { ascending: true });
 
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   const { data: maxPosData } = await supabase
     .from("bank_accounts")
     .select("position")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("position", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("bank_accounts")
     .insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       name,
       bank_name,
       account_type: account_type || "checking",
@@ -98,13 +99,13 @@ export async function PATCH(request: Request) {
       .from("bank_accounts")
       .select("balance")
       .eq("id", id)
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
 
     if (current && Number(current.balance) !== Number(balance)) {
       await supabase.from("account_balance_logs").insert({
         account_id: id,
-        user_id: user.id,
+        user_id: await getEffectiveUserId(supabase, user.id),
         old_balance: Number(current.balance),
         new_balance: Number(balance),
       });
@@ -125,7 +126,7 @@ export async function PATCH(request: Request) {
     .from("bank_accounts")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -157,7 +158,7 @@ export async function DELETE(request: Request) {
     .from("bank_accounts")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -17,7 +18,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     .from("collection_calendar_emails")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

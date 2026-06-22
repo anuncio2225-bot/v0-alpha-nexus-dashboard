@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // GET /api/collections — lista clientes com filtros e paginacao
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   }
 
   // Garante que os status/plataformas padrao existam para o usuario
-  await supabase.rpc("seed_collection_defaults", { p_user_id: user.id });
+  await supabase.rpc("seed_collection_defaults", { p_user_id: await getEffectiveUserId(supabase, user.id) });
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("collection_clients")
     .select("*", { count: "exact" })
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (statusIds.length > 0) query = query.in("status_id", statusIds);
   else if (statusId) query = query.eq("status_id", statusId);
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
       .from("collection_statuses")
       .select("name")
       .eq("id", body.status_id)
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
     statusName = st?.name || null;
   }
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
       .from("collection_platforms")
       .select("name")
       .eq("id", body.platform_id)
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
     platformName = pl?.name || null;
   }
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       .from("attendants")
       .select("name")
       .eq("id", body.attendant_id)
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
     attendantName = at?.name || null;
   }
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("collection_clients")
     .insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       name: body.name,
       phone: body.phone || null,
       email: body.email || null,

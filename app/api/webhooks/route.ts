@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { randomBytes } from "crypto";
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("webhooks")
     .select("id, name, product_name, source, token, is_active, operational_type, created_at, updated_at")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("webhooks")
     .insert({
-      user_id: user.id,
+      user_id: await getEffectiveUserId(supabase, user.id),
       name,
       product_name,
       source,

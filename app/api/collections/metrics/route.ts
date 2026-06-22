@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // Data de "hoje" no fuso de Sao Paulo (YYYY-MM-DD)
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
     .select(
       "id, status_name, braip_status, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (statusIds.length > 0) clientsQuery = clientsQuery.in("status_id", statusIds);
   else if (statusId) clientsQuery = clientsQuery.eq("status_id", statusId);
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
     const { data } = await supabase
       .from("collection_history")
       .select("payment_amount, created_at, client_id")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("type", "payment")
       .in("client_id", clientIds)
       .gte("created_at", `${today}T00:00:00`)

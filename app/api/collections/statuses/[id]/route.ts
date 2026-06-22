@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -23,7 +24,7 @@ export async function PATCH(request: Request, { params }: Params) {
     .from("collection_statuses")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
     .single();
 
@@ -36,7 +37,7 @@ export async function PATCH(request: Request, { params }: Params) {
     await supabase
       .from("collection_clients")
       .update({ status_name: body.name })
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("status_id", id);
   }
 
@@ -57,7 +58,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     .from("collection_statuses")
     .select("is_system")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (status?.is_system) {
@@ -71,7 +72,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     .from("collection_statuses")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

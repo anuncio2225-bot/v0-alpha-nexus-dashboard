@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
   buildAttendantMap,
@@ -20,7 +21,7 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await supabase.rpc("seed_collection_defaults", { p_user_id: user.id });
+  await supabase.rpc("seed_collection_defaults", { p_user_id: await getEffectiveUserId(supabase, user.id) });
 
   // Busca TODAS as transacoes do usuario (qualquer status / sale_type)
   const { data: txs, error: txErr } = await supabase
@@ -28,7 +29,7 @@ export async function POST() {
     .select(
       "id, customer_name, customer_phone, customer_email, customer_doc, product_name, product_id, plan_name, commission, affiliate_commission, total_value, amount, gateway, src, attendant_id, status, status_code, original_status, sale_date, created_at, tracking_code, tracking_url, shipping_status, shipping_company, address_full, payment_method, payment_link"
     )
-    .eq("user_id", user.id);
+    .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
   if (txErr) {
     return NextResponse.json({ error: txErr.message }, { status: 500 });

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 // ============================================================================
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     const { data: activeAccounts } = await supabase
       .from("meta_ad_accounts")
       .select("account_id, account_name")
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
 
     const activeIds = (activeAccounts || []).map((a) => a.account_id);
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
       .select(
         "ad_account_id, date, spend, impressions, clicks, reach, conversions, conversion_value"
       )
-      .eq("user_id", user.id)
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .in("ad_account_id", accountFilter)
       .gte("date", from)
       .lte("date", to);

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 const DEFAULT_TEMPLATE = `Ola {nome}!
@@ -25,7 +26,7 @@ export async function GET() {
   const { data } = await supabase
     .from("collection_settings")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .maybeSingle();
 
   return NextResponse.json({
@@ -47,7 +48,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const updates: Record<string, unknown> = {
-    user_id: user.id,
+    user_id: await getEffectiveUserId(supabase, user.id),
     updated_at: new Date().toISOString(),
   };
   if ("message_template" in body) updates.message_template = body.message_template;

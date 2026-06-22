@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
   fetchAdAccounts,
@@ -24,7 +25,7 @@ export async function GET() {
   const { data: config } = await supabase
     .from("meta_config")
     .select("access_token, is_connected")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .single();
 
   if (!config?.is_connected || !config?.access_token) {
@@ -38,7 +39,7 @@ export async function GET() {
     const { data: savedAccounts } = await supabase
       .from("meta_ad_accounts")
       .select("account_id, is_active")
-      .eq("user_id", user.id);
+      .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
     const savedMap = new Map(
       (savedAccounts || []).map((a) => [a.account_id, a.is_active])
@@ -67,7 +68,7 @@ export async function GET() {
       await supabase
         .from("meta_config")
         .update({ validation_status: "expired", is_connected: false })
-        .eq("user_id", user.id);
+        .eq("user_id", await getEffectiveUserId(supabase, user.id));
     }
     console.error("[v0] Error fetching ad accounts:", message);
     return NextResponse.json({ error: message }, { status: 400 });
@@ -96,12 +97,13 @@ export async function PUT(request: Request) {
     }
 
     const selectedIds = accounts.map((a: { id: string }) => a.id);
+    const scopedId = await getEffectiveUserId(supabase, user.id);
 
     // Desativa contas que nao estao mais selecionadas (sem deletar histórico)
     await supabase
       .from("meta_ad_accounts")
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("user_id", user.id)
+      .eq("user_id", scopedId)
       .not(
         "account_id",
         "in",
@@ -120,7 +122,7 @@ export async function PUT(request: Request) {
           businessName?: string | null;
           accountStatus?: number;
         }) => ({
-          user_id: user.id,
+          user_id: scopedId,
           account_id: acc.id,
           account_name: acc.name,
           currency: acc.currency || "BRL",

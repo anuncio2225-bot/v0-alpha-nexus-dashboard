@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/team/scope";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("monthly_tax_config")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .eq("year", parseInt(year))
     .order("month", { ascending: true });
 
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     .from("monthly_tax_config")
     .upsert(
       {
-        user_id: user.id,
+        user_id: await getEffectiveUserId(supabase, user.id),
         year,
         month,
         tax_percentage: tax_percentage ?? 0,
@@ -88,7 +89,7 @@ export async function PATCH(request: Request) {
   const { data: existing } = await supabase
     .from("monthly_tax_config")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .eq("year", year)
     .eq("month", month)
     .single();
@@ -98,7 +99,7 @@ export async function PATCH(request: Request) {
     const { data, error } = await supabase
       .from("monthly_tax_config")
       .insert({
-        user_id: user.id,
+        user_id: await getEffectiveUserId(supabase, user.id),
         year,
         month,
         tax_percentage: tax_percentage ?? 0,
@@ -121,7 +122,7 @@ export async function PATCH(request: Request) {
   const { data, error } = await supabase
     .from("monthly_tax_config")
     .update(updateData)
-    .eq("user_id", user.id)
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .eq("year", year)
     .eq("month", month)
     .select()
