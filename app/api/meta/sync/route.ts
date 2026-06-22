@@ -77,6 +77,20 @@ export async function POST(request: Request) {
       until,
     });
 
+    // Sem nenhuma conta ativa: nao e uma sincronizacao bem-sucedida, e sim
+    // uma configuracao incompleta. Avisamos claramente o usuario.
+    if (result.accountsTotal === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Nenhuma conta de anuncio ativa. Marque uma conta e clique em "Salvar Selecao" antes de sincronizar.',
+          ...result,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({
       success: result.accountsFailed === 0,
       ...result,

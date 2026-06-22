@@ -117,6 +117,18 @@ export async function syncUser(
 
   result.accountsTotal = accounts?.length || 0;
   if (!accounts || accounts.length === 0) {
+    // IMPORTANTE: sem contas ativas NAO podemos retornar cedo sem antes
+    // liberar o lock — senao sync_status fica preso em 'syncing' para sempre
+    // (a tela trava em "Sincronizando..."). Resetamos para 'idle' com um aviso.
+    await supabase
+      .from("meta_config")
+      .update({
+        sync_status: "idle",
+        sync_error:
+          "Nenhuma conta de anuncio ativa. Selecione uma conta e clique em \"Salvar Selecao\" antes de sincronizar.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
     return result;
   }
 
