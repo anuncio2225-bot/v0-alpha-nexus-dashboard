@@ -16,7 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *   commission); se ambos forem 0/nulos, cai para total_value/amount da venda.
  */
 
-// Transacao -> nome do status de cobranca
+// Transacao -> nome do status de cobranca (alinhado ao Braip)
 export function mapTransactionStatusToCollection(txStatus: string | null): string {
   switch ((txStatus || "").toLowerCase()) {
     case "pago":
@@ -26,12 +26,15 @@ export function mapTransactionStatusToCollection(txStatus: string | null): strin
     case "devolvido":
     case "devolucao":
       return "Devolucao";
-    case "agendado":
-    case "aguardando":
     case "frustrado":
+      return "Frustrado";
+    case "agendado":
+      return "Agendado";
+    case "aguardando":
+      return "Aguardando Pagamento";
     default:
-      // afterpay/pendentes e frustrados entram como "Devendo" (cobravel)
-      return txStatus?.toLowerCase() === "frustrado" ? "Frustrado" : "Devendo";
+      // demais pendentes entram como "Pagamento Pendente" (cobravel)
+      return "Pagamento Pendente";
   }
 }
 
@@ -43,7 +46,9 @@ const SYSTEM_STATUS = new Set([
   "Pago",
   "Cancelado",
   "Devolucao",
-  "Devendo",
+  "Pagamento Pendente",
+  "Agendado",
+  "Aguardando Pagamento",
   "Frustrado",
 ]);
 
@@ -117,6 +122,7 @@ export function cleanSrc(src: string | null | undefined): string | null {
   return t || null;
 }
 
+// Valor mostrado na cobranca/KPIs = comissao do afiliado.
 export function txCollectionValue(t: TxRow): number {
   return (
     Number(t.affiliate_commission) ||
@@ -125,6 +131,11 @@ export function txCollectionValue(t: TxRow): number {
     Number(t.amount) ||
     0
   );
+}
+
+// Valor CHEIO do kit (o quanto o cliente paga) = usado nas mensagens de cobranca.
+export function txOrderTotalValue(t: TxRow): number {
+  return Number(t.total_value) || Number(t.amount) || 0;
 }
 
 /**
@@ -198,6 +209,7 @@ export async function syncTransactionToCollection(
   const targetStatusName = mapTransactionStatusToCollection(t.status ?? null);
   const targetStatus =
     statusMap.get(targetStatusName.toLowerCase()) ||
+    statusMap.get("pagamento pendente") ||
     statusMap.get("devendo") ||
     null;
 
@@ -208,6 +220,7 @@ export async function syncTransactionToCollection(
     attByName
   );
   const value = txCollectionValue(t);
+  const orderTotal = txOrderTotalValue(t);
 
   // Ja existe um collection_client para essa transacao?
   const { data: existing } = await supabase
@@ -233,6 +246,7 @@ export async function syncTransactionToCollection(
     attendant_id,
     attendant_name,
     src: cleanSrc(t.src),
+    order_total_value: orderTotal || null,
     payment_method: t.payment_method || null,
     payment_link: t.payment_link || null,
     tracking_code: t.tracking_code || null,

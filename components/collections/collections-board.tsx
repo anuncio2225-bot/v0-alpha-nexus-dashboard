@@ -89,10 +89,9 @@ export function CollectionsBoard({
     total: number;
   }>(`/api/collections?${query.toString()}`, fetcher);
 
-  const { data: statusData } = useSWR<{ statuses: CollectionStatus[] }>(
-    "/api/collections/statuses",
-    fetcher
-  );
+  const { data: statusData, mutate: mutateStatuses } = useSWR<{
+    statuses: CollectionStatus[];
+  }>("/api/collections/statuses", fetcher);
   const { data: platformData } = useSWR<{ platforms: CollectionPlatform[] }>(
     "/api/collections/platforms",
     fetcher
@@ -164,6 +163,34 @@ export function CollectionsBoard({
     } catch {
       toast.error("Erro ao mover cliente");
       mutate();
+    }
+  }
+
+  async function handleReorder(orderedIds: string[]) {
+    // Atualizacao otimista das posicoes das colunas
+    mutateStatuses(
+      (prev) =>
+        prev
+          ? {
+              statuses: prev.statuses.map((s) => ({
+                ...s,
+                position: orderedIds.indexOf(s.id),
+              })),
+            }
+          : prev,
+      false
+    );
+    try {
+      const res = await fetch("/api/collections/statuses/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: orderedIds }),
+      });
+      if (!res.ok) throw new Error();
+      mutateStatuses();
+    } catch {
+      toast.error("Erro ao reordenar colunas");
+      mutateStatuses();
     }
   }
 
@@ -270,6 +297,7 @@ export function CollectionsBoard({
           statuses={statuses}
           onCardClick={(c) => setSelectedId(c.id)}
           onMove={handleMove}
+          onReorder={handleReorder}
         />
       ) : (
         <Card className="border-border bg-card overflow-hidden">

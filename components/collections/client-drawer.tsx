@@ -323,7 +323,7 @@ export function ClientDrawer({
                 <TabsContent value="info" className="m-0 space-y-4 p-6">
                   <div className="grid grid-cols-3 gap-3">
                     <ValueCard
-                      label="Total"
+                      label="Comissao"
                       value={formatCurrency(client.total_value)}
                     />
                     <ValueCard
@@ -337,6 +337,16 @@ export function ClientDrawer({
                       accent="text-destructive"
                     />
                   </div>
+                  {client.order_total_value ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">
+                        Valor do kit (cobranca ao cliente)
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(Number(client.order_total_value))}
+                      </span>
+                    </div>
+                  ) : null}
                   {client.braip_status && (
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
                       <span className="text-xs text-muted-foreground">
