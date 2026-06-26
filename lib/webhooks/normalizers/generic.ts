@@ -94,6 +94,63 @@ function pickFirst(obj: Record<string, unknown>, keys: string[]): unknown {
   return undefined;
 }
 
+/** Payt envia valores como centavos inteiros (ex.: 37344 = R$ 373,44). */
+function centsToReais(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n) / 100;
+}
+
+/**
+ * Extrai a comissao REAL do vendedor a partir da estrutura achatada
+ * "commission.N.type" / "commission.N.amount" (formato Payt).
+ *
+ * Regra de negocio (o que o usuario RECEBE, nao o que o cliente paga):
+ *  - O tipo "platform" e a taxa do gateway (Payt) — NUNCA e a receita do usuario.
+ *  - A receita do usuario e a comissao de afiliado (quando ele e afiliado) ou
+ *    de produtor (quando ele e o produtor). Por isso ignoramos "platform" e
+ *    preferimos affiliate > producer > coproducer > maior comissao nao-plataforma.
+ *
+ * Retorna { found } = false quando o payload nao usa essa estrutura (ex.:
+ * outras plataformas), para o normalizer cair no parsing generico antigo.
+ */
+function extractTypedCommissions(payload: Record<string, unknown>): {
+  found: boolean;
+  affiliate: number | null;
+  producer: number | null;
+  coproducer: number | null;
+  maxNonPlatform: number | null;
+} {
+  let found = false;
+  let affiliate: number | null = null;
+  let producer: number | null = null;
+  let coproducer: number | null = null;
+  let maxNonPlatform: number | null = null;
+
+  for (let i = 0; i < 10; i++) {
+    const type = payload[`commission.${i}.type`];
+    const amount = payload[`commission.${i}.amount`];
+    if (type === undefined && amount === undefined) continue;
+    found = true;
+
+    const reais = centsToReais(amount);
+    if (reais === null) continue;
+
+    const t = String(type || "").toLowerCase();
+    // Taxa do gateway: nunca conta como receita do usuario.
+    if (t.includes("platform") || t.includes("plataforma")) continue;
+
+    if (t.includes("afili") || t.includes("affili")) affiliate = reais;
+    else if (t.includes("coprodu") || t.includes("co-produ")) coproducer = reais;
+    else if (t.includes("produ")) producer = reais;
+
+    if (maxNonPlatform === null || reais > maxNonPlatform) maxNonPlatform = reais;
+  }
+
+  return { found, affiliate, producer, coproducer, maxNonPlatform };
+}
+
 function normalizeStatus(raw: string): string {
   const lower = raw.toLowerCase().trim();
   return GENERIC_STATUS_MAP[lower] || GENERIC_STATUS_MAP[raw] || "aguardando";
@@ -178,16 +235,26 @@ export function normalizeGeneric(
     ])
   );
 
-  const commission = parseValue(
-    pickFirst(payload, [
-      "commission.0.amount",
-      "commission",
-      "comissao",
-      "affiliate_commission",
-      "comissao_afiliado",
-      "valor_comissao",
-    ])
-  );
+  // Comissao REAL do vendedor. Para Payt (estrutura commission.N.type/amount)
+  // ignoramos a taxa da plataforma e usamos affiliate > producer > coproducer.
+  // Para outras plataformas, caimos no parsing generico antigo.
+  const typedCommissions = extractTypedCommissions(payload);
+  const sellerCommission = typedCommissions.found
+    ? typedCommissions.affiliate ??
+      typedCommissions.producer ??
+      typedCommissions.coproducer ??
+      typedCommissions.maxNonPlatform ??
+      0
+    : parseValue(
+        pickFirst(payload, [
+          "commission",
+          "comissao",
+          "affiliate_commission",
+          "comissao_afiliado",
+          "valor_comissao",
+        ])
+      );
+  const commission = sellerCommission;
 
   const customerName = safeString(
     pickFirst(payload, [
@@ -320,7 +387,11 @@ export function normalizeGeneric(
     total_value: totalValue || undefined,
     paid_value: paidValue || totalValue || undefined,
     commission: commission || undefined,
-    affiliate_commission: commission || undefined,
+    // affiliate_commission e o campo prioritario no dashboard; refletimos a
+    // receita real do vendedor (afiliado quando houver, senao a comissao apurada).
+    affiliate_commission:
+      (typedCommissions.affiliate ?? commission) || undefined,
+    producer_commission: typedCommissions.producer ?? undefined,
     currency: "BRL",
 
     payment_method: rawPayment || undefined,
