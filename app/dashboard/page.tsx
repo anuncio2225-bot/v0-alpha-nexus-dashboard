@@ -146,7 +146,7 @@ export default function DashboardPage() {
           "Vendas atualizadas. Falha ao sincronizar o Meta Ads — tente novamente."
         );
       } else if (metaSkipped) {
-        toast.info("Vendas atualizadas. Sincronizacao do Meta ja em andamento.");
+        toast.info("Vendas atualizadas. Sincronização do Meta já em andamento.");
       } else {
         toast.success("Dados atualizados (vendas + Meta Ads).");
       }
@@ -292,7 +292,7 @@ export default function DashboardPage() {
               <Inbox className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              Nenhuma venda no periodo
+              Nenhuma venda no período
             </h3>
             <p className="text-sm text-muted-foreground max-w-md">
               {selectedProducts.length > 0
@@ -329,7 +329,7 @@ export default function DashboardPage() {
         <KpiCard
           data={
             kpis?.entradasHoje || {
-              label: "Pagas no Periodo",
+              label: "Pagas no Período",
               subtitle: "Baseado na data de pagamento",
               value: 0,
               formatted: "R$ 0",
@@ -346,12 +346,12 @@ export default function DashboardPage() {
       {/* ================================================================ */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger">
         <KpiCard
-          data={kpis?.comissaoReal || { label: "Comissao Real", value: 0, formatted: "R$ 0" }}
+          data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0" }}
           icon={DollarSign}
           loading={isLoading}
         />
         <KpiCard
-          data={kpis?.comissaoProjetada || { label: "Comissao Projetada", value: 0, formatted: "R$ 0" }}
+          data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0" }}
           icon={TrendingUp}
           loading={isLoading}
         />
@@ -391,7 +391,7 @@ export default function DashboardPage() {
           loading={isLoading}
         />
         <KpiCard
-          data={kpis?.ticketMedio || { label: "Ticket Medio", value: 0, formatted: "R$ 0" }}
+          data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0" }}
           icon={BarChart3}
           loading={isLoading}
         />
@@ -431,7 +431,7 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground">
-              Comissao vs Investimento
+              Comissão vs Investimento
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -439,7 +439,7 @@ export default function DashboardPage() {
               <Skeleton className="h-[300px] w-full" />
             ) : dailyData.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no periodo
+                Sem dados no período
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="comissao"
-                    name="Comissao"
+                    name="Comissão"
                     stroke="#10b981"
                     fillOpacity={1}
                     fill="url(#colorComissao)"
@@ -510,7 +510,7 @@ export default function DashboardPage() {
               <Skeleton className="h-[300px] w-full" />
             ) : dailyData.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no periodo
+                Sem dados no período
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -555,7 +555,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-brand" />
-              Distribuicao Financeira
+              Distribuição Financeira
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -563,7 +563,7 @@ export default function DashboardPage() {
               <Skeleton className="h-[300px] w-full" />
             ) : financialBreakdown.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados financeiros no periodo
+                Sem dados financeiros no período
               </div>
             ) : (
               <div className="flex flex-col items-center">
@@ -617,7 +617,7 @@ export default function DashboardPage() {
               <Skeleton className="h-[300px] w-full" />
             ) : operationalFunnel.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados operacionais no periodo
+                Sem dados operacionais no período
               </div>
             ) : (
               <div className="space-y-4 py-4">
@@ -705,7 +705,7 @@ export default function DashboardPage() {
                         {campaign.name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {campaign.conversions} lancamento{campaign.conversions !== 1 ? "s" : ""} | <SensitiveValue>{formatCurrency(campaign.spend)}</SensitiveValue> investido
+                        {campaign.conversions} lançamento{campaign.conversions !== 1 ? "s" : ""} | <SensitiveValue>{formatCurrency(campaign.spend)}</SensitiveValue> investido
                       </p>
                     </div>
                     <Badge
@@ -741,7 +741,7 @@ export default function DashboardPage() {
               </div>
             ) : attendants.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                Nenhum atendente com vendas no periodo
+                Nenhum atendente com vendas no período
               </p>
             ) : (
               <div className="space-y-3">
@@ -770,7 +770,7 @@ export default function DashboardPage() {
                           {att.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {att.sales} vendas | <SensitiveValue>{formatCurrency(att.commission)}</SensitiveValue> comissao
+                          {att.sales} vendas | <SensitiveValue>{formatCurrency(att.commission)}</SensitiveValue> comissão
                         </p>
                       </div>
                       <div className="text-right">

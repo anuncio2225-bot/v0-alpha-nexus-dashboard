@@ -128,7 +128,7 @@ export function ClientDrawer({
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
-      toast.success("Removido da Cobranca");
+      toast.success("Removido da Cobrança");
       onChanged();
       onOpenChange(false);
       onDeleted?.();
@@ -213,7 +213,7 @@ export function ClientDrawer({
       if (!res.ok) throw new Error();
       const json = await res.json().catch(() => null);
       setScheduleDate("");
-      toast.success("Cobranca agendada");
+      toast.success("Cobrança agendada");
       refresh();
       // Abre o Google Calendar para criar o lembrete (Melhoria 6)
       if (json?.calendar_url) {
@@ -294,9 +294,9 @@ export function ClientDrawer({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir da Cobranca?</AlertDialogTitle>
+                      <AlertDialogTitle>Excluir da Cobrança?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {client.name} sera removido apenas do modulo de Cobranca.
+                        {client.name} será removido apenas do módulo de Cobrança.
                         A venda original na tabela de transacoes NAO sera afetada e
                         o cliente pode ser reimportado depois.
                       </AlertDialogDescription>
@@ -318,7 +318,7 @@ export function ClientDrawer({
             <Tabs defaultValue="info" className="flex min-h-0 flex-1 flex-col">
               <TabsList className="mx-6 mt-4 grid w-auto grid-cols-3">
                 <TabsTrigger value="info">Informacoes</TabsTrigger>
-                <TabsTrigger value="actions">Acoes</TabsTrigger>
+                <TabsTrigger value="actions">Ações</TabsTrigger>
                 <TabsTrigger value="timeline">Histórico</TabsTrigger>
               </TabsList>
 
@@ -326,7 +326,7 @@ export function ClientDrawer({
                 <TabsContent value="info" className="m-0 space-y-4 p-6">
                   <div className="grid grid-cols-3 gap-3">
                     <ValueCard
-                      label="Comissao"
+                      label="Comissão"
                       value={formatCurrency(client.total_value)}
                     />
                     <ValueCard
@@ -406,7 +406,7 @@ export function ClientDrawer({
                     />
                     <InfoRow
                       icon={CalendarClock}
-                      label="Proxima cobranca"
+                      label="Próxima cobrança"
                       value={
                         client.next_collection_date
                           ? format(
