@@ -20,6 +20,12 @@ interface KpiCardProps {
   icon?: LucideIcon;
   loading?: boolean;
   className?: string;
+  /** Tailwind text-size class for the value, e.g. "text-2xl", "text-xl", "text-lg" */
+  textSize?: string;
+  /** Removes extra padding for smaller faixas */
+  compact?: boolean;
+  /** Even more compact: smaller icon, xs label */
+  mini?: boolean;
 }
 
 const colorClasses = {
@@ -50,19 +56,33 @@ const colorClasses = {
   },
 };
 
-export function KpiCard({ data, icon: Icon, loading, className }: KpiCardProps) {
-  const colors = colorClasses[data.color || "neutral"];
+export function KpiCard({ data, icon: Icon, loading, className, textSize, compact, mini }: KpiCardProps) {
+  // If color not set, auto-color negative values red and positive green
+  const autoColor = !data.color
+    ? data.value < 0
+      ? "danger"
+      : data.value > 0
+        ? "success"
+        : "neutral"
+    : data.color;
+  const colors = colorClasses[autoColor];
+
+  const padding = mini ? "p-3" : compact ? "p-3.5" : "p-4";
+  const labelSize = mini ? "text-xs" : "text-sm";
+  const valueSize = textSize ?? "metric";
+  const iconSize = mini ? "h-4 w-4" : "h-5 w-5";
+  const iconPad = mini ? "p-2" : "p-2.5";
 
   if (loading) {
     return (
       <Card className={cn("bg-card border-border", className)}>
-        <CardContent className="p-4">
+        <CardContent className={padding}>
           <div className="flex items-start justify-between">
             <div className="space-y-2">
               <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-32" />
+              <Skeleton className={cn("w-32", mini ? "h-5" : compact ? "h-6" : "h-8")} />
             </div>
-            <Skeleton className="h-10 w-10 rounded-lg" />
+            <Skeleton className={cn("rounded-lg", mini ? "h-8 w-8" : "h-10 w-10")} />
           </div>
         </CardContent>
       </Card>
@@ -71,24 +91,24 @@ export function KpiCard({ data, icon: Icon, loading, className }: KpiCardProps) 
 
   return (
     <TooltipProvider delayDuration={200}>
-      <GlowCard glowColor={data.color || "neutral"} className="fade-up">
+      <GlowCard glowColor={autoColor} className="fade-up">
         <Card
           className={cn(
             "bg-card border-border card-hover h-full",
             className
           )}
         >
-        <CardContent className="p-4">
+        <CardContent className={padding}>
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-muted-foreground">
+                <span className={cn(labelSize, "text-muted-foreground truncate")}>
                   {data.label}
                 </span>
                 {data.tooltip && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                      <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       {data.tooltip}
@@ -96,7 +116,7 @@ export function KpiCard({ data, icon: Icon, loading, className }: KpiCardProps) 
                   </Tooltip>
                 )}
               </div>
-              <p className={cn("metric", colors.text)}>
+              <p className={cn(valueSize === "metric" ? "metric" : `font-bold tabular-nums ${valueSize}`, colors.text)}>
                 <SensitiveValue>{data.formatted}</SensitiveValue>
               </p>
               {data.subtitle && (
@@ -117,8 +137,8 @@ export function KpiCard({ data, icon: Icon, loading, className }: KpiCardProps) 
               )}
             </div>
             {Icon && (
-              <div className={cn("rounded-lg p-2.5", colors.bg)}>
-                <Icon className={cn("h-5 w-5", colors.icon)} />
+              <div className={cn("rounded-lg shrink-0", iconPad, colors.bg)}>
+                <Icon className={cn(iconSize, colors.icon)} />
               </div>
             )}
           </div>
