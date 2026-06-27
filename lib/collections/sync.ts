@@ -58,6 +58,7 @@ interface TxRow {
   customer_phone?: string | null;
   customer_email?: string | null;
   customer_doc?: string | null;
+  transaction_code?: string | null;
   product_name?: string | null;
   product_id?: string | null;
   plan_name?: string | null;
@@ -240,6 +241,7 @@ export async function syncTransactionToCollection(
     phone: t.customer_phone || null,
     email: t.customer_email || null,
     document: t.customer_doc || null,
+    transaction_code: t.transaction_code || null,
     product_name: t.product_name || null,
     product_id: t.product_id || null,
     plan_name: t.plan_name || null,
@@ -309,6 +311,13 @@ export async function syncTransactionToCollection(
         } else if (!existing.payment_date) {
           updates.payment_date = new Date().toISOString();
         }
+      } else if (
+        targetStatusName === "Cancelado" ||
+        targetStatusName === "Devolvido" ||
+        targetStatusName === "Frustrado"
+      ) {
+        // Cancelados/devolvidos não têm data de pagamento — limpar se havia
+        updates.payment_date = null;
       } else {
       const paid = Number(existing.paid_value) || 0;
       updates.remaining_value = value - paid;

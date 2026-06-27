@@ -592,6 +592,7 @@ export interface CollectionClient {
   attendant_name: string | null;
   src: string | null;
   transaction_id: string | null;
+  transaction_code: string | null;
   total_value: number;
   order_total_value: number | null;
   paid_value: number;

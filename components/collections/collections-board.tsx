@@ -216,7 +216,7 @@ export function CollectionsBoard({
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar nome, telefone, produto"
+                placeholder="Buscar nome, telefone, CPF, cód. pedido"
                 className="bg-card-elevated border-border pl-9"
               />
             </div>
@@ -350,6 +350,11 @@ export function CollectionsBoard({
                       <div className="font-medium text-foreground">{c.name}</div>
                       {c.phone && (
                         <div className="text-xs text-muted-foreground">{c.phone}</div>
+                      )}
+                      {c.transaction_code && (
+                        <div className="text-xs text-muted-foreground/60 font-mono mt-0.5">
+                          #{c.transaction_code}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="max-w-[180px] truncate text-muted-foreground">

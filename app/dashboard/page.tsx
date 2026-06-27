@@ -10,16 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
+import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
 import { getDateRange, formatCurrency, cn } from "@/lib/utils";
 import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode, Profile } from "@/types";
 import {
@@ -53,7 +48,6 @@ import {
   Wallet,
   BarChart3,
   ShoppingCart,
-  ArrowRightLeft,
   RefreshCw,
 } from "lucide-react";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
@@ -66,7 +60,29 @@ export default function DashboardPage() {
   const [preset, setPreset] = useState<FilterPreset>("7d");
   const [range, setRange] = useState<DateRange>(getDateRange("7d"));
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [mode, setMode] = useState<OperationalMode>("all");
+
+  // Modos operacionais: múltipla seleção, persistida no localStorage.
+  // [] = todas as modalidades (equivalente ao antigo "all").
+  const [selectedModes, setSelectedModes] = useState<OperationalMode[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("dashboard_modes");
+      if (saved) return JSON.parse(saved) as OperationalMode[];
+    } catch {}
+    return [];
+  });
+
+  function handleModesChange(modes: OperationalMode[]) {
+    setSelectedModes(modes);
+    try {
+      localStorage.setItem("dashboard_modes", JSON.stringify(modes));
+    } catch {}
+  }
+
+  // Para a API, múltiplos modos viram parâmetros separados por vírgula.
+  // Quando vazio, não envia parâmetro (= todos).
+  const modeParam =
+    selectedModes.length > 0 ? selectedModes.join(",") : null;
 
   // Perfil do usuario logado (mesmo padrao usado em settings/sidebar)
   const { data: profileData } = useSWR<{ profile: Profile }>(
@@ -103,7 +119,7 @@ export default function DashboardPage() {
     selectedProducts.length > 0
       ? `&products=${encodeURIComponent(selectedProducts.join(","))}`
       : ""
-  }${mode !== "all" ? `&mode=${mode}` : ""}`;
+  }${modeParam ? `&mode=${encodeURIComponent(modeParam)}` : ""}`;
 
   const { data, isLoading, error, mutate } = useSWR<DashboardMetrics>(
     queryUrl,
@@ -180,8 +196,7 @@ export default function DashboardPage() {
     Pausar: "bg-danger/20 text-danger border-danger/30",
   };
 
-  const modeLabels: Record<OperationalMode, string> = {
-    all: "Todos os Produtos",
+  const modeLabels: Record<string, string> = {
     afterpay: "Afterpay (Pós-Pago)",
     antecipado: "Antecipado",
     recuperacao: "Recuperação",
@@ -231,22 +246,11 @@ export default function DashboardPage() {
             />
             {refreshing ? "Atualizando..." : "Atualizar"}
           </Button>
-          {/* Seletor de Modo Operacional */}
-          <Select
-            value={mode}
-            onValueChange={(v) => setMode(v as OperationalMode)}
-          >
-            <SelectTrigger className="w-[200px] bg-card border-border">
-              <ArrowRightLeft className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Produtos</SelectItem>
-              <SelectItem value="afterpay">Afterpay (Pós-Pago)</SelectItem>
-              <SelectItem value="antecipado">Antecipado</SelectItem>
-              <SelectItem value="recuperacao">Recuperação</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Seletor de Modalidade (multi-select, persistido) */}
+          <ModeMultiSelect
+            selected={selectedModes}
+            onChange={handleModesChange}
+          />
           <ProductMultiSelect
             products={products}
             selected={selectedProducts}
@@ -261,17 +265,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Mode Badge */}
-      {mode !== "all" && (
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-brand/10 text-brand border-brand/30">
-            Modo: {modeLabels[mode]}
-          </Badge>
+      {/* Badges das modalidades ativas */}
+      {selectedModes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedModes.map((m) => (
+            <Badge key={m} variant="outline" className="bg-brand/10 text-brand border-brand/30">
+              {modeLabels[m]}
+            </Badge>
+          ))}
           <Button
             variant="ghost"
             size="sm"
             className="text-xs text-muted-foreground h-6"
-            onClick={() => setMode("all")}
+            onClick={() => handleModesChange([])}
           >
             Limpar filtro
           </Button>

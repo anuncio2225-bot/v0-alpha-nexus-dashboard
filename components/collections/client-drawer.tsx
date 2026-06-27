@@ -395,6 +395,20 @@ export function ClientDrawer({
                       label="Pagamento"
                       value={client.payment_method}
                     />
+                    {client.transaction_code && (
+                      <InfoRow
+                        icon={Tag}
+                        label="Cód. do pedido"
+                        value={client.transaction_code}
+                      />
+                    )}
+                    {client.document && (
+                      <InfoRow
+                        icon={FileText}
+                        label="CPF / CNPJ"
+                        value={client.document}
+                      />
+                    )}
                     <InfoRow
                       icon={CalendarDays}
                       label="Data do pedido"
