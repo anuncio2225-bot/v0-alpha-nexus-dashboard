@@ -464,6 +464,13 @@ export async function GET(request: Request) {
         tooltip: `${antecipadas.length} vendas antecipadas`,
         color: "brand",
       },
+      recuperacoes: {
+        label: "Recuperação",
+        value: valorPagasRecuperacao,
+        formatted: formatCurrency(valorPagasRecuperacao),
+        tooltip: `${pagasRecuperacao.length} venda${pagasRecuperacao.length !== 1 ? "s" : ""} de recuperação pagas`,
+        color: "success",
+      },
       pagas: {
         label: "Pagas",
         value: valorPagas,

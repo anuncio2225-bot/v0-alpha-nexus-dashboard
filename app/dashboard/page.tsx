@@ -310,9 +310,9 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================ */}
-      {/* BLOCO 1: STATUS DAS VENDAS (3 cards) */}
+      {/* BLOCO 1: STATUS DAS VENDAS (4 cards) */}
       {/* ================================================================ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger">
         <KpiCard
           data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
           icon={Calendar}
@@ -321,6 +321,11 @@ export default function DashboardPage() {
         <KpiCard
           data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
           icon={Clock}
+          loading={isLoading}
+        />
+        <KpiCard
+          data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
+          icon={RefreshCw}
           loading={isLoading}
         />
         <KpiCard

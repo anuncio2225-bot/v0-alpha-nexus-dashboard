@@ -438,6 +438,7 @@ export interface DashboardMetrics {
   kpis: {
     agendadas: KpiData;
     antecipadas: KpiData;
+    recuperacoes: KpiData;
     pagas: KpiData;
     frustradas: KpiData;
     entradasHoje: KpiData;
