@@ -314,15 +314,28 @@ export default function DashboardPage() {
       {/* ================================================================ */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 stagger">
         <KpiCard
-          data={
-            kpis?.entradasHoje || {
-              label: "Pagas no Período",
-              subtitle: "Baseado na data de pagamento",
-              value: 0,
-              formatted: "R$ 0",
-              color: "success",
-            }
-          }
+          data={(() => {
+            const fmt = (d: Date) =>
+              format(d, "dd/MM", { locale: ptBR });
+            const subtitle = (() => {
+              const today = new Date();
+              if (preset === "today") return `Hoje, ${fmt(range.from)}`;
+              if (preset === "yesterday") return `Ontem, ${fmt(range.from)}`;
+              if (preset === "thisMonth")
+                return `${fmt(range.from)} - ${fmt(range.to)}`;
+              // custom ou qualquer intervalo
+              return `${fmt(range.from)} - ${fmt(range.to)}`;
+            })();
+            return kpis?.entradasHoje
+              ? { ...kpis.entradasHoje, subtitle }
+              : {
+                  label: "Pagas no Período",
+                  subtitle,
+                  value: 0,
+                  formatted: "R$ 0",
+                  color: "success" as const,
+                };
+          })()}
           icon={CheckCircle}
           loading={isLoading}
           className="h-28"
@@ -332,14 +345,14 @@ export default function DashboardPage() {
           data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
           icon={Calendar}
           loading={isLoading}
-          className="h-28"
+          className="min-h-[7rem]"
           textSize="text-2xl"
         />
         <KpiCard
           data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
           icon={AlertTriangle}
           loading={isLoading}
-          className="h-28"
+          className="min-h-[7rem]"
           textSize="text-2xl"
         />
         <KpiCard
@@ -357,7 +370,7 @@ export default function DashboardPage() {
           })()}
           icon={Percent}
           loading={isLoading}
-          className="h-28"
+          className="min-h-[7rem]"
           textSize="text-2xl"
         />
       </div>
@@ -370,6 +383,7 @@ export default function DashboardPage() {
           data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0" }}
           icon={Zap}
           loading={isLoading}
+          className="min-h-[5.5rem]"
           textSize="text-xl"
           compact
         />
@@ -377,6 +391,7 @@ export default function DashboardPage() {
           data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0" }}
           icon={ShoppingCart}
           loading={isLoading}
+          className="min-h-[5.5rem]"
           textSize="text-xl"
           compact
         />
@@ -384,6 +399,7 @@ export default function DashboardPage() {
           data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0" }}
           icon={DollarSign}
           loading={isLoading}
+          className="min-h-[5.5rem]"
           textSize="text-xl"
           compact
         />
@@ -391,6 +407,7 @@ export default function DashboardPage() {
           data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
           icon={Clock}
           loading={isLoading}
+          className="min-h-[5.5rem]"
           textSize="text-xl"
           compact
         />
@@ -398,6 +415,7 @@ export default function DashboardPage() {
           data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
           icon={RefreshCw}
           loading={isLoading}
+          className="min-h-[5.5rem]"
           textSize="text-xl"
           compact
         />
@@ -412,6 +430,7 @@ export default function DashboardPage() {
           data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0" }}
           icon={TrendingUp}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -420,6 +439,7 @@ export default function DashboardPage() {
           data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0" }}
           icon={Target}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -428,6 +448,7 @@ export default function DashboardPage() {
           data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0" }}
           icon={BarChart3}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -436,6 +457,7 @@ export default function DashboardPage() {
           data={kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0%" }}
           icon={Target}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -444,6 +466,7 @@ export default function DashboardPage() {
           data={kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0%" }}
           icon={XCircle}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -452,6 +475,7 @@ export default function DashboardPage() {
           data={kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0" }}
           icon={XCircle}
           loading={isLoading}
+          className="min-h-[5rem]"
           textSize="text-lg"
           compact
           mini
@@ -473,7 +497,8 @@ export default function DashboardPage() {
           }
           icon={Wallet}
           loading={isLoading}
-          textSize="text-lg"
+          className="min-h-[5.5rem]"
+          textSize="text-xl"
           compact
         />
         <KpiCard
@@ -492,7 +517,8 @@ export default function DashboardPage() {
           }
           icon={Percent}
           loading={isLoading}
-          textSize="text-lg"
+          className="min-h-[5.5rem]"
+          textSize="text-xl"
           compact
         />
       </div>
