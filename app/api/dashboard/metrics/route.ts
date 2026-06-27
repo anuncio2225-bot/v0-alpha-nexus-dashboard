@@ -84,14 +84,19 @@ export async function GET(request: Request) {
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
-    // Estratégia de data por modo:
-    // - antecipado/recuperacao → payment_date (quando o dinheiro entrou)
-    // - afterpay/todos → sale_date (data do pedido)
-    // Com múltiplos modos mistos, usamos sale_date (mais abrangente) e filtramos depois.
-    const allPaymentBased =
-      modes.length > 0 && modes.every((m) => m === "antecipado" || m === "recuperacao");
+    // Flags de modalidade selecionadas ([] = todos)
+    const hasAfterPay = modes.length === 0 || modes.includes("afterpay");
+    const hasAntecipado = modes.length === 0 || modes.includes("antecipado");
+    const hasRecuperacao = modes.length === 0 || modes.includes("recuperacao");
 
-    if (allPaymentBased) {
+    // Estratégia de data:
+    // Se APENAS antecipado e/ou recuperação estão selecionados (sem afterpay) →
+    //   usamos payment_date (quando o dinheiro entrou de fato).
+    // Em qualquer outro caso (afterpay presente, ou todos) →
+    //   usamos sale_date (data do pedido) para não perder agendadas.
+    const onlyPaymentBased = !hasAfterPay && (hasAntecipado || hasRecuperacao);
+
+    if (onlyPaymentBased) {
       txQuery = txQuery
         .not("payment_date", "is", null)
         .gte("payment_date", from)
@@ -104,15 +109,10 @@ export async function GET(request: Request) {
 
     // Filtrar por sale_type quando modos específicos foram selecionados
     if (modes.length > 0) {
-      const saleTypeMap: Record<string, string> = {
-        afterpay: "afterpay",
-        antecipado: "antecipado",
-        recuperacao: "recuperacao",
-      };
-      const saleTypes = modes.map((m) => saleTypeMap[m]).filter(Boolean);
+      const saleTypes = modes.map(String);
       if (saleTypes.length === 1) {
         txQuery = txQuery.eq("sale_type", saleTypes[0]);
-      } else if (saleTypes.length > 1) {
+      } else {
         txQuery = txQuery.in("sale_type", saleTypes);
       }
     }
@@ -137,20 +137,12 @@ export async function GET(request: Request) {
     // Cast transactions to Tx[] immediately
     const txList = (transactions || []) as Tx[];
 
-    // 1b. If mode is set, filter transactions by webhook operational_type
+    // 1b. Filtrar transações pelas modalidades selecionadas usando sale_type.
+    // Não filtramos por webhook aqui — o sale_type já identifica a modalidade.
+    // Quando nenhum modo selecionado (hasAfterPay/Antecipado/Recuperacao todos true) → sem filtro.
     let filteredTxList = txList;
-    if (mode !== "all") {
-      // Get webhook IDs matching the mode
-      const { data: modeWebhooks } = await supabase
-        .from("webhooks")
-        .select("id")
-        .eq("user_id", await getEffectiveUserId(supabase, user.id))
-        .eq("operational_type", mode);
-
-      const modeWebhookIds = new Set((modeWebhooks || []).map((w) => w.id));
-      filteredTxList = txList.filter(
-        (t) => t.webhook_id && modeWebhookIds.has(t.webhook_id)
-      );
+    if (modes.length > 0) {
+      filteredTxList = txList.filter((t) => modes.includes(t.sale_type as typeof modes[number]));
     }
 
     // 2. Fetch product list (for filter dropdown) - ALWAYS the full list,
@@ -397,31 +389,35 @@ export async function GET(request: Request) {
     // ============================================================
     // MODE-BASED CALCULATIONS
     // ============================================================
-    // Afterpay  → base = agendadas (projeção de receita futura)
-    // Antecipado → base = pagas antecipadas (receita real, filtrada por payment_date)
-    // Recuperacao → base = pagas recuperação (receita real, filtrada por payment_date)
-    // Todos      → agendadas + pagas antecipadas + pagas recuperação
+    // Cada modalidade contribui com sua parte na receita base:
+    //   Afterpay    → AGENDADAS (projeção futura — NÃO muda com Recuperação)
+    //   Antecipado  → PAGAS antecipadas (receita real)
+    //   Recuperação → PAGAS recuperação (receita real, ADICIONA ao que já está)
+    //
+    // Recuperação NUNCA altera a base do Afterpay. Ela apenas SOMA.
+    // Cenário B (Afterpay + Recuperação):
+    //   receitaBase = agendadas + pagas_recuperacao
+    //   quantidadeBase = agendadas.length + pagasRecuperacao.length
     // ============================================================
 
+    // flags já declaradas acima (hasAfterPay / hasAntecipado / hasRecuperacao)
     let receitaBase = 0;
     let quantidadeBase = 0;
 
-    if (mode === "afterpay") {
-      // AfterPay: base = agendadas (projeção)
-      receitaBase = valorAgendadas;
-      quantidadeBase = agendadas.length;
-    } else if (mode === "antecipado") {
-      // Antecipado: base = pagas antecipadas (receita real)
-      receitaBase = valorPagasAntecipadas;
-      quantidadeBase = pagasAntecipadas.length;
-    } else if (mode === "recuperacao") {
-      // Recuperação: base = pagas recuperação (receita real)
-      receitaBase = valorPagasRecuperacao;
-      quantidadeBase = pagasRecuperacao.length;
-    } else {
-      // Todos: agendadas + pagas antecipadas + pagas recuperação
-      receitaBase = valorAgendadas + valorPagasAntecipadas + valorPagasRecuperacao;
-      quantidadeBase = agendadas.length + pagasAntecipadas.length + pagasRecuperacao.length;
+    if (hasAfterPay) {
+      // Afterpay contribui com AGENDADAS (projeção)
+      receitaBase += valorAgendadas;
+      quantidadeBase += agendadas.length;
+    }
+    if (hasAntecipado) {
+      // Antecipado contribui com PAGAS antecipadas (real)
+      receitaBase += valorPagasAntecipadas;
+      quantidadeBase += pagasAntecipadas.length;
+    }
+    if (hasRecuperacao) {
+      // Recuperação contribui com PAGAS recuperação (real) — SOMA, não substitui
+      receitaBase += valorPagasRecuperacao;
+      quantidadeBase += pagasRecuperacao.length;
     }
 
     // ALL derived metrics wrapped in safeNumber - investment NEVER breaks sales
@@ -562,13 +558,13 @@ export async function GET(request: Request) {
         label: "Caixa Esperado",
         value: receitaBase,
         formatted: formatCurrency(receitaBase),
-        tooltip: mode === "afterpay"
-          ? `Agendadas: ${formatCurrency(valorAgendadas)}`
-          : mode === "antecipado"
-            ? `Pagas antecipadas: ${formatCurrency(valorPagasAntecipadas)}`
-            : mode === "recuperacao"
-              ? `Pagas recuperação: ${formatCurrency(valorPagasRecuperacao)}`
-              : `Agendadas (${formatCurrency(valorAgendadas)}) + Antecipadas (${formatCurrency(valorPagasAntecipadas)}) + Recuperação (${formatCurrency(valorPagasRecuperacao)})`,
+        tooltip: (() => {
+          const parts: string[] = [];
+          if (hasAfterPay) parts.push(`Agendadas: ${formatCurrency(valorAgendadas)}`);
+          if (hasAntecipado) parts.push(`Antecipadas: ${formatCurrency(valorPagasAntecipadas)}`);
+          if (hasRecuperacao) parts.push(`Recuperação: ${formatCurrency(valorPagasRecuperacao)}`);
+          return parts.join(" + ") || formatCurrency(receitaBase);
+        })(),
         color: "brand",
       },
       taxaConversao: {
