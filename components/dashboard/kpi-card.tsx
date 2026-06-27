@@ -98,8 +98,8 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
             className
           )}
         >
-        <CardContent className={padding}>
-          <div className="flex items-start justify-between">
+        <CardContent className={cn(padding, "h-full flex flex-col justify-center")}>
+          <div className="flex items-center justify-between">
             <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className={cn(labelSize, "text-muted-foreground truncate")}>
