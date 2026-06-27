@@ -310,33 +310,9 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================ */}
-      {/* BLOCO 1: STATUS DAS VENDAS (4 cards) */}
+      {/* FAIXA 1 — DESTAQUE: Pagas, Agendadas, Investimento, ROI */}
       {/* ================================================================ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger">
-        <KpiCard
-          data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
-          icon={Calendar}
-          loading={isLoading}
-        />
-        <KpiCard
-          data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
-          icon={Clock}
-          loading={isLoading}
-        />
-        <KpiCard
-          data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
-          icon={RefreshCw}
-          loading={isLoading}
-        />
-        <KpiCard
-          data={kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0" }}
-          icon={XCircle}
-          loading={isLoading}
-        />
-      </div>
-
-      {/* BLOCO 2: PAGAS NO PERIODO (card destaque) */}
-      <div className="grid gap-4 sm:grid-cols-1 stagger">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 stagger">
         <KpiCard
           data={
             kpis?.entradasHoje || {
@@ -349,77 +325,143 @@ export default function DashboardPage() {
           }
           icon={CheckCircle}
           loading={isLoading}
+          className="h-28"
+          textSize="text-2xl"
+        />
+        <KpiCard
+          data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
+          icon={Calendar}
+          loading={isLoading}
+          className="h-28"
+          textSize="text-2xl"
+        />
+        <KpiCard
+          data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
+          icon={AlertTriangle}
+          loading={isLoading}
+          className="h-28"
+          textSize="text-2xl"
+        />
+        <KpiCard
+          data={(() => {
+            const raw = kpis?.roi;
+            if (!raw) return { label: "ROI", value: 0, formatted: "1.00", color: "neutral" as const };
+            const roiPct = raw.value ?? 0;
+            const multiplier = 1 + roiPct / 100;
+            const color = multiplier < 1 ? "danger" : multiplier === 1 ? "warning" : "success";
+            return {
+              ...raw,
+              formatted: multiplier.toFixed(2),
+              color: color as "danger" | "warning" | "success",
+            };
+          })()}
+          icon={Percent}
+          loading={isLoading}
+          className="h-28"
+          textSize="text-2xl"
         />
       </div>
 
       {/* ================================================================ */}
-      {/* BLOCO 3: COMISSOES (3 cards) */}
+      {/* FAIXA 2 — IMPORTANTE: Lucro, CPA, Comissão Real, Antecipadas, Recuperação */}
       {/* ================================================================ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 stagger">
+        <KpiCard
+          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0" }}
+          icon={Zap}
+          loading={isLoading}
+          textSize="text-xl"
+          compact
+        />
+        <KpiCard
+          data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0" }}
+          icon={ShoppingCart}
+          loading={isLoading}
+          textSize="text-xl"
+          compact
+        />
         <KpiCard
           data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0" }}
           icon={DollarSign}
           loading={isLoading}
+          textSize="text-xl"
+          compact
         />
+        <KpiCard
+          data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
+          icon={Clock}
+          loading={isLoading}
+          textSize="text-xl"
+          compact
+        />
+        <KpiCard
+          data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
+          icon={RefreshCw}
+          loading={isLoading}
+          textSize="text-xl"
+          compact
+        />
+      </div>
+
+      {/* ================================================================ */}
+      {/* FAIXA 3 — SECUNDÁRIO: Comissão Projetada, A Receber, Ticket Médio, */}
+      {/*            Taxa Conversão, Taxa Frustração, Frustradas             */}
+      {/* ================================================================ */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 stagger">
         <KpiCard
           data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0" }}
           icon={TrendingUp}
           loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
         />
         <KpiCard
           data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0" }}
           icon={Target}
           loading={isLoading}
-        />
-      </div>
-
-      {/* ================================================================ */}
-      {/* BLOCO 4: INVESTIMENTO & PERFORMANCE (6 cards - 2 rows of 3) */}
-      {/* ================================================================ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger">
-        <KpiCard
-          data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
-          icon={AlertTriangle}
-          loading={isLoading}
-        />
-        <KpiCard
-          data={kpis?.roi || { label: "ROI", value: 0, formatted: "0%" }}
-          icon={Percent}
-          loading={isLoading}
-        />
-        <KpiCard
-          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0" }}
-          icon={Zap}
-          loading={isLoading}
-        />
-      </div>
-
-      {/* BLOCO 5: METRICAS AVANCADAS (4 cards novos) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger">
-        <KpiCard
-          data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0" }}
-          icon={ShoppingCart}
-          loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
         />
         <KpiCard
           data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0" }}
           icon={BarChart3}
           loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
         />
         <KpiCard
           data={kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0%" }}
           icon={Target}
           loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
         />
         <KpiCard
           data={kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0%" }}
           icon={XCircle}
           loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
+        />
+        <KpiCard
+          data={kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0" }}
+          icon={XCircle}
+          loading={isLoading}
+          textSize="text-lg"
+          compact
+          mini
         />
       </div>
 
-      {/* BLOCO 6: CAIXA ESPERADO (card destaque) */}
-      <div className="grid gap-4 sm:grid-cols-1 stagger">
+      {/* ================================================================ */}
+      {/* FAIXA 4 — RESUMO: Caixa Esperado + Margem */}
+      {/* ================================================================ */}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 stagger">
         <KpiCard
           data={
             kpis?.caixaEsperado || {
@@ -431,6 +473,27 @@ export default function DashboardPage() {
           }
           icon={Wallet}
           loading={isLoading}
+          textSize="text-lg"
+          compact
+        />
+        <KpiCard
+          data={kpis?.lucro
+            ? {
+                ...kpis.lucro,
+                label: "Margem de Lucro",
+                formatted: kpis.investimento?.value
+                  ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1)}%`
+                  : "0%",
+                value: kpis.investimento?.value
+                  ? (kpis.lucro.value / kpis.investimento.value) * 100
+                  : 0,
+              }
+            : { label: "Margem de Lucro", value: 0, formatted: "0%" }
+          }
+          icon={Percent}
+          loading={isLoading}
+          textSize="text-lg"
+          compact
         />
       </div>
 
