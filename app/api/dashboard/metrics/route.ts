@@ -57,7 +57,14 @@ export async function GET(request: Request) {
   const productFilters = productsParam
     ? productsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
-  const mode = (searchParams.get("mode") || "all") as "all" | "afterpay" | "antecipado" | "recuperacao";
+  // Suporta múltiplos modos separados por vírgula (ex.: "antecipado,recuperacao").
+  // Quando vazio ou não enviado, equivale a "todos".
+  const modeParam = searchParams.get("mode") || "";
+  const modes = modeParam
+    ? modeParam.split(",").map((m) => m.trim()).filter(Boolean) as Array<"afterpay" | "antecipado" | "recuperacao">
+    : [];
+  // Para compatibilidade com código legado que usava "mode" singular:
+  const mode = modes.length === 1 ? modes[0] : modes.length === 0 ? "all" : "multi";
 
   if (!from || !to) {
     return NextResponse.json(
@@ -77,18 +84,37 @@ export async function GET(request: Request) {
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
-    // Antecipado e Recuperacao: filtrar por PAYMENT DATE (quando o dinheiro entrou).
-    // Afterpay e Todos: filtrar por SALE DATE (data do pedido).
-    if (mode === "antecipado" || mode === "recuperacao") {
+    // Estratégia de data por modo:
+    // - antecipado/recuperacao → payment_date (quando o dinheiro entrou)
+    // - afterpay/todos → sale_date (data do pedido)
+    // Com múltiplos modos mistos, usamos sale_date (mais abrangente) e filtramos depois.
+    const allPaymentBased =
+      modes.length > 0 && modes.every((m) => m === "antecipado" || m === "recuperacao");
+
+    if (allPaymentBased) {
       txQuery = txQuery
         .not("payment_date", "is", null)
         .gte("payment_date", from)
         .lte("payment_date", to);
     } else {
-      // Filter by date range using OR: sale_date in range OR (sale_date is null AND created_at in range)
       txQuery = txQuery.or(
         `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
       );
+    }
+
+    // Filtrar por sale_type quando modos específicos foram selecionados
+    if (modes.length > 0) {
+      const saleTypeMap: Record<string, string> = {
+        afterpay: "afterpay",
+        antecipado: "antecipado",
+        recuperacao: "recuperacao",
+      };
+      const saleTypes = modes.map((m) => saleTypeMap[m]).filter(Boolean);
+      if (saleTypes.length === 1) {
+        txQuery = txQuery.eq("sale_type", saleTypes[0]);
+      } else if (saleTypes.length > 1) {
+        txQuery = txQuery.in("sale_type", saleTypes);
+      }
     }
 
     if (attendantId) {

@@ -77,8 +77,9 @@ export async function GET(request: Request) {
   if (from) query = query.gte("order_date", from);
   if (to) query = query.lte("order_date", to);
   if (search) {
+    // Busca por: nome, telefone, produto, CPF (document) e código do pedido (transaction_code)
     query = query.or(
-      `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%`
+      `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%,document.ilike.%${search}%,transaction_code.ilike.%${search}%`
     );
   }
 
