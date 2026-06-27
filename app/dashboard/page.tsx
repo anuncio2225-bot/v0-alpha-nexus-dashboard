@@ -345,14 +345,14 @@ export default function DashboardPage() {
           data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
           icon={Calendar}
           loading={isLoading}
-          className="min-h-[7rem]"
+          className="h-28"
           textSize="text-2xl"
         />
         <KpiCard
           data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
           icon={AlertTriangle}
           loading={isLoading}
-          className="min-h-[7rem]"
+          className="h-28"
           textSize="text-2xl"
         />
         <KpiCard
@@ -370,7 +370,7 @@ export default function DashboardPage() {
           })()}
           icon={Percent}
           loading={isLoading}
-          className="min-h-[7rem]"
+          className="h-28"
           textSize="text-2xl"
         />
       </div>
