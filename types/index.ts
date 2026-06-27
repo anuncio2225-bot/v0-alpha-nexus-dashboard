@@ -603,6 +603,7 @@ export interface CollectionClient {
   braip_status: string | null;
   braip_status_code: number | null;
   order_date: string | null;
+  payment_date: string | null;
   negotiation_date: string | null;
   next_collection_date: string | null;
   tracking_code: string | null;

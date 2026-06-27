@@ -136,7 +136,7 @@ export default function ConnectPage() {
       if (res.ok && data.success) {
         toast.success(
           data.neverExpires
-            ? "Conectado! Token sem data de expiracao."
+            ? "Conectado! Token sem data de expiração."
             : "Conectado ao Meta Ads com sucesso."
         );
         setToken("");
@@ -154,7 +154,7 @@ export default function ConnectPage() {
   }
 
   async function handleDisconnect() {
-    if (!confirm("Desconectar Meta Ads? O historico de dados sera mantido."))
+    if (!confirm("Desconectar Meta Ads? O histórico de dados será mantido."))
       return;
     setLoading(true);
     try {
@@ -178,7 +178,7 @@ export default function ConnectPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accounts: selected }),
       });
-      toast.success("Selecao de contas salva.");
+      toast.success("Seleção de contas salva.");
       mutateAccounts();
     } catch {
       toast.error("Erro ao salvar contas.");
@@ -201,9 +201,9 @@ export default function ConnectPage() {
           `Sincronizado: ${data.rowsUpserted} registros (${data.accountsOk}/${data.accountsTotal} contas).`
         );
       } else if (res.status === 409) {
-        toast.info("Ja existe uma sincronizacao em andamento.");
+        toast.info("Já existe uma sincronização em andamento.");
       } else {
-        toast.error(data.error || "Erro na sincronizacao.");
+        toast.error(data.error || "Erro na sincronização.");
       }
       mutateStatus();
     } catch {
@@ -235,13 +235,13 @@ export default function ConnectPage() {
           `${data.rowsUpserted} dias importados de ${rangeLabel} (${data.accountsOk}/${data.accountsTotal} contas).`
         );
       } else if (res.status === 409) {
-        toast.info("Ja existe uma sincronizacao em andamento.");
+        toast.info("Já existe uma sincronização em andamento.");
       } else {
-        toast.error(data.error || "Erro ao importar historico.");
+        toast.error(data.error || "Erro ao importar histórico.");
       }
       mutateStatus();
     } catch {
-      toast.error("Erro ao importar historico.");
+      toast.error("Erro ao importar histórico.");
     } finally {
       setImporting(false);
     }
@@ -258,10 +258,10 @@ export default function ConnectPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-foreground">
-          Integracoes
+          Integrações
         </h1>
         <p className="text-sm text-muted-foreground">
-          Conecte suas contas de anuncio e plataformas de venda
+          Conecte suas contas de anúncio e plataformas de venda
         </p>
       </div>
 
@@ -312,9 +312,9 @@ export default function ConnectPage() {
           {isExpired && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Conexao expirada</AlertTitle>
+              <AlertTitle>Conexão expirada</AlertTitle>
               <AlertDescription>
-                Sua conexao com o Meta expirou. Gere um novo token e reconecte
+                Sua conexão com o Meta expirou. Gere um novo token e reconecte
                 abaixo.
               </AlertDescription>
             </Alert>
@@ -351,7 +351,7 @@ export default function ConnectPage() {
                         importing && "animate-spin"
                       )}
                     />
-                    {importing ? "Importando..." : "Importar historico"}
+                    {importing ? "Importando..." : "Importar histórico"}
                   </Button>
                   <Button
                     variant="outline"
@@ -387,25 +387,25 @@ export default function ConnectPage() {
                   Expira em:{" "}
                   {metaStatus.expiresAt
                     ? formatDate(metaStatus.expiresAt, "dd/MM/yyyy")
-                    : "Nunca (token de longa duracao)"}
+                    : "Nunca (token de longa duração)"}
                 </span>
                 <span>
-                  Ultima sincronizacao:{" "}
+                  Última sincronização:{" "}
                   {metaStatus.lastSyncAt
                     ? formatDate(metaStatus.lastSyncAt, "dd/MM/yyyy HH:mm")
-                    : "Ainda nao sincronizado"}
+                    : "Ainda não sincronizado"}
                 </span>
               </div>
 
               {metaStatus.syncError && (
                 <p className="text-xs text-destructive">
-                  Ultimo erro: {metaStatus.syncError}
+                  Último erro: {metaStatus.syncError}
                 </p>
               )}
 
               <div className="space-y-3">
                 <h4 className="text-sm font-medium text-foreground">
-                  Contas de Anuncio
+                  Contas de Anúncio
                 </h4>
                 {!accountsData ? (
                   <div className="space-y-2">
@@ -473,7 +473,7 @@ export default function ConnectPage() {
                       disabled={loading}
                       className="bg-brand hover:bg-brand/90"
                     >
-                      Salvar Selecao
+                      Salvar Seleção
                     </Button>
                   </>
                 )}
@@ -483,17 +483,17 @@ export default function ConnectPage() {
             <div className="space-y-4">
               <Alert>
                 <KeyRound className="h-4 w-4" />
-                <AlertTitle>Conexao via System User Token</AlertTitle>
+                <AlertTitle>Conexão via System User Token</AlertTitle>
                 <AlertDescription>
                   Gere um System User Token no Business Manager do Meta (com as
-                  permissoes <strong>ads_read</strong> e{" "}
-                  <strong>ads_management</strong>) e cole abaixo. Esse metodo e
-                  mais estavel que o login OAuth.
+                  permissões <strong>ads_read</strong> e{" "}
+                  <strong>ads_management</strong>) e cole abaixo. Esse método é
+                  mais estável que o login OAuth.
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-2">
-                <Label htmlFor="meta-token">Access Token (obrigatorio)</Label>
+                <Label htmlFor="meta-token">Access Token (obrigatório)</Label>
                 <div className="relative">
                   <Textarea
                     id="meta-token"
@@ -578,7 +578,7 @@ export default function ConnectPage() {
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground">
             Crie um webhook diferente para cada produto ou plataforma. Cada um
-            tem um token unico e pode ser ativado/desativado independentemente.
+            tem um token único e pode ser ativado/desativado independentemente.
           </p>
           <Link href="/dashboard/webhooks">
             <Button variant="outline" className="bg-card-elevated">

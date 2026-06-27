@@ -319,6 +319,7 @@ export function CollectionsBoard({
                   <TableHead>Cliente</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead>Pedido</TableHead>
+                  <TableHead>Pagamento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Pago</TableHead>
                   <TableHead className="text-right">Pendente</TableHead>
@@ -358,6 +359,11 @@ export function CollectionsBoard({
                       {c.order_date
                         ? new Date(c.order_date).toLocaleDateString("pt-BR")
                         : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {c.payment_date
+                        ? new Date(c.payment_date).toLocaleDateString("pt-BR")
+                        : <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       <SensitiveValue>{formatCurrency(Number(c.total_value) || 0)}</SensitiveValue>

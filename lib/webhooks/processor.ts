@@ -437,6 +437,7 @@ export async function processWebhook(
         total_value: event.total_value ?? event.amount ?? 0,
         amount: event.amount ?? 0,
         sale_date: event.sale_date || null,
+        payment_date: event.payment_date || (event.status === "pago" ? new Date().toISOString() : null),
         created_at: event.sale_date || new Date().toISOString(),
         payment_method: event.payment_method || null,
         payment_link: event.payment_link || null,

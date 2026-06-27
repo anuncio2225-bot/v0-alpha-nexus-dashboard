@@ -84,7 +84,7 @@ export default function AttendantsPage() {
 
     try {
       await fetch(`/api/attendants?id=${id}`, { method: "DELETE" });
-      toast.success("Atendente excluido");
+      toast.success("Atendente excluído");
       mutate();
     } catch {
       toast.error("Erro ao excluir");
@@ -156,7 +156,7 @@ export default function AttendantsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role">Funcao</Label>
+                <Label htmlFor="role">Função</Label>
                 <Select name="role" defaultValue={editing?.role || "closer"}>
                   <SelectTrigger className="bg-card-elevated border-border">
                     <SelectValue />
@@ -181,7 +181,7 @@ export default function AttendantsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="commission_rate">Comissao (%)</Label>
+                  <Label htmlFor="commission_rate">Comissão (%)</Label>
                   <Input
                     id="commission_rate"
                     name="commission_rate"
@@ -217,7 +217,7 @@ export default function AttendantsPage() {
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground">Nenhum atendente cadastrado</p>
             <p className="text-sm text-muted-foreground/70">
-              Clique em &quot;Novo Atendente&quot; para comecar
+              Clique em &quot;Novo Atendente&quot; para começar
             </p>
           </CardContent>
         </Card>

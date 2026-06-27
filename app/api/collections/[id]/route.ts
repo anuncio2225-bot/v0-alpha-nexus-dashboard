@@ -74,6 +74,7 @@ export async function PATCH(request: Request, { params }: Params) {
     "status_id",
     "status_name",
     "order_date",
+    "payment_date",
     "negotiation_date",
     "next_collection_date",
     "tracking_code",

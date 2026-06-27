@@ -347,7 +347,7 @@ export default function InvestimentoAdsPage() {
         mutateMeta();
         mutateSyncStatus();
       } else if (res.status === 409) {
-        toast.info("Ja existe uma sincronizacao em andamento");
+        toast.info("Já existe uma sincronização em andamento");
       } else {
         toast.error(result.error || "Erro ao sincronizar");
       }
@@ -593,7 +593,7 @@ export default function InvestimentoAdsPage() {
         <CardHeader>
           <CardTitle className="text-foreground text-sm flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Investimento no periodo
+            Investimento no período
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -605,7 +605,7 @@ export default function InvestimentoAdsPage() {
                   variant="outline"
                   className="border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs"
                 >
-                  Automatico (Meta)
+                  Automático (Meta)
                 </Badge>
               </div>
               <p className="mt-2 text-lg font-bold text-foreground">
@@ -627,7 +627,7 @@ export default function InvestimentoAdsPage() {
                 <SensitiveValue>{formatCurrency(dedupedManualTotal)}</SensitiveValue>
               </p>
               <p className="text-xs text-muted-foreground">
-                Lancamentos digitados (excluindo dias cobertos pelo Meta)
+                Lançamentos digitados (excluindo dias cobertos pelo Meta)
               </p>
             </div>
 
@@ -647,7 +647,7 @@ export default function InvestimentoAdsPage() {
                 </SensitiveValue>
               </p>
               <p className="text-xs text-muted-foreground">
-                Meta automatico + manuais (sem duplicacao)
+                Meta automático + manuais (sem duplicação)
               </p>
             </div>
           </div>
@@ -655,12 +655,12 @@ export default function InvestimentoAdsPage() {
           {/* Ultima sincronizacao + aviso sobre o dia atual */}
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              Ultima sincronizacao:{" "}
+              Última sincronização:{" "}
               {metaSyncStatus?.lastSync
                 ? new Date(metaSyncStatus.lastSync).toLocaleString("pt-BR", {
                     timeZone: "America/Sao_Paulo",
                   })
-                : "Ainda nao sincronizado"}
+                : "Ainda não sincronizado"}
             </p>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Info className="h-3.5 w-3.5 shrink-0" />
@@ -753,7 +753,7 @@ export default function InvestimentoAdsPage() {
                   )}
                   title={
                     entry.superseded
-                      ? "Substituido pelo gasto automatico do Meta nesta data — nao somado para evitar duplicacao"
+                      ? "Substituído pelo gasto automático do Meta nesta data — não somado para evitar duplicação"
                       : undefined
                   }
                 >
