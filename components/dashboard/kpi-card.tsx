@@ -94,7 +94,7 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
       <GlowCard glowColor={autoColor} className="fade-up">
         <Card
           className={cn(
-            "bg-card border-border card-hover h-full",
+            "bg-card border-border card-hover h-full overflow-hidden",
             className
           )}
         >
@@ -120,7 +120,7 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
                 <SensitiveValue>{data.formatted}</SensitiveValue>
               </p>
               {data.subtitle && (
-                <p className="text-xs text-muted-foreground">{data.subtitle}</p>
+                <p className="text-xs leading-none mt-0.5 text-muted-foreground truncate">{data.subtitle}</p>
               )}
               {data.changeLabel && (
                 <p
