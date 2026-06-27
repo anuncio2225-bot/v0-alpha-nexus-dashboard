@@ -72,6 +72,7 @@ interface TxRow {
   total_value?: number | null;
   amount?: number | null;
   sale_date?: string | null;
+  payment_date?: string | null;
   created_at?: string | null;
   payment_method?: string | null;
   payment_link?: string | null;
@@ -225,7 +226,7 @@ export async function syncTransactionToCollection(
   // Ja existe um collection_client para essa transacao?
   const { data: existing } = await supabase
     .from("collection_clients")
-    .select("id, status_id, status_name, paid_value, braip_status")
+    .select("id, status_id, status_name, paid_value, braip_status, payment_date")
     .eq("user_id", userId)
     .eq("transaction_id", t.id)
     .maybeSingle();
@@ -256,6 +257,7 @@ export async function syncTransactionToCollection(
     braip_status: braipStatus,
     braip_status_code: Number.isFinite(braipStatusCode) ? braipStatusCode : null,
     order_date: t.sale_date || t.created_at || null,
+    payment_date: t.payment_date || null,
   };
 
   if (!existing) {
@@ -295,13 +297,19 @@ export async function syncTransactionToCollection(
   const shouldOverrideStatus =
     WEBHOOK_AUTHORITATIVE.has(targetStatusName) || !currentIsManual;
 
-  if (shouldOverrideStatus && targetStatus) {
-    updates.status_id = targetStatus.id;
-    updates.status_name = targetStatus.name;
-    if (targetStatusName === "Pago") {
-      updates.paid_value = value;
-      updates.remaining_value = 0;
-    } else {
+    if (shouldOverrideStatus && targetStatus) {
+      updates.status_id = targetStatus.id;
+      updates.status_name = targetStatus.name;
+      if (targetStatusName === "Pago") {
+        updates.paid_value = value;
+        updates.remaining_value = 0;
+        // Gravar data de pagamento se ainda não estiver preenchida
+        if (t.payment_date && !existing.payment_date) {
+          updates.payment_date = t.payment_date;
+        } else if (!existing.payment_date) {
+          updates.payment_date = new Date().toISOString();
+        }
+      } else {
       const paid = Number(existing.paid_value) || 0;
       updates.remaining_value = value - paid;
     }

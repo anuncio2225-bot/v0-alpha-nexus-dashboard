@@ -405,6 +405,15 @@ export function ClientDrawer({
                       }
                     />
                     <InfoRow
+                      icon={CalendarDays}
+                      label="Data do pagamento"
+                      value={
+                        client.payment_date
+                          ? format(new Date(client.payment_date), "dd/MM/yyyy")
+                          : "Pendente"
+                      }
+                    />
+                    <InfoRow
                       icon={CalendarClock}
                       label="Próxima cobrança"
                       value={

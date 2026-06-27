@@ -77,10 +77,19 @@ export async function GET(request: Request) {
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id));
 
-    // Filter by date range using OR: sale_date in range OR (sale_date is null AND created_at in range)
-    txQuery = txQuery.or(
-      `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
-    );
+    // Antecipado e Recuperacao: filtrar por PAYMENT DATE (quando o dinheiro entrou).
+    // Afterpay e Todos: filtrar por SALE DATE (data do pedido).
+    if (mode === "antecipado" || mode === "recuperacao") {
+      txQuery = txQuery
+        .not("payment_date", "is", null)
+        .gte("payment_date", from)
+        .lte("payment_date", to);
+    } else {
+      // Filter by date range using OR: sale_date in range OR (sale_date is null AND created_at in range)
+      txQuery = txQuery.or(
+        `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
+      );
+    }
 
     if (attendantId) {
       txQuery = txQuery.eq("attendant_id", attendantId);
@@ -288,6 +297,11 @@ export async function GET(request: Request) {
 
     // Status buckets (Portuguese canonical) - use filtered list
     const workingList = filteredTxList;
+
+    const sumValue = (arr: Tx[]) => arr.reduce((s, t) => s + txValue(t), 0);
+    const sumCommission = (arr: Tx[]) =>
+      arr.reduce((s, t) => s + txCommission(t), 0);
+
     const pagas = workingList.filter((t) => t.status === "pago");
     const agendadas = workingList.filter((t) => t.status === "agendado");
     const aguardando = workingList.filter((t) => t.status === "aguardando");
@@ -295,21 +309,27 @@ export async function GET(request: Request) {
     const devolvidas = workingList.filter((t) => t.status === "devolvido");
     const frustradasOnly = workingList.filter((t) => t.status === "frustrado");
 
-    // "Antecipadas" = vendas pagas no ato (sale_type 'antecipado' OU 'recuperacao'),
-    // nao afterpay. Recuperacao e uma venda paga no ato (link de recuperacao),
-    // entao entra na mesma base que antecipado para fins de receita/KPIs.
+    // Separar pagas por sale_type para cálculo correto por modo.
+    // Antecipado e Recuperação = pagas no ato (dinheiro já entrou).
+    const pagasAntecipadas = workingList.filter(
+      (t) => t.sale_type === "antecipado" && t.status === "pago"
+    );
+    const pagasRecuperacao = workingList.filter(
+      (t) => t.sale_type === "recuperacao" && t.status === "pago"
+    );
+
+    // "Antecipadas" card = pagas antecipadas + pagas recuperação (tudo pago no ato)
     const antecipadas = workingList.filter(
       (t) =>
         (t.sale_type === "antecipado" || t.sale_type === "recuperacao") &&
-        (t.status === "agendado" || t.status === "pago")
+        t.status === "pago"
     );
+
+    const valorPagasAntecipadas = sumValue(pagasAntecipadas);
+    const valorPagasRecuperacao = sumValue(pagasRecuperacao);
 
     // Frustradas = cancelado + devolvido + frustrado
     const frustradas = [...canceladas, ...devolvidas, ...frustradasOnly];
-
-    const sumValue = (arr: Tx[]) => arr.reduce((s, t) => s + txValue(t), 0);
-    const sumCommission = (arr: Tx[]) =>
-      arr.reduce((s, t) => s + txCommission(t), 0);
 
     const valorPagas = sumValue(pagas);
     const valorAgendadas = sumValue(agendadas);
@@ -351,26 +371,31 @@ export async function GET(request: Request) {
     // ============================================================
     // MODE-BASED CALCULATIONS
     // ============================================================
-    // Mode AfterPay: usa agendadas como base principal, mas antecipadas somam
-    // Mode Antecipado: usa apenas antecipadas/pagas
-    // Mode Todos: soma tudo
+    // Afterpay  → base = agendadas (projeção de receita futura)
+    // Antecipado → base = pagas antecipadas (receita real, filtrada por payment_date)
+    // Recuperacao → base = pagas recuperação (receita real, filtrada por payment_date)
+    // Todos      → agendadas + pagas antecipadas + pagas recuperação
     // ============================================================
 
     let receitaBase = 0;
     let quantidadeBase = 0;
 
     if (mode === "afterpay") {
-      // AfterPay: Agendadas + Antecipadas
-      receitaBase = valorAgendadas + valorAntecipadas;
-      quantidadeBase = agendadas.length + antecipadas.length;
+      // AfterPay: base = agendadas (projeção)
+      receitaBase = valorAgendadas;
+      quantidadeBase = agendadas.length;
     } else if (mode === "antecipado") {
-      // Antecipado: apenas antecipadas (que podem estar com status pago ou agendado)
-      receitaBase = valorAntecipadas;
-      quantidadeBase = antecipadas.length;
+      // Antecipado: base = pagas antecipadas (receita real)
+      receitaBase = valorPagasAntecipadas;
+      quantidadeBase = pagasAntecipadas.length;
+    } else if (mode === "recuperacao") {
+      // Recuperação: base = pagas recuperação (receita real)
+      receitaBase = valorPagasRecuperacao;
+      quantidadeBase = pagasRecuperacao.length;
     } else {
-      // Todos: Agendadas + Antecipadas
-      receitaBase = valorAgendadas + valorAntecipadas;
-      quantidadeBase = agendadas.length + antecipadas.length;
+      // Todos: agendadas + pagas antecipadas + pagas recuperação
+      receitaBase = valorAgendadas + valorPagasAntecipadas + valorPagasRecuperacao;
+      quantidadeBase = agendadas.length + pagasAntecipadas.length + pagasRecuperacao.length;
     }
 
     // ALL derived metrics wrapped in safeNumber - investment NEVER breaks sales
@@ -511,11 +536,13 @@ export async function GET(request: Request) {
         label: "Caixa Esperado",
         value: receitaBase,
         formatted: formatCurrency(receitaBase),
-        tooltip: mode === "afterpay" 
-          ? `Agendadas (${formatCurrency(valorAgendadas)}) + Antecipadas (${formatCurrency(valorAntecipadas)})`
+        tooltip: mode === "afterpay"
+          ? `Agendadas: ${formatCurrency(valorAgendadas)}`
           : mode === "antecipado"
-            ? `Antecipadas: ${formatCurrency(valorAntecipadas)}`
-            : `Total: ${formatCurrency(receitaBase)}`,
+            ? `Pagas antecipadas: ${formatCurrency(valorPagasAntecipadas)}`
+            : mode === "recuperacao"
+              ? `Pagas recuperação: ${formatCurrency(valorPagasRecuperacao)}`
+              : `Agendadas (${formatCurrency(valorAgendadas)}) + Antecipadas (${formatCurrency(valorPagasAntecipadas)}) + Recuperação (${formatCurrency(valorPagasRecuperacao)})`,
         color: "brand",
       },
       taxaConversao: {
