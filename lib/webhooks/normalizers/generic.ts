@@ -235,6 +235,16 @@ export function normalizeGeneric(
     ])
   );
 
+  // Preço do PRODUTO sem juros de parcelamento. Na Payt, `product.price` é o
+  // preço do produto (em centavos), enquanto `transaction.total_price` inclui
+  // os juros do parcelamento. Ex.: product.price=58998 (R$589,98) parcelado
+  // vira transaction.total_price=64232 (R$642,32). Usamos product.price como
+  // base do modo produtor. Fica undefined quando a plataforma não envia (aí o
+  // cálculo cai no fallback para total_value).
+  const productPriceRaw = pickFirst(payload, ["product.price", "product_price"]);
+  const productPrice =
+    productPriceRaw != null ? centsToReais(productPriceRaw) : null;
+
   // Comissao REAL do vendedor. Para Payt (estrutura commission.N.type/amount)
   // ignoramos a taxa da plataforma e usamos affiliate > producer > coproducer.
   // Para outras plataformas, caimos no parsing generico antigo.
@@ -386,6 +396,7 @@ export function normalizeGeneric(
     amount: paidValue || totalValue,
     total_value: totalValue || undefined,
     paid_value: paidValue || totalValue || undefined,
+    product_price: productPrice ?? undefined,
     commission: commission || undefined,
     // affiliate_commission e o campo prioritario no dashboard; refletimos a
     // receita real do vendedor (afiliado quando houver, senao a comissao apurada).

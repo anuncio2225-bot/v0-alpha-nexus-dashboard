@@ -63,7 +63,7 @@ export async function GET(
     const { data: txs, error: txErr } = await supabase
       .from("transactions")
       .select(
-        "status, amount, total_value, paid_value, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
       )
       .eq("user_id", userId)
       // Comparação case-insensitive: "Bruna" == "bruna" == "BRUNA"
@@ -110,6 +110,8 @@ export async function GET(
       total_value: Number(cc.order_total_value) || Number(cc.total_value) || 0,
       amount: Number(cc.order_total_value) || Number(cc.total_value) || 0,
       paid_value: Number(cc.paid_value) || 0,
+      // Clientes manuais não têm product_price; o cálculo usa o fallback para total_value.
+      product_price: Number(cc.total_value) || null,
       sale_date: cc.order_date,
       payment_date: cc.payment_date || cc.created_at,
       customer_name: cc.name,
@@ -122,15 +124,27 @@ export async function GET(
 
   // Lista detalhada de vendas para a tela de Detalhes
   const sales = paidSales
-    .map((tx) => ({
-      date: (tx.payment_date || tx.sale_date || "").slice(0, 10),
-      customer_name: tx.customer_name,
-      product_name: tx.product_name,
-      sale_value:
-        Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0,
-      base_value: saleBaseValue(tx, att),
-      commission: saleBaseValue(tx, att) * (result.commission_tier.percent / 100),
-    }))
+    .map((tx) => {
+      // "Venda" = preço do produto SEM juros (fallback total_value nas antigas).
+      const saleValue =
+        Number(tx.product_price) ||
+        Number(tx.total_value) ||
+        Number(tx.amount) ||
+        Number(tx.paid_value) ||
+        0;
+      // "Cliente pagou" = valor com juros de parcelamento.
+      const customerPaid =
+        Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0;
+      return {
+        date: (tx.payment_date || tx.sale_date || "").slice(0, 10),
+        customer_name: tx.customer_name,
+        product_name: tx.product_name,
+        sale_value: saleValue,
+        customer_paid: customerPaid,
+        base_value: saleBaseValue(tx, att),
+        commission: saleBaseValue(tx, att) * (result.commission_tier.percent / 100),
+      };
+    })
     .sort((a, b) => b.date.localeCompare(a.date));
 
   // Indica se a atendente tem ao menos uma faixa de comissão salva em

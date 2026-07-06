@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     const { data: txs } = await supabase
       .from("transactions")
       .select(
-        "status, amount, total_value, paid_value, commission, affiliate_commission, sale_date, payment_date"
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date"
       )
       .eq("user_id", userId)
       .ilike("src", att.src)

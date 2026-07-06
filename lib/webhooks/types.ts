@@ -33,6 +33,7 @@ export interface NormalizedEvent {
   amount: number; // primary value (paid_value if available, else total_value)
   total_value?: number;
   paid_value?: number;
+  product_price?: number; // preço do produto SEM juros de parcelamento (base do modo produtor)
   commission?: number; // legacy generic commission field
   affiliate_commission?: number; // what the affiliate actually receives (trans_value_partner)
   producer_commission?: number; // what the producer receives (prod_partner_value)

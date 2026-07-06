@@ -337,6 +337,8 @@ export async function processWebhook(
       amount: event.amount || 0,
       total_value: event.total_value ?? event.amount ?? 0,
       paid_value: event.paid_value ?? event.amount ?? 0,
+      // Preço do produto SEM juros de parcelamento (base do modo produtor).
+      product_price: event.product_price ?? null,
       commission: event.commission ?? 0,
       affiliate_commission: event.affiliate_commission ?? 0,
       producer_commission: event.producer_commission ?? 0,
