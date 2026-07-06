@@ -80,6 +80,43 @@ export async function GET(
     });
   }
 
+  // Fonte 2: clientes de Cobrança atribuídos manualmente a este atendente
+  // que NÃO possuem transaction_id (vendas adicionadas manualmente). Assim não
+  // duplicam com a fonte acima — as vendas vindas de transações já são cobertas
+  // pelo src (que é propagado ao reatribuir o atendente na Cobrança).
+  const { data: manualClients } = await supabase
+    .from("collection_clients")
+    .select(
+      "name, product_name, total_value, order_total_value, paid_value, remaining_value, status_name, order_date, payment_date, created_at"
+    )
+    .eq("user_id", userId)
+    .eq("attendant_id", id)
+    .is("transaction_id", null);
+
+  const manualSales = (manualClients || [])
+    .filter((cc) => {
+      const paid =
+        Number(cc.paid_value) > 0 ||
+        (Number(cc.total_value) > 0 && Number(cc.remaining_value) <= 0);
+      if (!paid) return false;
+      const ref = (cc.payment_date || cc.order_date || cc.created_at || "").slice(0, 10);
+      return ref >= period.start && ref <= period.end;
+    })
+    .map((cc) => ({
+      status: "pago",
+      affiliate_commission: Number(cc.total_value) || 0,
+      commission: Number(cc.total_value) || 0,
+      total_value: Number(cc.order_total_value) || Number(cc.total_value) || 0,
+      amount: Number(cc.order_total_value) || Number(cc.total_value) || 0,
+      paid_value: Number(cc.paid_value) || 0,
+      sale_date: cc.order_date,
+      payment_date: cc.payment_date || cc.created_at,
+      customer_name: cc.name,
+      product_name: cc.product_name,
+    }));
+
+  paidSales = [...paidSales, ...manualSales];
+
   const result = calculateCommission(att, (rules || []) as AttendantRule[], paidSales, period);
 
   // Lista detalhada de vendas para a tela de Detalhes

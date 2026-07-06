@@ -56,12 +56,17 @@ export function getCurrentPeriod(closingDay: number): { start: string; end: stri
  */
 export function saleBaseValue(tx: CommissionTx, attendant: Attendant): number {
   if (attendant.calc_mode === "producer") {
-    const gross =
+    // Base = VALOR TOTAL DO KIT (o que o cliente paga), não o líquido da plataforma.
+    const kitPrice =
       Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0;
-    const afterPct = gross * (1 - (attendant.platform_fee_percent || 0) / 100);
-    const afterFixed = afterPct - (attendant.platform_fee_fixed || 0);
     const producerPct = attendant.producer_affiliate_percent || 0;
-    const base = producerPct > 0 ? afterFixed * (producerPct / 100) : afterFixed;
+    // 1. Quanto receberia como afiliado sobre o preço do kit
+    const asAffiliate = producerPct > 0 ? kitPrice * (producerPct / 100) : kitPrice;
+    // 2. Descontar a taxa percentual da plataforma
+    const afterPlatformFee =
+      asAffiliate * (1 - (attendant.platform_fee_percent || 0) / 100);
+    // 3. Descontar o fixo por venda da plataforma
+    const base = afterPlatformFee - (attendant.platform_fee_fixed || 0);
     return Math.max(base, 0);
   }
   // affiliate: valor já descontado que o dono recebe por venda
@@ -78,9 +83,14 @@ export function saleBaseValue(tx: CommissionTx, attendant: Attendant): number {
 /** Dedução da plataforma por venda (apenas para relatório, modo produtor). */
 function platformDeduction(tx: CommissionTx, attendant: Attendant): number {
   if (attendant.calc_mode !== "producer") return 0;
-  const gross =
+  const kitPrice =
     Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0;
-  return gross * ((attendant.platform_fee_percent || 0) / 100) + (attendant.platform_fee_fixed || 0);
+  const producerPct = attendant.producer_affiliate_percent || 0;
+  const asAffiliate = producerPct > 0 ? kitPrice * (producerPct / 100) : kitPrice;
+  return (
+    asAffiliate * ((attendant.platform_fee_percent || 0) / 100) +
+    (attendant.platform_fee_fixed || 0)
+  );
 }
 
 /**

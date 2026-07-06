@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -23,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy } from "lucide-react";
 import type { Attendant, AttendantRule } from "@/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -66,10 +67,55 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
   const [tiers, setTiers] = useState<TierRow[]>([]);
   const [bonuses, setBonuses] = useState<BonusRow[]>([]);
 
+  // Copiar configuração para outras atendentes
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
+
   const { data: rulesData } = useSWR<{ rules: AttendantRule[] }>(
     attendant && open ? `/api/attendants/${attendant.id}/rules` : null,
     fetcher
   );
+
+  const { data: allData } = useSWR<{ attendants: Attendant[] }>(
+    copyOpen ? "/api/attendants" : null,
+    fetcher
+  );
+
+  const otherAttendants = (allData?.attendants || []).filter(
+    (a) => a.id !== attendant?.id
+  );
+
+  function toggleTarget(id: string) {
+    setSelectedTargets((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  async function handleCopyConfig() {
+    if (!attendant || selectedTargets.length === 0) return;
+    setCopying(true);
+    try {
+      const res = await fetch("/api/attendants/copy-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_id: attendant.id,
+          target_ids: selectedTargets,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error();
+      toast.success(`Configuração aplicada para ${json.applied} atendente(s)`);
+      setCopyOpen(false);
+      setSelectedTargets([]);
+      onSaved();
+    } catch {
+      toast.error("Erro ao aplicar configuração");
+    } finally {
+      setCopying(false);
+    }
+  }
 
   useEffect(() => {
     if (!attendant) return;
@@ -386,6 +432,18 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
           </TabsContent>
         </Tabs>
 
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setCopyOpen(true)}
+          >
+            <Copy className="mr-1.5 h-3.5 w-3.5" />
+            Aplicar esta configuração para outras atendentes
+          </Button>
+        </div>
+
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button disabled={saving} className="bg-brand hover:bg-brand/90" onClick={handleSave}>
@@ -393,6 +451,59 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Modal de seleção de destinos */}
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Aplicar configuração para outras</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            As faixas, bônus, modo de cálculo, descontos, fixo por venda e dia de
+            fechamento serão copiados. As regras atuais das selecionadas serão
+            substituídas. Dados pessoais (nome, email, telefone, SRC) não são
+            copiados. Salve a configuração antes para copiar os valores mais
+            recentes.
+          </p>
+
+          <div className="space-y-1.5">
+            {otherAttendants.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Nenhuma outra atendente disponível
+              </p>
+            ) : (
+              otherAttendants.map((a) => (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-3 rounded-md border border-border px-3 py-2 cursor-pointer hover:bg-card-elevated"
+                >
+                  <Checkbox
+                    checked={selectedTargets.includes(a.id)}
+                    onCheckedChange={() => toggleTarget(a.id)}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-foreground">{a.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {a.src ? `SRC: ${a.src}` : "sem SRC"}
+                    </span>
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCopyOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={copying || selectedTargets.length === 0}
+              className="bg-brand hover:bg-brand/90"
+              onClick={handleCopyConfig}
+            >
+              {copying ? "Aplicando..." : `Aplicar (${selectedTargets.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

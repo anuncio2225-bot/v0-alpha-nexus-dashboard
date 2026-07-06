@@ -2,10 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
+/** Remove caracteres especiais soltos no final do SRC (colchetes, parênteses, chaves, pontos, vírgulas, espaços). */
+export function cleanSrc(src: string): string {
+  return (src || "").replace(/[\]\[(){}.,\s]+$/g, "").trim();
+}
+
 /**
  * Varre a tabela transactions do usuário, extrai valores DISTINTOS de `src`
- * e cria automaticamente atendentes para cada SRC ainda não cadastrado.
- * Não altera a tabela transactions (somente leitura).
+ * (já higienizados) e cria automaticamente atendentes para cada SRC ainda
+ * não cadastrado. Não altera a tabela transactions (somente leitura).
  */
 export async function POST() {
   const supabase = await createClient();
@@ -30,8 +35,9 @@ export async function POST() {
     return NextResponse.json({ error: srcErr.message }, { status: 500 });
   }
 
+  // Higieniza e deduplica os SRCs das vendas
   const uniqueSrcs = [
-    ...new Set((srcs || []).map((s) => (s.src || "").trim()).filter(Boolean)),
+    ...new Set((srcs || []).map((s) => cleanSrc(s.src || "")).filter(Boolean)),
   ];
 
   const { data: existing, error: exErr } = await supabase
@@ -43,8 +49,9 @@ export async function POST() {
     return NextResponse.json({ error: exErr.message }, { status: 500 });
   }
 
+  // Compara contra os SRCs existentes também higienizados (evita duplicar "Gabriela" x "Gabriela]")
   const existingSrcs = new Set(
-    (existing || []).map((a) => (a.src || "").trim()).filter(Boolean)
+    (existing || []).map((a) => cleanSrc(a.src || "")).filter(Boolean)
   );
 
   const toCreate = uniqueSrcs.filter((src) => !existingSrcs.has(src));
