@@ -41,12 +41,14 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface Props {
   attendant: Attendant;
+  /** Período fixo aplicado a todas as atendentes. null = período de fechamento próprio. */
+  period?: { start: string; end: string } | null;
   onConfigure: (a: Attendant) => void;
   onDetails: (a: Attendant, commission: CommissionResult) => void;
   onChanged: () => void;
 }
 
-export function AttendantCard({ attendant, onConfigure, onDetails, onChanged }: Props) {
+export function AttendantCard({ attendant, period, onConfigure, onDetails, onChanged }: Props) {
   const [registering, setRegistering] = useState(false);
   const [togglingActive, setTogglingActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -90,10 +92,13 @@ export function AttendantCard({ attendant, onConfigure, onDetails, onChanged }: 
     }
   }
 
-  const { data, mutate } = useSWR<CommissionResult & { sales: unknown[] }>(
-    `/api/attendants/${attendant.id}/commission`,
-    fetcher
-  );
+  const commissionUrl = period
+    ? `/api/attendants/${attendant.id}/commission?period_start=${period.start}&period_end=${period.end}`
+    : `/api/attendants/${attendant.id}/commission`;
+
+  const { data, mutate } = useSWR<
+    CommissionResult & { sales: unknown[]; has_commission_rule?: boolean }
+  >(commissionUrl, fetcher);
 
   const roleLabels: Record<string, string> = {
     closer: "Closer",
@@ -103,9 +108,12 @@ export function AttendantCard({ attendant, onConfigure, onDetails, onChanged }: 
     outro: "Outro",
   };
 
+  // Só avisa "Configure as faixas" se NÃO houver nenhuma faixa de comissão
+  // salva em attendant_rules e também não houver comissão fixa configurada.
+  // (Antes usava commission_tier.percent, que fica 0 quando não há vendas no
+  // período mesmo com faixas configuradas — causando o aviso indevido.)
   const needsConfig =
-    attendant.commission_rate === 0 &&
-    (!data || data.commission_tier?.percent === 0);
+    !!data && !data.has_commission_rule && (attendant.commission_rate || 0) === 0;
 
   // Progresso rumo à próxima faixa
   const current = data?.total_sales || 0;

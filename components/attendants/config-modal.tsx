@@ -96,6 +96,11 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
     if (!attendant || selectedTargets.length === 0) return;
     setCopying(true);
     try {
+      // Salva a config atual da atendente-fonte antes de copiar, garantindo que
+      // os valores editados (mesmo sem "Salvar" prévio) sejam os aplicados.
+      const saved = await persistConfig();
+      if (!saved) throw new Error();
+
       const res = await fetch("/api/attendants/copy-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -153,60 +158,69 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
 
   if (!attendant) return null;
 
+  // Persiste a config atual (dados + faixas + bônus) da atendente em edição,
+  // sem fechar o modal. Retorna true em caso de sucesso.
+  async function persistConfig(): Promise<boolean> {
+    if (!attendant) return false;
+    // 1. Atualiza dados da atendente
+    const attRes = await fetch("/api/attendants", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: attendant.id,
+        name,
+        src: src || null,
+        email: email || null,
+        phone: phone || null,
+        role,
+        payment_closing_day: parseInt(closingDay) || 1,
+        calc_mode: calcMode,
+        producer_affiliate_percent: parseFloat(producerPct) || 0,
+        platform_fee_percent: parseFloat(platformPct) || 0,
+        platform_fee_fixed: parseFloat(platformFixed) || 0,
+        fixed_per_sale: fixedEnabled ? parseFloat(fixedPerSale) || 0 : 0,
+      }),
+    });
+    if (!attRes.ok) return false;
+
+    // 2. Salva faixas
+    await fetch(`/api/attendants/${attendant.id}/rules`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rule_type: "commission",
+        rules: tiers.map((t, i) => ({
+          label: `Faixa ${i + 1}`,
+          min_sales: t.min_sales,
+          max_sales: t.max_sales === "" ? null : t.max_sales,
+          commission_value: t.commission_value,
+        })),
+      }),
+    });
+
+    // 3. Salva bonificações
+    await fetch(`/api/attendants/${attendant.id}/rules`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rule_type: "bonus",
+        rules: bonuses.map((b) => ({
+          label: `${b.min_sales} vendas`,
+          min_sales: b.min_sales,
+          bonus_value: b.bonus_value,
+        })),
+      }),
+    });
+
+    return true;
+  }
+
   async function handleSave() {
     if (!attendant) return;
     setSaving(true);
     try {
-      // 1. Atualiza dados da atendente
-      const attRes = await fetch("/api/attendants", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: attendant.id,
-          name,
-          src: src || null,
-          email: email || null,
-          phone: phone || null,
-          role,
-          payment_closing_day: parseInt(closingDay) || 1,
-          calc_mode: calcMode,
-          producer_affiliate_percent: parseFloat(producerPct) || 0,
-          platform_fee_percent: parseFloat(platformPct) || 0,
-          platform_fee_fixed: parseFloat(platformFixed) || 0,
-          fixed_per_sale: fixedEnabled ? parseFloat(fixedPerSale) || 0 : 0,
-        }),
-      });
-      if (!attRes.ok) throw new Error();
-
-      // 2. Salva faixas
-      await fetch(`/api/attendants/${attendant.id}/rules`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rule_type: "commission",
-          rules: tiers.map((t, i) => ({
-            label: `Faixa ${i + 1}`,
-            min_sales: t.min_sales,
-            max_sales: t.max_sales === "" ? null : t.max_sales,
-            commission_value: t.commission_value,
-          })),
-        }),
-      });
-
-      // 3. Salva bonificações
-      await fetch(`/api/attendants/${attendant.id}/rules`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rule_type: "bonus",
-          rules: bonuses.map((b) => ({
-            label: `${b.min_sales} vendas`,
-            min_sales: b.min_sales,
-            bonus_value: b.bonus_value,
-          })),
-        }),
-      });
-
+      const ok = await persistConfig();
+      if (!ok) throw new Error();
       toast.success("Configuração salva");
       onSaved();
       onOpenChange(false);
@@ -216,6 +230,22 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
       setSaving(false);
     }
   }
+
+  // Botão exibido apenas nas abas Comissão, Faixas e Bônus (não em Geral,
+  // pois dados pessoais não fazem sentido copiar).
+  const copyConfigButton = (
+    <div className="pt-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={() => setCopyOpen(true)}
+      >
+        <Copy className="mr-1.5 h-3.5 w-3.5" />
+        Aplicar esta configuração para outras atendentes
+      </Button>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -337,6 +367,8 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
                 </div>
               )}
             </div>
+
+            {copyConfigButton}
           </TabsContent>
 
           {/* FAIXAS */}
@@ -387,6 +419,8 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar faixa
             </Button>
+
+            {copyConfigButton}
           </TabsContent>
 
           {/* BONUS */}
@@ -429,20 +463,10 @@ export function ConfigModal({ attendant, open, onOpenChange, onSaved }: Props) {
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar bonificação
             </Button>
+
+            {copyConfigButton}
           </TabsContent>
         </Tabs>
-
-        <div className="pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => setCopyOpen(true)}
-          >
-            <Copy className="mr-1.5 h-3.5 w-3.5" />
-            Aplicar esta configuração para outras atendentes
-          </Button>
-        </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>

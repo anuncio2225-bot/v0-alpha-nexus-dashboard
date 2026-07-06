@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge } from "lucide-react";
+import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge, CalendarRange } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
@@ -32,6 +32,51 @@ import { ConfigModal } from "@/components/attendants/config-modal";
 import { DetailsModal } from "@/components/attendants/details-modal";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+type PeriodFilter = "current" | "last_month" | "30" | "60" | "90" | "custom";
+
+function ymd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Converte o filtro selecionado num intervalo fixo {start,end}.
+ * Retorna null para "Período atual" — nesse caso cada atendente usa o próprio
+ * dia de fechamento no backend.
+ */
+function computePeriod(
+  filter: PeriodFilter,
+  customStart: string,
+  customEnd: string
+): { start: string; end: string } | null {
+  const today = new Date();
+  switch (filter) {
+    case "current":
+      return null;
+    case "last_month": {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { start: ymd(start), end: ymd(end) };
+    }
+    case "30":
+    case "60":
+    case "90": {
+      const days = parseInt(filter, 10);
+      const start = new Date(today);
+      start.setDate(start.getDate() - days);
+      return { start: ymd(start), end: ymd(today) };
+    }
+    case "custom":
+      return customStart && customEnd
+        ? { start: customStart, end: customEnd }
+        : null;
+    default:
+      return null;
+  }
+}
 
 interface Summary {
   total_attendants: number;
@@ -52,12 +97,24 @@ export default function AttendantsPage() {
   const [detailsTarget, setDetailsTarget] = useState<Attendant | null>(null);
   const [detailsPeriod, setDetailsPeriod] = useState<{ start: string; end: string } | null>(null);
 
+  // Filtro de período (topo da página)
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("current");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const period = useMemo(
+    () => computePeriod(periodFilter, customStart, customEnd),
+    [periodFilter, customStart, customEnd]
+  );
+
   const { data, mutate, isLoading } = useSWR<{ attendants: Attendant[] }>(
     "/api/attendants",
     fetcher
   );
+  const summaryUrl = period
+    ? `/api/attendants/summary?period_start=${period.start}&period_end=${period.end}`
+    : "/api/attendants/summary";
   const { data: summary, mutate: mutateSummary } = useSWR<Summary>(
-    "/api/attendants/summary",
+    summaryUrl,
     fetcher
   );
 
@@ -189,7 +246,43 @@ export default function AttendantsPage() {
             Comissionamento progressivo com cálculo automático pelas vendas
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={periodFilter}
+            onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}
+          >
+            <SelectTrigger className="w-[180px] bg-card-elevated border-border">
+              <CalendarRange className="mr-1 h-4 w-4 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Período atual</SelectItem>
+              <SelectItem value="last_month">Mês passado</SelectItem>
+              <SelectItem value="30">Últimos 30 dias</SelectItem>
+              <SelectItem value="60">Últimos 60 dias</SelectItem>
+              <SelectItem value="90">Últimos 90 dias</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodFilter === "custom" && (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="w-[150px] bg-card-elevated border-border"
+                aria-label="Data inicial"
+              />
+              <span className="text-muted-foreground text-sm">até</span>
+              <Input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="w-[150px] bg-card-elevated border-border"
+                aria-label="Data final"
+              />
+            </div>
+          )}
           <Button variant="outline" onClick={() => runAutoDetect(false)} disabled={detecting}>
             <RefreshCw className={detecting ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
             Detectar
@@ -320,6 +413,7 @@ export default function AttendantsPage() {
               <AttendantCard
                 key={att.id}
                 attendant={att}
+                period={period}
                 onConfigure={(a) => setConfigTarget(a)}
                 onDetails={(a, commission: CommissionResult) => {
                   setDetailsTarget(a);

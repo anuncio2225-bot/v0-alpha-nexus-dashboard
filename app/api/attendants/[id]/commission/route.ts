@@ -66,7 +66,8 @@ export async function GET(
         "status, amount, total_value, paid_value, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
       )
       .eq("user_id", userId)
-      .eq("src", att.src)
+      // Comparação case-insensitive: "Bruna" == "bruna" == "BRUNA"
+      .ilike("src", att.src)
       .eq("status", "pago");
 
     if (txErr) {
@@ -132,5 +133,11 @@ export async function GET(
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  return NextResponse.json({ ...result, sales });
+  // Indica se a atendente tem ao menos uma faixa de comissão salva em
+  // attendant_rules — usado para decidir se exibe o aviso "Configure as faixas".
+  const hasCommissionRule = ((rules || []) as AttendantRule[]).some(
+    (r) => r.rule_type === "commission"
+  );
+
+  return NextResponse.json({ ...result, sales, has_commission_rule: hasCommissionRule });
 }
