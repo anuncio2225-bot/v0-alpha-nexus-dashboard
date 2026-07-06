@@ -32,7 +32,7 @@ import type {
   CollectionPlatform,
 } from "@/types";
 import { StatusBadge } from "./status-badge";
-import { AttendantBadge } from "./attendant-badge";
+import { AttendantSelect } from "./attendant-select";
 import { buildWhatsappUrl } from "@/lib/collections/whatsapp";
 import type { CollectionFilters } from "@/app/dashboard/collections/page";
 import { MultiSelectFilter } from "./multi-select-filter";
@@ -343,8 +343,13 @@ export function CollectionsBoard({
                         : undefined
                     }
                   >
-                    <TableCell>
-                      <AttendantBadge name={c.attendant_name || c.src} />
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <AttendantSelect
+                        clientId={c.id}
+                        currentName={c.attendant_name || c.src}
+                        attendants={attendants}
+                        onChanged={mutate}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-foreground">{c.name}</div>

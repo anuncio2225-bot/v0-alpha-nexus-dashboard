@@ -86,6 +86,44 @@ export async function PATCH(request: Request, { params }: Params) {
     if (key in body) updates[key] = body[key];
   }
 
+  // Ao (re)atribuir um atendente pela Cobrança, resolvemos o registro autoritativo
+  // da atendente para preencher attendant_name e src, e propagamos o src para a
+  // transação vinculada — assim o cálculo de comissão da aba de Atendentes reflete
+  // a mudança automaticamente (a query lá busca transações por src).
+  if ("attendant_id" in body && body.attendant_id) {
+    const scopedUserId = await getEffectiveUserId(supabase, user.id);
+    const { data: att } = await supabase
+      .from("attendants")
+      .select("id, name, src")
+      .eq("id", body.attendant_id)
+      .eq("user_id", scopedUserId)
+      .single();
+
+    if (att) {
+      const effectiveSrc = (att.src && att.src.trim()) || att.name;
+      updates.attendant_name = att.name;
+      updates.src = effectiveSrc;
+
+      // Garante que a atendente tenha um src (necessário para o cálculo por transações)
+      if (!att.src && effectiveSrc) {
+        await supabase
+          .from("attendants")
+          .update({ src: effectiveSrc })
+          .eq("id", att.id)
+          .eq("user_id", scopedUserId);
+      }
+
+      // Propaga o src para a transação vinculada (quando existir)
+      if (current.transaction_id) {
+        await supabase
+          .from("transactions")
+          .update({ src: effectiveSrc })
+          .eq("id", current.transaction_id)
+          .eq("user_id", scopedUserId);
+      }
+    }
+  }
+
   // Recalcula saldo se valores mudaram
   const total =
     "total_value" in body ? Number(body.total_value) || 0 : Number(current.total_value) || 0;

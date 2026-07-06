@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "./status-badge";
+import { AttendantSelect } from "./attendant-select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
@@ -105,6 +106,10 @@ export function ClientDrawer({
     client: CollectionClient;
     history: CollectionHistoryEvent[];
   }>(clientId ? `/api/collections/${clientId}` : null, fetcher);
+
+  const { data: suggestions } = useSWR<{
+    attendants: { id: string | null; name: string }[];
+  }>(open ? "/api/collections/suggestions" : null, fetcher);
 
   const client = data?.client;
   const history = data?.history ?? [];
@@ -385,11 +390,20 @@ export function ClientDrawer({
                         value={client.plan_name}
                       />
                     )}
-                    <InfoRow
-                      icon={User}
-                      label="Atendente"
-                      value={client.attendant_name || client.src}
-                    />
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="flex items-center gap-2 text-muted-foreground">
+                        <User className="size-4" />
+                        Atendente
+                      </dt>
+                      <dd className="text-right">
+                        <AttendantSelect
+                          clientId={client.id}
+                          currentName={client.attendant_name || client.src}
+                          attendants={suggestions?.attendants || []}
+                          onChanged={refresh}
+                        />
+                      </dd>
+                    </div>
                     <InfoRow
                       icon={CreditCard}
                       label="Pagamento"
