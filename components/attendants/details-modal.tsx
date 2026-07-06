@@ -30,6 +30,7 @@ interface SaleRow {
   customer_name: string | null;
   product_name: string | null;
   sale_value: number;
+  customer_paid: number;
   base_value: number;
   commission: number;
 }
@@ -106,6 +107,7 @@ export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: P
                   <TableHead>Cliente</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Venda</TableHead>
+                  <TableHead className="text-right">Cliente pagou</TableHead>
                   <TableHead className="text-right">Base</TableHead>
                   <TableHead className="text-right">Comissão</TableHead>
                 </TableRow>
@@ -118,6 +120,9 @@ export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: P
                     <TableCell className="max-w-[10rem] truncate text-xs text-muted-foreground">{s.product_name || "-"}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <SensitiveValue>{formatCurrency(s.sale_value)}</SensitiveValue>
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap text-xs text-muted-foreground">
+                      <SensitiveValue>{formatCurrency(s.customer_paid)}</SensitiveValue>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap text-muted-foreground">
                       <SensitiveValue>{formatCurrency(s.base_value)}</SensitiveValue>

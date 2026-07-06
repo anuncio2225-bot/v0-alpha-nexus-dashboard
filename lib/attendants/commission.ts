@@ -14,6 +14,8 @@ export interface CommissionTx {
   amount: number | null;
   total_value: number | null;
   paid_value: number | null;
+  /** Preço do produto SEM juros de parcelamento (base do modo produtor). */
+  product_price: number | null;
   commission: number | null;
   affiliate_commission: number | null;
   sale_date: string | null;
@@ -56,9 +58,14 @@ export function getCurrentPeriod(closingDay: number): { start: string; end: stri
  */
 export function saleBaseValue(tx: CommissionTx, attendant: Attendant): number {
   if (attendant.calc_mode === "producer") {
-    // Base = VALOR TOTAL DO KIT (o que o cliente paga), não o líquido da plataforma.
+    // Base = PREÇO DO PRODUTO sem juros de parcelamento (product_price).
+    // Fallback para total_value nas transações antigas que não têm product_price.
     const kitPrice =
-      Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0;
+      Number(tx.product_price) ||
+      Number(tx.total_value) ||
+      Number(tx.amount) ||
+      Number(tx.paid_value) ||
+      0;
     const producerPct = attendant.producer_affiliate_percent || 0;
     // 1. Quanto receberia como afiliado sobre o preço do kit
     const asAffiliate = producerPct > 0 ? kitPrice * (producerPct / 100) : kitPrice;
@@ -84,7 +91,11 @@ export function saleBaseValue(tx: CommissionTx, attendant: Attendant): number {
 function platformDeduction(tx: CommissionTx, attendant: Attendant): number {
   if (attendant.calc_mode !== "producer") return 0;
   const kitPrice =
-    Number(tx.total_value) || Number(tx.amount) || Number(tx.paid_value) || 0;
+    Number(tx.product_price) ||
+    Number(tx.total_value) ||
+    Number(tx.amount) ||
+    Number(tx.paid_value) ||
+    0;
   const producerPct = attendant.producer_affiliate_percent || 0;
   const asAffiliate = producerPct > 0 ? kitPrice * (producerPct / 100) : kitPrice;
   return (

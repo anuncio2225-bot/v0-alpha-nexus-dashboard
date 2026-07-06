@@ -213,6 +213,14 @@ export function normalizeBraip(
     ])
   );
 
+  // Preço do PRODUTO sem juros de parcelamento. Na Braip, `trans_value` é o
+  // valor do produto (constante), enquanto `trans_total_value` varia com o
+  // parcelamento (inclui juros). Ex.: trans_value=46700 (R$467) em 12x vira
+  // trans_total_value=57960. Usamos trans_value como base do modo produtor.
+  const productPrice = parseValue(
+    pickFirst(payload, ["trans_value", "plan_value", "product_price"])
+  );
+
   const commission = parseValue(
     pickFirst(payload, [
       "trans_commission",
@@ -509,6 +517,7 @@ export function normalizeBraip(
     amount: paidValue || totalValue,
     total_value: totalValue || undefined,
     paid_value: paidValue || totalValue || undefined,
+    product_price: productPrice || undefined,
     commission: commission || undefined,
     affiliate_commission: affiliateCommission || undefined,
     producer_commission: producerCommission || undefined,
