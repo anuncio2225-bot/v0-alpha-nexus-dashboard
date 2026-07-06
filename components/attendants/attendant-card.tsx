@@ -7,7 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { toast } from "sonner";
@@ -21,6 +33,7 @@ import {
   Square,
   AlertTriangle,
   Trophy,
+  Trash2,
 } from "lucide-react";
 import type { Attendant, CommissionResult } from "@/types";
 
@@ -30,10 +43,52 @@ interface Props {
   attendant: Attendant;
   onConfigure: (a: Attendant) => void;
   onDetails: (a: Attendant, commission: CommissionResult) => void;
+  onChanged: () => void;
 }
 
-export function AttendantCard({ attendant, onConfigure, onDetails }: Props) {
+export function AttendantCard({ attendant, onConfigure, onDetails, onChanged }: Props) {
   const [registering, setRegistering] = useState(false);
+  const [togglingActive, setTogglingActive] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const isInactive = attendant.status === "inactive";
+
+  async function handleToggleActive(next: boolean) {
+    setTogglingActive(true);
+    try {
+      const res = await fetch("/api/attendants", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: attendant.id,
+          status: next ? "active" : "inactive",
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(next ? "Atendente ativada" : "Atendente inativada");
+      onChanged();
+    } catch {
+      toast.error("Erro ao atualizar status");
+    } finally {
+      setTogglingActive(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/attendants?id=${attendant.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Atendente removida");
+      onChanged();
+    } catch {
+      toast.error("Erro ao remover atendente");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const { data, mutate } = useSWR<CommissionResult & { sales: unknown[] }>(
     `/api/attendants/${attendant.id}/commission`,
@@ -92,7 +147,7 @@ export function AttendantCard({ attendant, onConfigure, onDetails }: Props) {
   }
 
   return (
-    <Card className="bg-card border-border card-hover">
+    <Card className={cn("bg-card border-border card-hover", isInactive && "opacity-60")}>
       <CardContent className="p-4 space-y-4">
         {/* Cabeçalho */}
         <div className="flex items-start justify-between gap-2">
@@ -109,6 +164,11 @@ export function AttendantCard({ attendant, onConfigure, onDetails }: Props) {
                   auto
                 </Badge>
               )}
+              {isInactive && (
+                <Badge variant="outline" className="text-[10px] border-border text-muted-foreground shrink-0">
+                  inativa
+                </Badge>
+              )}
             </div>
             <p className="mt-1 text-xs text-muted-foreground truncate">
               {attendant.src ? `SRC: ${attendant.src}` : "sem SRC"}
@@ -117,10 +177,23 @@ export function AttendantCard({ attendant, onConfigure, onDetails }: Props) {
               {attendant.email ? ` · ${attendant.email}` : ""}
             </p>
           </div>
-          <Badge variant="outline" className="shrink-0 gap-1 text-xs border-border text-muted-foreground">
-            <Calendar className="h-3 w-3" />
-            Dia {attendant.payment_closing_day}
-          </Badge>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">
+                {isInactive ? "Inativa" : "Ativa"}
+              </span>
+              <Switch
+                checked={!isInactive}
+                disabled={togglingActive}
+                onCheckedChange={handleToggleActive}
+                aria-label="Ativar ou inativar atendente"
+              />
+            </div>
+            <Badge variant="outline" className="gap-1 text-xs border-border text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              Dia {attendant.payment_closing_day}
+            </Badge>
+          </div>
         </div>
 
         {needsConfig && (
@@ -243,6 +316,37 @@ export function AttendantCard({ attendant, onConfigure, onDetails }: Props) {
                 <Wallet className="mr-1.5 h-3.5 w-3.5" />
                 {registering ? "..." : "Registrar"}
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    aria-label="Remover atendente"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-card border-border">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remover {attendant.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      As vendas dela continuarão no sistema mas não serão mais
+                      vinculadas a esta atendente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={handleDelete}
+                    >
+                      {deleting ? "Removendo..." : "Remover"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </>
         )}

@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw } from "lucide-react";
+import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { AttendantCard } from "@/components/attendants/attendant-card";
@@ -43,6 +44,8 @@ export default function AttendantsPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [autoRan, setAutoRan] = useState(false);
 
   const [configTarget, setConfigTarget] = useState<Attendant | null>(null);
@@ -59,6 +62,32 @@ export default function AttendantsPage() {
   );
 
   const attendants = data?.attendants || [];
+  const visibleAttendants = showInactive
+    ? attendants
+    : attendants.filter((a) => a.status !== "inactive");
+  const inactiveCount = attendants.filter((a) => a.status === "inactive").length;
+
+  const runMerge = async () => {
+    setMerging(true);
+    try {
+      const res = await fetch("/api/attendants/merge", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error();
+      toast.success(
+        json.merged > 0
+          ? `${json.merged} atendente(s) mesclado(s)`
+          : "Nenhum duplicado encontrado"
+      );
+      if (json.merged > 0) {
+        mutate();
+        mutateSummary();
+      }
+    } catch {
+      toast.error("Erro ao mesclar duplicados");
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const runAutoDetect = async (silent = false) => {
     setDetecting(true);
@@ -165,6 +194,10 @@ export default function AttendantsPage() {
             <RefreshCw className={detecting ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
             Detectar
           </Button>
+          <Button variant="outline" onClick={runMerge} disabled={merging}>
+            <GitMerge className={merging ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+            Mesclar Duplicados
+          </Button>
           <Dialog open={newOpen} onOpenChange={setNewOpen}>
             <DialogTrigger asChild>
               <Button className="bg-brand hover:bg-brand/90">
@@ -269,19 +302,37 @@ export default function AttendantsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {attendants.map((att) => (
-            <AttendantCard
-              key={att.id}
-              attendant={att}
-              onConfigure={(a) => setConfigTarget(a)}
-              onDetails={(a, commission: CommissionResult) => {
-                setDetailsTarget(a);
-                setDetailsPeriod(commission.period);
-              }}
-            />
-          ))}
-        </div>
+        <>
+          {inactiveCount > 0 && (
+            <div className="flex items-center justify-end gap-2">
+              <Label htmlFor="show-inactive" className="text-xs text-muted-foreground cursor-pointer">
+                Mostrar inativas ({inactiveCount})
+              </Label>
+              <Switch
+                id="show-inactive"
+                checked={showInactive}
+                onCheckedChange={setShowInactive}
+              />
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleAttendants.map((att) => (
+              <AttendantCard
+                key={att.id}
+                attendant={att}
+                onConfigure={(a) => setConfigTarget(a)}
+                onDetails={(a, commission: CommissionResult) => {
+                  setDetailsTarget(a);
+                  setDetailsPeriod(commission.period);
+                }}
+                onChanged={() => {
+                  mutate();
+                  mutateSummary();
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       <ConfigModal
