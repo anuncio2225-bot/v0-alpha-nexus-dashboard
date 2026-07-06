@@ -32,7 +32,21 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { name, email, phone, role, monthly_goal, commission_rate } = body;
+  const {
+    name,
+    email,
+    phone,
+    role,
+    monthly_goal,
+    commission_rate,
+    src,
+    payment_closing_day,
+    calc_mode,
+    producer_affiliate_percent,
+    platform_fee_percent,
+    platform_fee_fixed,
+    fixed_per_sale,
+  } = body;
 
   if (!name) {
     return NextResponse.json({ error: "Name required" }, { status: 400 });
@@ -48,6 +62,14 @@ export async function POST(request: Request) {
       role: role || "closer",
       monthly_goal: monthly_goal || 0,
       commission_rate: commission_rate || 0,
+      src: src || null,
+      auto_detected: false,
+      payment_closing_day: payment_closing_day || 1,
+      calc_mode: calc_mode || "affiliate",
+      producer_affiliate_percent: producer_affiliate_percent || 0,
+      platform_fee_percent: platform_fee_percent || 0,
+      platform_fee_fixed: platform_fee_fixed || 0,
+      fixed_per_sale: fixed_per_sale || 0,
     })
     .select()
     .single();
