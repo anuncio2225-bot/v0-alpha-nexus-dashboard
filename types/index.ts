@@ -250,6 +250,67 @@ export interface Attendant {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Auto-detecção / comissionamento avançado
+  src: string | null;
+  auto_detected: boolean;
+  payment_closing_day: number;
+  calc_mode: "affiliate" | "producer";
+  producer_affiliate_percent: number;
+  platform_fee_percent: number;
+  platform_fee_fixed: number;
+  fixed_per_sale: number;
+}
+
+export interface AttendantRule {
+  id: string;
+  user_id: string;
+  attendant_id: string;
+  rule_type: "commission" | "bonus";
+  label: string | null;
+  min_sales: number;
+  max_sales: number | null;
+  commission_value: number;
+  bonus_value: number;
+  created_at: string;
+}
+
+export interface AttendantPayment {
+  id: string;
+  user_id: string;
+  attendant_id: string;
+  period_start: string;
+  period_end: string;
+  total_sales: number;
+  commission_percent: number;
+  commission_value: number;
+  bonus_total: number;
+  fixed_per_sale_total: number;
+  platform_deductions: number;
+  total_to_pay: number;
+  status: string;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface CommissionBonus {
+  label: string;
+  value: number;
+  achieved: boolean;
+  remaining?: number;
+}
+
+export interface CommissionResult {
+  period: { start: string; end: string };
+  total_sales: number;
+  commission_tier: { percent: number; label: string };
+  next_tier: { percent: number; sales_needed: number; label: string } | null;
+  base_value_total: number;
+  commission_value: number;
+  fixed_per_sale_total: number;
+  bonuses: CommissionBonus[];
+  bonus_total: number;
+  platform_deductions: number;
+  total_to_pay: number;
 }
 
 // ============================================================================
