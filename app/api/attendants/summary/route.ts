@@ -8,7 +8,7 @@ import {
 } from "@/lib/attendants/commission";
 import type { Attendant, AttendantRule } from "@/types";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,6 +16,13 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = await getEffectiveUserId(supabase, user.id);
+
+  // Período fixo opcional (mesmo intervalo para todas). Sem parâmetros, cada
+  // atendente usa seu próprio dia de fechamento.
+  const { searchParams } = new URL(request.url);
+  const qStart = searchParams.get("period_start");
+  const qEnd = searchParams.get("period_end");
+  const fixedPeriod = qStart && qEnd ? { start: qStart, end: qEnd } : null;
 
   const { data: attendants } = await supabase
     .from("attendants")
@@ -52,7 +59,7 @@ export async function GET() {
 
   for (const att of list) {
     if (!att.src) continue;
-    const period = getCurrentPeriod(att.payment_closing_day || 1);
+    const period = fixedPeriod ?? getCurrentPeriod(att.payment_closing_day || 1);
 
     const { data: txs } = await supabase
       .from("transactions")
@@ -60,7 +67,7 @@ export async function GET() {
         "status, amount, total_value, paid_value, commission, affiliate_commission, sale_date, payment_date"
       )
       .eq("user_id", userId)
-      .eq("src", att.src)
+      .ilike("src", att.src)
       .eq("status", "pago");
 
     const paidSales = ((txs || []) as CommissionTx[]).filter((tx) => {
