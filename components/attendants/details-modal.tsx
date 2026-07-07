@@ -18,9 +18,11 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
+import { Calculator, ChevronDown } from "lucide-react";
 import type { Attendant, CommissionResult } from "@/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -45,6 +47,7 @@ interface Props {
 export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [showCalc, setShowCalc] = useState(false);
 
   const periodStart = start || initialPeriod?.start || "";
   const periodEnd = end || initialPeriod?.end || "";
@@ -163,7 +166,191 @@ export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: P
             </div>
           </div>
         )}
+
+        {/* Explicação do cálculo */}
+        {data && sales.length > 0 && attendant && (
+          <div className="rounded-lg border border-border bg-card-elevated">
+            <button
+              type="button"
+              onClick={() => setShowCalc((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-foreground"
+              aria-expanded={showCalc}
+            >
+              <span className="flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-brand" />
+                Como o cálculo é feito
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${
+                  showCalc ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {showCalc && (
+              <div className="space-y-4 border-t border-border px-3 py-3 text-xs">
+                {attendant.calc_mode === "producer" ? (
+                  <CalcProducer attendant={attendant} data={data} sample={sales[0]} />
+                ) : (
+                  <CalcAffiliate data={data} />
+                )}
+
+                {/* Totais do período (comum aos dois modos) */}
+                <div className="space-y-1.5">
+                  <p className="font-semibold text-foreground">
+                    3. Total do período
+                  </p>
+                  <CalcLine
+                    label={`Base de ${data.total_sales} venda(s) somada`}
+                    value={formatCurrency(data.base_value_total)}
+                  />
+                  <CalcLine
+                    label={`Comissão = ${data.commission_tier.percent}% da base`}
+                    value={formatCurrency(data.commission_value)}
+                  />
+                  {data.fixed_per_sale_total > 0 && (
+                    <CalcLine
+                      label={`Fixo por venda (${formatCurrency(
+                        attendant.fixed_per_sale
+                      )} × ${data.total_sales})`}
+                      value={formatCurrency(data.fixed_per_sale_total)}
+                    />
+                  )}
+                  {data.bonus_total > 0 && (
+                    <CalcLine
+                      label="Bônus atingidos"
+                      value={formatCurrency(data.bonus_total)}
+                    />
+                  )}
+                  <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5 font-semibold text-success">
+                    <span>Total a pagar</span>
+                    <SensitiveValue>{formatCurrency(data.total_to_pay)}</SensitiveValue>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Linha "rótulo ........ valor" da explicação. */
+function CalcLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="whitespace-nowrap font-medium text-foreground">
+        <SensitiveValue>{value}</SensitiveValue>
+      </span>
+    </div>
+  );
+}
+
+/** Explicação passo a passo do modo PRODUTOR, usando a 1ª venda como exemplo. */
+function CalcProducer({
+  attendant,
+  data,
+  sample,
+}: {
+  attendant: Attendant;
+  data: CommissionResult;
+  sample: SaleRow;
+}) {
+  const producerPct = attendant.producer_affiliate_percent || 0;
+  const platformPct = attendant.platform_fee_percent || 0;
+  const platformFixed = attendant.platform_fee_fixed || 0;
+  const tierPct = data.commission_tier.percent;
+
+  const kit = sample.sale_value;
+  const asAffiliate = producerPct > 0 ? kit * (producerPct / 100) : kit;
+  const afterFee = asAffiliate * (1 - platformPct / 100);
+  const base = Math.max(afterFee - platformFixed, 0);
+  const commission = base * (tierPct / 100);
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">
+          Modo de cálculo: Produtor
+        </p>
+        <p className="leading-relaxed text-muted-foreground">
+          Como você é o produtor, a base de comissão parte do preço do produto e
+          descontam-se a sua parte de afiliado e as taxas da plataforma. Os juros
+          de parcelamento que o cliente paga não entram na base.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">
+          1. Base por venda (exemplo: 1ª venda da lista)
+        </p>
+        <CalcLine label="Preço do produto (Venda)" value={formatCurrency(kit)} />
+        <CalcLine
+          label={`× ${producerPct}% (sua parte de afiliado)`}
+          value={formatCurrency(asAffiliate)}
+        />
+        <CalcLine
+          label={`− ${platformPct}% (taxa % da plataforma)`}
+          value={formatCurrency(afterFee)}
+        />
+        {platformFixed > 0 && (
+          <CalcLine
+            label={`− ${formatCurrency(platformFixed)} (taxa fixa da plataforma)`}
+            value={formatCurrency(base)}
+          />
+        )}
+        <div className="flex items-center justify-between gap-3 border-t border-border pt-1.5">
+          <span className="font-medium text-foreground">= Base desta venda</span>
+          <span className="whitespace-nowrap font-semibold text-foreground">
+            <SensitiveValue>{formatCurrency(base)}</SensitiveValue>
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">2. Comissão desta venda</p>
+        <CalcLine
+          label={`${tierPct}% (faixa atual) × base ${formatCurrency(base)}`}
+          value={formatCurrency(commission)}
+        />
+        <p className="leading-relaxed text-muted-foreground">
+          A faixa é definida pelo total de vendas do período e vale para todas as
+          vendas (retroativa).
+        </p>
+      </div>
+    </>
+  );
+}
+
+/** Explicação do modo AFILIADO. */
+function CalcAffiliate({ data }: { data: CommissionResult }) {
+  const tierPct = data.commission_tier.percent;
+  return (
+    <>
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">
+          Modo de cálculo: Afiliado
+        </p>
+        <p className="leading-relaxed text-muted-foreground">
+          Aqui a base de cada venda é a comissão de afiliado que já chega
+          descontada da plataforma (coluna &quot;Base&quot;). Não há desconto
+          adicional de taxas.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">1 e 2. Base e comissão</p>
+        <CalcLine
+          label="Base = comissão de afiliado recebida por venda"
+          value={formatCurrency(data.base_value_total)}
+        />
+        <CalcLine
+          label={`Comissão = ${tierPct}% (faixa atual) da base`}
+          value={formatCurrency(data.commission_value)}
+        />
+      </div>
+    </>
   );
 }
