@@ -86,6 +86,23 @@ export async function resolveWebhookFromToken(
  * These represent customers who only initiated checkout but haven't paid.
  * The real sale arrives later when status changes to "pago" (status_code=2).
  */
+/**
+ * Detecta postbacks de TESTE enviados pelos gateways ao cadastrar/testar um
+ * webhook (ex.: Payt manda `"test": true` com dados ficticios como
+ * "Afiliado LTDA" / "Produtor CNPJ" / cliente "Walter White"). Esses eventos
+ * NUNCA devem virar transacoes reais. Sao ignorados silenciosamente.
+ */
+function isTestWebhook(payload: Record<string, unknown>): boolean {
+  const testRaw =
+    payload.test ?? payload.is_test ?? payload.sandbox ?? payload.teste;
+  return (
+    testRaw === true ||
+    testRaw === 1 ||
+    testRaw === "1" ||
+    String(testRaw).toLowerCase() === "true"
+  );
+}
+
 function isAfterpayAwaiting(payload: Record<string, unknown>): boolean {
   const payOnDeliveryRaw =
     payload.trans_pay_on_delivery ??
@@ -248,6 +265,17 @@ export async function processWebhook(
 
     console.log("[v0] Webhook received:", { gateway, eventType, userId });
     console.log("[v0] Payload:", JSON.stringify(payload).slice(0, 500));
+
+    // Postback de TESTE do gateway (ex.: Payt "test": true) - SKIP SILENTLY.
+    // Nao vira transacao nem log; e apenas o evento de teste do cadastro.
+    if (isTestWebhook(payload)) {
+      console.log("[v0] SKIP: test webhook (gateway test postback) - ignored");
+      return {
+        success: true,
+        message: "skipped_test_webhook",
+        action: "skipped",
+      };
+    }
 
     // CRITICAL RULE: PIX de termo (afterpay aguardando) - SKIP SILENTLY
     // Sales that are afterpay AND still aguardando are not real sales yet,
