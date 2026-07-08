@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -13,17 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
-import { Handshake, Users, ShoppingCart, Wallet, CalendarRange } from "lucide-react";
+import {
+  Handshake,
+  Users,
+  ShoppingCart,
+  Wallet,
+  CalendarRange,
+  Trophy,
+} from "lucide-react";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -69,33 +67,19 @@ function computePeriod(
 
 interface AffiliateGroup {
   affiliate_name: string;
-  total_sales: number;
-  paid_sales: number;
+  approved_sales: number;
   total_commission: number;
   total_volume: number;
-}
-
-interface SaleRow {
-  affiliate_name: string;
-  product_name: string | null;
-  customer_name: string | null;
-  gateway: string | null;
-  status: string | null;
-  commission: number;
-  volume: number;
-  date: string;
 }
 
 interface AffiliationData {
   summary: {
     total_affiliates: number;
-    total_sales: number;
-    paid_sales: number;
+    approved_sales: number;
     total_commission: number;
     total_volume: number;
   };
   groups: AffiliateGroup[];
-  sales: SaleRow[];
 }
 
 export default function AffiliationPage() {
@@ -114,7 +98,13 @@ export default function AffiliationPage() {
 
   const summary = data?.summary;
   const groups = data?.groups || [];
-  const sales = data?.sales || [];
+
+  // Ranking por quantidade de vendas aprovadas (quem vende mais primeiro).
+  const ranked = useMemo(
+    () => [...groups].sort((a, b) => b.approved_sales - a.approved_sales),
+    [groups]
+  );
+  const topSales = ranked[0]?.approved_sales ?? 0;
 
   const kpis = [
     {
@@ -124,8 +114,8 @@ export default function AffiliationPage() {
       sensitive: false,
     },
     {
-      label: "Vendas pagas",
-      value: summary ? String(summary.paid_sales) : "—",
+      label: "Vendas aprovadas",
+      value: summary ? String(summary.approved_sales) : "—",
       icon: ShoppingCart,
       sensitive: false,
     },
@@ -223,132 +213,98 @@ export default function AffiliationPage() {
           <Skeleton className="h-48" />
           <Skeleton className="h-64" />
         </div>
-      ) : summary && summary.total_sales === 0 ? (
+      ) : summary && summary.approved_sales === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Handshake className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <p className="text-muted-foreground">
-              Nenhuma venda de afiliado externo no período
+              Nenhuma venda aprovada de afiliado externo no período
             </p>
             <p className="text-sm text-muted-foreground/70">
-              Quando um afiliado de fora vender um produto seu, ela aparece aqui
-              automaticamente.
+              Quando um afiliado de fora tiver uma venda aprovada de um produto
+              seu, ela aparece aqui automaticamente.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Ranking por afiliado */}
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Por afiliado
-              </h2>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Afiliado</TableHead>
-                      <TableHead className="text-right">Vendas pagas</TableHead>
-                      <TableHead className="text-right">Volume</TableHead>
-                      <TableHead className="text-right">Comissão</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groups.map((g) => (
-                      <TableRow key={g.affiliate_name}>
-                        <TableCell className="font-medium text-foreground">
+        /* Ranking por afiliado: quem vende mais */
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <h2 className="mb-1 text-sm font-semibold text-foreground">
+              Ranking de afiliados
+            </h2>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Ordenado por quantidade de vendas aprovadas.
+            </p>
+            <div className="space-y-2">
+              {ranked.map((g, i) => {
+                const pct = topSales > 0 ? (g.approved_sales / topSales) * 100 : 0;
+                const isLeader = i === 0;
+                return (
+                  <div
+                    key={g.affiliate_name}
+                    className={`flex items-center gap-3 rounded-lg border p-3 ${
+                      isLeader
+                        ? "border-brand/40 bg-brand/5"
+                        : "border-border bg-card-elevated"
+                    }`}
+                  >
+                    {/* Posição */}
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        isLeader
+                          ? "bg-brand text-brand-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {isLeader ? <Trophy className="h-4 w-4" /> : i + 1}
+                    </div>
+
+                    {/* Nome + barra de volume relativo */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium text-foreground">
                           {g.affiliate_name}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {g.paid_sales}
-                          <span className="text-muted-foreground">
-                            {" "}
-                            / {g.total_sales}
+                        </p>
+                        {isLeader && (
+                          <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                            Top
                           </span>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <SensitiveValue>
-                            {formatCurrency(g.total_volume)}
-                          </SensitiveValue>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap font-medium text-success">
+                        )}
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${
+                            isLeader ? "bg-brand" : "bg-muted-foreground/40"
+                          }`}
+                          style={{ width: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-foreground">
+                        {g.approved_sales}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          {g.approved_sales === 1 ? "venda" : "vendas"}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Comissão:{" "}
+                        <span className="font-medium text-success">
                           <SensitiveValue>
                             {formatCurrency(g.total_commission)}
                           </SensitiveValue>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Vendas detalhadas */}
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Vendas recentes
-              </h2>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Afiliado</TableHead>
-                      <TableHead>Produto</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Volume</TableHead>
-                      <TableHead className="text-right">Comissão</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sales.map((s, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {s.date || "—"}
-                        </TableCell>
-                        <TableCell className="font-medium text-foreground">
-                          {s.affiliate_name}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {s.product_name || "—"}
-                        </TableCell>
-                        <TableCell className="max-w-[160px] truncate text-muted-foreground">
-                          {s.customer_name || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              s.status === "pago"
-                                ? "border-success/30 text-success"
-                                : "border-border text-muted-foreground"
-                            }
-                          >
-                            {s.status || "—"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <SensitiveValue>
-                            {formatCurrency(s.volume)}
-                          </SensitiveValue>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap text-success">
-                          <SensitiveValue>
-                            {formatCurrency(s.commission)}
-                          </SensitiveValue>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
