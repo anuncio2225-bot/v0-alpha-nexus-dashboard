@@ -12,17 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
-import { Handshake, Users, ShoppingCart, Wallet, CalendarRange } from "lucide-react";
+import {
+  Handshake,
+  Users,
+  ShoppingCart,
+  Wallet,
+  CalendarRange,
+  Trophy,
+} from "lucide-react";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -99,6 +98,13 @@ export default function AffiliationPage() {
 
   const summary = data?.summary;
   const groups = data?.groups || [];
+
+  // Ranking por quantidade de vendas aprovadas (quem vende mais primeiro).
+  const ranked = useMemo(
+    () => [...groups].sort((a, b) => b.approved_sales - a.approved_sales),
+    [groups]
+  );
+  const topSales = ranked[0]?.approved_sales ?? 0;
 
   const kpis = [
     {
@@ -221,45 +227,81 @@ export default function AffiliationPage() {
           </CardContent>
         </Card>
       ) : (
-        /* Ranking por afiliado */
+        /* Ranking por afiliado: quem vende mais */
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">
-              Por afiliado
+            <h2 className="mb-1 text-sm font-semibold text-foreground">
+              Ranking de afiliados
             </h2>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Afiliado</TableHead>
-                    <TableHead className="text-right">Vendas aprovadas</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Comissão</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groups.map((g) => (
-                    <TableRow key={g.affiliate_name}>
-                      <TableCell className="font-medium text-foreground">
-                        {g.affiliate_name}
-                      </TableCell>
-                      <TableCell className="text-right">
+            <p className="mb-4 text-xs text-muted-foreground">
+              Ordenado por quantidade de vendas aprovadas.
+            </p>
+            <div className="space-y-2">
+              {ranked.map((g, i) => {
+                const pct = topSales > 0 ? (g.approved_sales / topSales) * 100 : 0;
+                const isLeader = i === 0;
+                return (
+                  <div
+                    key={g.affiliate_name}
+                    className={`flex items-center gap-3 rounded-lg border p-3 ${
+                      isLeader
+                        ? "border-brand/40 bg-brand/5"
+                        : "border-border bg-card-elevated"
+                    }`}
+                  >
+                    {/* Posição */}
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        isLeader
+                          ? "bg-brand text-brand-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {isLeader ? <Trophy className="h-4 w-4" /> : i + 1}
+                    </div>
+
+                    {/* Nome + barra de volume relativo */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium text-foreground">
+                          {g.affiliate_name}
+                        </p>
+                        {isLeader && (
+                          <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                            Top
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${
+                            isLeader ? "bg-brand" : "bg-muted-foreground/40"
+                          }`}
+                          style={{ width: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-foreground">
                         {g.approved_sales}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <SensitiveValue>
-                          {formatCurrency(g.total_volume)}
-                        </SensitiveValue>
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap font-medium text-success">
-                        <SensitiveValue>
-                          {formatCurrency(g.total_commission)}
-                        </SensitiveValue>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          {g.approved_sales === 1 ? "venda" : "vendas"}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Comissão:{" "}
+                        <span className="font-medium text-success">
+                          <SensitiveValue>
+                            {formatCurrency(g.total_commission)}
+                          </SensitiveValue>
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
