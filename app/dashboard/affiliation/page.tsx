@@ -213,7 +213,7 @@ export default function AffiliationPage() {
           <Skeleton className="h-48" />
           <Skeleton className="h-64" />
         </div>
-      ) : summary && summary.approved_sales === 0 ? (
+      ) : summary && summary.total_affiliates === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Handshake className="mb-4 h-12 w-12 text-muted-foreground/50" />

@@ -48,10 +48,10 @@ export async function GET(request: Request) {
       "affiliate_name, affiliate_commission, commission, total_value, amount, product_price, product_name, customer_name, gateway, status, sale_date, payment_date"
     )
     .eq("user_id", userId)
-    .eq("origin_type", "affiliate_incoming")
-    // Apenas vendas APROVADAS: só interessa quantas foram aprovadas e a comissão
-    // efetivamente recebida. Canceladas/pendentes/reembolsadas ficam de fora.
-    .eq("status", "pago");
+    .eq("origin_type", "affiliate_incoming");
+    // Trazemos TODAS as vendas do afiliado (aprovadas ou não) para que o afiliado
+    // continue aparecendo no ranking mesmo sem venda aprovada. A contagem de
+    // "vendas aprovadas" e a comissão são calculadas apenas sobre status = pago.
 
   // Filtro de período opcional pela data da venda (ou pagamento como fallback).
   if (qStart && qEnd) {
@@ -67,13 +67,16 @@ export async function GET(request: Request) {
 
   const txs = (data || []) as AffiliateTx[];
 
-  // Agrupa por afiliado (todas as linhas aqui já são vendas APROVADAS).
+  // Agrupa por afiliado. O afiliado aparece mesmo sem venda aprovada; porém
+  // a contagem de vendas e a comissão consideram SOMENTE status = pago.
   const groupsMap = new Map<string, AffiliateGroup>();
+  let totalApproved = 0;
   let totalCommission = 0;
   let totalVolume = 0;
 
   for (const tx of txs) {
     const name = (tx.affiliate_name || "Afiliado não identificado").trim();
+    const isApproved = (tx.status || "").toLowerCase() === "pago";
     const commission = Number(tx.affiliate_commission) || Number(tx.commission) || 0;
     const volume =
       Number(tx.product_price) || Number(tx.total_value) || Number(tx.amount) || 0;
@@ -83,21 +86,24 @@ export async function GET(request: Request) {
       g = { affiliate_name: name, approved_sales: 0, total_commission: 0, total_volume: 0 };
       groupsMap.set(name, g);
     }
-    g.approved_sales += 1;
-    g.total_commission += commission;
-    g.total_volume += volume;
-    totalCommission += commission;
-    totalVolume += volume;
+    if (isApproved) {
+      g.approved_sales += 1;
+      g.total_commission += commission;
+      g.total_volume += volume;
+      totalApproved += 1;
+      totalCommission += commission;
+      totalVolume += volume;
+    }
   }
 
   const groups = Array.from(groupsMap.values()).sort(
-    (a, b) => b.total_commission - a.total_commission
+    (a, b) => b.approved_sales - a.approved_sales
   );
 
   return NextResponse.json({
     summary: {
       total_affiliates: groups.length,
-      approved_sales: txs.length,
+      approved_sales: totalApproved,
       total_commission: totalCommission,
       total_volume: totalVolume,
     },
