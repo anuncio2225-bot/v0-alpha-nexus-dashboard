@@ -82,7 +82,10 @@ export async function GET(request: Request) {
       .select(
         "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_name, product_id, attendant_id, sale_date, payment_date, webhook_id, created_at"
       )
-      .eq("user_id", await getEffectiveUserId(supabase, user.id));
+      .eq("user_id", await getEffectiveUserId(supabase, user.id))
+      // Apenas vendas PRÓPRIAS. Afiliados externos (affiliate_incoming) ficam de
+      // fora do dashboard. Rows antigas (NULL) contam como próprias por segurança.
+      .or("origin_type.eq.own,origin_type.is.null");
 
     // Flags de modalidade selecionadas ([] = todos)
     const hasAfterPay = modes.length === 0 || modes.includes("afterpay");
@@ -151,6 +154,7 @@ export async function GET(request: Request) {
       .from("transactions")
       .select("product_id, product_name, webhook_id, sale_date, created_at")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
+      .or("origin_type.eq.own,origin_type.is.null")
       .not("product_name", "is", null)
       .or(
         `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
@@ -230,6 +234,7 @@ export async function GET(request: Request) {
         "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_id, product_name, payment_date"
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
+      .or("origin_type.eq.own,origin_type.is.null")
       .eq("status", "pago")
       .not("payment_date", "is", null)
       .gte("payment_date", from)

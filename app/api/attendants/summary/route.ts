@@ -68,6 +68,7 @@ export async function GET(request: Request) {
       )
       .eq("user_id", userId)
       .ilike("src", att.src)
+      .or("origin_type.eq.own,origin_type.is.null")
       .eq("status", "pago");
 
     const paidSales = ((txs || []) as CommissionTx[]).filter((tx) => {

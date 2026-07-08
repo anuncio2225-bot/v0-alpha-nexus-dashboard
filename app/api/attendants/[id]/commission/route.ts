@@ -68,6 +68,8 @@ export async function GET(
       .eq("user_id", userId)
       // Comparação case-insensitive: "Bruna" == "bruna" == "BRUNA"
       .ilike("src", att.src)
+      // Afiliados externos não têm atendente — não entram no cálculo de comissão.
+      .or("origin_type.eq.own,origin_type.is.null")
       .eq("status", "pago");
 
     if (txErr) {

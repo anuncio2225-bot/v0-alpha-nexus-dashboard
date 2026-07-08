@@ -342,6 +342,9 @@ export async function processWebhook(
       commission: event.commission ?? 0,
       affiliate_commission: event.affiliate_commission ?? 0,
       producer_commission: event.producer_commission ?? 0,
+      // Origem da venda: 'own' (própria) ou 'affiliate_incoming' (afiliado externo).
+      origin_type: event.origin_type ?? "own",
+      affiliate_name: event.affiliate_name ?? null,
       currency: event.currency ?? "BRL",
 
       payment_method: event.payment_method || null,
@@ -419,7 +422,11 @@ export async function processWebhook(
     // Cria um collection_client novo (ou atualiza o status do existente quando o
     // webhook manda uma mudanca de status, ex.: agendado -> pago). NUNCA altera a
     // tabela transactions a partir daqui. E nao bloqueia o retorno do webhook.
+    // Vendas de afiliados externos (affiliate_incoming) NÃO entram na Cobrança.
     try {
+      if (event.origin_type === "affiliate_incoming") {
+        console.log("[v0] SKIP collection sync: affiliate_incoming sale");
+      } else {
       const collectionTx = {
         id: upserted?.id as string,
         customer_name: event.customer_name || null,
@@ -466,6 +473,7 @@ export async function processWebhook(
         statusMap,
         attMap
       );
+      }
     } catch (collErr) {
       console.error("[v0] collection sync error (non-blocking):", collErr);
     }

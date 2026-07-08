@@ -29,7 +29,9 @@ export async function POST() {
     .select(
       "id, transaction_code, customer_name, customer_phone, customer_email, customer_doc, product_name, product_id, plan_name, commission, affiliate_commission, total_value, amount, gateway, src, attendant_id, status, status_code, original_status, sale_date, payment_date, created_at, tracking_code, tracking_url, shipping_status, shipping_company, address_full, payment_method, payment_link"
     )
-    .eq("user_id", await getEffectiveUserId(supabase, user.id));
+    .eq("user_id", await getEffectiveUserId(supabase, user.id))
+    // Vendas de afiliados externos não entram na Cobrança.
+    .or("origin_type.eq.own,origin_type.is.null");
 
   if (txErr) {
     return NextResponse.json({ error: txErr.message }, { status: 500 });
