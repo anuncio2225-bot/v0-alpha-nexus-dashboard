@@ -121,12 +121,14 @@ function extractTypedCommissions(payload: Record<string, unknown>): {
   producer: number | null;
   coproducer: number | null;
   maxNonPlatform: number | null;
+  affiliationName: string | null;
 } {
   let found = false;
   let affiliate: number | null = null;
   let producer: number | null = null;
   let coproducer: number | null = null;
   let maxNonPlatform: number | null = null;
+  let affiliationName: string | null = null;
 
   for (let i = 0; i < 10; i++) {
     const type = payload[`commission.${i}.type`];
@@ -141,14 +143,17 @@ function extractTypedCommissions(payload: Record<string, unknown>): {
     // Taxa do gateway: nunca conta como receita do usuario.
     if (t.includes("platform") || t.includes("plataforma")) continue;
 
-    if (t.includes("afili") || t.includes("affili")) affiliate = reais;
-    else if (t.includes("coprodu") || t.includes("co-produ")) coproducer = reais;
+    if (t.includes("afili") || t.includes("affili")) {
+      affiliate = reais;
+      const name = payload[`commission.${i}.name`];
+      if (name != null) affiliationName = String(name).trim() || null;
+    } else if (t.includes("coprodu") || t.includes("co-produ")) coproducer = reais;
     else if (t.includes("produ")) producer = reais;
 
     if (maxNonPlatform === null || reais > maxNonPlatform) maxNonPlatform = reais;
   }
 
-  return { found, affiliate, producer, coproducer, maxNonPlatform };
+  return { found, affiliate, producer, coproducer, maxNonPlatform, affiliationName };
 }
 
 function normalizeStatus(raw: string): string {
@@ -265,6 +270,22 @@ export function normalizeGeneric(
         ])
       );
   const commission = sellerCommission;
+
+  // Classificação da origem (own vs affiliate_incoming) para Payt e similares.
+  // Quando o payload traz SIMULTANEAMENTE uma comissão de "producer" e uma de
+  // "affiliation", significa que o dono é o produtor e um afiliado EXTERNO
+  // vendeu → 'affiliate_incoming'. Quando há só "affiliation" (o dono é o
+  // afiliado) ou só "producer" (venda própria do produtor) → 'own'.
+  const isAffiliateIncoming =
+    typedCommissions.found &&
+    typedCommissions.producer != null &&
+    typedCommissions.affiliate != null;
+  const originType: "own" | "affiliate_incoming" = isAffiliateIncoming
+    ? "affiliate_incoming"
+    : "own";
+  const externalAffiliateName = isAffiliateIncoming
+    ? typedCommissions.affiliationName ?? undefined
+    : undefined;
 
   const customerName = safeString(
     pickFirst(payload, [
@@ -403,6 +424,8 @@ export function normalizeGeneric(
     affiliate_commission:
       (typedCommissions.affiliate ?? commission) || undefined,
     producer_commission: typedCommissions.producer ?? undefined,
+    origin_type: originType,
+    affiliate_name: externalAffiliateName,
     currency: "BRL",
 
     payment_method: rawPayment || undefined,

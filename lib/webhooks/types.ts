@@ -39,6 +39,14 @@ export interface NormalizedEvent {
   producer_commission?: number; // what the producer receives (prod_partner_value)
   currency?: string;
 
+  // Origem da venda:
+  // - "own": venda própria (equipe do dono vendeu, seja como produtor ou como
+  //   afiliado configurado). Entra em dashboard/atendentes/cobrança normalmente.
+  // - "affiliate_incoming": o dono é o PRODUTOR e um afiliado EXTERNO vendeu o
+  //   produto dele. NÃO entra nos cálculos internos; aparece só na aba Afiliação.
+  origin_type?: "own" | "affiliate_incoming";
+  affiliate_name?: string; // nome do afiliado externo (quando origin_type = affiliate_incoming)
+
   // Payment
   payment_method?: string;
   payment_link?: string; // trans_payment_link_checkout (Braip) - link para o cliente pagar

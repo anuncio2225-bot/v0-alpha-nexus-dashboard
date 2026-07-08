@@ -234,6 +234,9 @@ export function normalizeBraip(
   // We sum all "Afiliado" entries (in case of co-affiliates) for the user's actual revenue.
   let affiliateCommission = 0;
   let producerCommission = 0;
+  // Nome do afiliado que consta no array de comissões (pode ser o próprio dono,
+  // quando a conta opera como afiliada, ou um terceiro).
+  let affiliateEntryName: string | null = null;
 
   const commissionsArray = payload.commissions;
   if (Array.isArray(commissionsArray)) {
@@ -253,10 +256,24 @@ export function normalizeBraip(
 
       if (type.includes("afiliado") || type.includes("affiliate")) {
         affiliateCommission += valueInReais;
+        if (!affiliateEntryName) affiliateEntryName = safeString(c.name) || null;
       } else if (type.includes("produtor") || type.includes("producer")) {
         producerCommission += valueInReais;
       }
     }
+  }
+
+  // Classificação da origem (own vs affiliate_incoming).
+  // `postback_type` indica em QUAL papel o dono recebeu o postback:
+  //   - "Afiliado": o DONO é o afiliado desta venda → venda PRÓPRIA ('own').
+  //   - "Produtor": o dono é o produtor. Se houver uma comissão de afiliado
+  //     (terceiro) no payload, um afiliado EXTERNO vendeu → 'affiliate_incoming'.
+  const postbackType = safeString(payload.postback_type).toLowerCase();
+  let originType: "own" | "affiliate_incoming" = "own";
+  let externalAffiliateName: string | undefined;
+  if (postbackType.includes("produtor") && affiliateEntryName) {
+    originType = "affiliate_incoming";
+    externalAffiliateName = affiliateEntryName;
   }
 
   // Fallback: try flat fields if no commissions array (other gateways or older payloads)
@@ -521,6 +538,8 @@ export function normalizeBraip(
     commission: commission || undefined,
     affiliate_commission: affiliateCommission || undefined,
     producer_commission: producerCommission || undefined,
+    origin_type: originType,
+    affiliate_name: externalAffiliateName,
     currency: "BRL",
 
     payment_method: normalizePayment(rawPayment) || undefined,
