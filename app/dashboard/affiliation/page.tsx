@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -69,33 +68,19 @@ function computePeriod(
 
 interface AffiliateGroup {
   affiliate_name: string;
-  total_sales: number;
-  paid_sales: number;
+  approved_sales: number;
   total_commission: number;
   total_volume: number;
-}
-
-interface SaleRow {
-  affiliate_name: string;
-  product_name: string | null;
-  customer_name: string | null;
-  gateway: string | null;
-  status: string | null;
-  commission: number;
-  volume: number;
-  date: string;
 }
 
 interface AffiliationData {
   summary: {
     total_affiliates: number;
-    total_sales: number;
-    paid_sales: number;
+    approved_sales: number;
     total_commission: number;
     total_volume: number;
   };
   groups: AffiliateGroup[];
-  sales: SaleRow[];
 }
 
 export default function AffiliationPage() {
@@ -114,7 +99,6 @@ export default function AffiliationPage() {
 
   const summary = data?.summary;
   const groups = data?.groups || [];
-  const sales = data?.sales || [];
 
   const kpis = [
     {
@@ -124,8 +108,8 @@ export default function AffiliationPage() {
       sensitive: false,
     },
     {
-      label: "Vendas pagas",
-      value: summary ? String(summary.paid_sales) : "—",
+      label: "Vendas aprovadas",
+      value: summary ? String(summary.approved_sales) : "—",
       icon: ShoppingCart,
       sensitive: false,
     },
@@ -223,132 +207,62 @@ export default function AffiliationPage() {
           <Skeleton className="h-48" />
           <Skeleton className="h-64" />
         </div>
-      ) : summary && summary.total_sales === 0 ? (
+      ) : summary && summary.approved_sales === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Handshake className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <p className="text-muted-foreground">
-              Nenhuma venda de afiliado externo no período
+              Nenhuma venda aprovada de afiliado externo no período
             </p>
             <p className="text-sm text-muted-foreground/70">
-              Quando um afiliado de fora vender um produto seu, ela aparece aqui
-              automaticamente.
+              Quando um afiliado de fora tiver uma venda aprovada de um produto
+              seu, ela aparece aqui automaticamente.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Ranking por afiliado */}
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Por afiliado
-              </h2>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Afiliado</TableHead>
-                      <TableHead className="text-right">Vendas pagas</TableHead>
-                      <TableHead className="text-right">Volume</TableHead>
-                      <TableHead className="text-right">Comissão</TableHead>
+        /* Ranking por afiliado */
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              Por afiliado
+            </h2>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Afiliado</TableHead>
+                    <TableHead className="text-right">Vendas aprovadas</TableHead>
+                    <TableHead className="text-right">Volume</TableHead>
+                    <TableHead className="text-right">Comissão</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map((g) => (
+                    <TableRow key={g.affiliate_name}>
+                      <TableCell className="font-medium text-foreground">
+                        {g.affiliate_name}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {g.approved_sales}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <SensitiveValue>
+                          {formatCurrency(g.total_volume)}
+                        </SensitiveValue>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap font-medium text-success">
+                        <SensitiveValue>
+                          {formatCurrency(g.total_commission)}
+                        </SensitiveValue>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groups.map((g) => (
-                      <TableRow key={g.affiliate_name}>
-                        <TableCell className="font-medium text-foreground">
-                          {g.affiliate_name}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {g.paid_sales}
-                          <span className="text-muted-foreground">
-                            {" "}
-                            / {g.total_sales}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <SensitiveValue>
-                            {formatCurrency(g.total_volume)}
-                          </SensitiveValue>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap font-medium text-success">
-                          <SensitiveValue>
-                            {formatCurrency(g.total_commission)}
-                          </SensitiveValue>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Vendas detalhadas */}
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Vendas recentes
-              </h2>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Afiliado</TableHead>
-                      <TableHead>Produto</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Volume</TableHead>
-                      <TableHead className="text-right">Comissão</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sales.map((s, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {s.date || "—"}
-                        </TableCell>
-                        <TableCell className="font-medium text-foreground">
-                          {s.affiliate_name}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {s.product_name || "—"}
-                        </TableCell>
-                        <TableCell className="max-w-[160px] truncate text-muted-foreground">
-                          {s.customer_name || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              s.status === "pago"
-                                ? "border-success/30 text-success"
-                                : "border-border text-muted-foreground"
-                            }
-                          >
-                            {s.status || "—"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <SensitiveValue>
-                            {formatCurrency(s.volume)}
-                          </SensitiveValue>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap text-success">
-                          <SensitiveValue>
-                            {formatCurrency(s.commission)}
-                          </SensitiveValue>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
