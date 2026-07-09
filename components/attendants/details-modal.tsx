@@ -23,7 +23,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { Calculator, ChevronDown } from "lucide-react";
-import type { Attendant, CommissionResult } from "@/types";
+import { formatPeriodRange } from "@/lib/format-period";
+import type { Attendant, CommissionResult, AttendantPayment } from "@/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -60,6 +61,12 @@ export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: P
   );
 
   const sales = data?.sales || [];
+
+  const { data: paymentsData } = useSWR<{ payments: AttendantPayment[] }>(
+    attendant && open ? `/api/attendants/${attendant.id}/payments` : null,
+    fetcher
+  );
+  const payments = paymentsData?.payments || [];
 
   function fmtDate(d: string) {
     if (!d) return "-";
@@ -229,6 +236,51 @@ export function DetailsModal({ attendant, initialPeriod, open, onOpenChange }: P
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Histórico de pagamentos registrados */}
+        {payments.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Histórico de pagamentos
+            </h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Período</TableHead>
+                    <TableHead className="text-right">Vendas</TableHead>
+                    <TableHead className="text-right">Comissão</TableHead>
+                    <TableHead className="text-right">Bônus</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Pago em</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {formatPeriodRange(p.period_start, p.period_end)}
+                      </TableCell>
+                      <TableCell className="text-right">{p.total_sales}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <SensitiveValue>{formatCurrency(p.commission_value)}</SensitiveValue>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <SensitiveValue>{formatCurrency(p.bonus_total)}</SensitiveValue>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap font-medium text-success">
+                        <SensitiveValue>{formatCurrency(p.total_to_pay)}</SensitiveValue>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap text-xs text-muted-foreground">
+                        {p.paid_at ? fmtDate(p.paid_at.slice(0, 10)) : "pendente"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </DialogContent>

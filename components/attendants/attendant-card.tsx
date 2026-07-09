@@ -9,6 +9,17 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { formatPeriodRange } from "@/lib/format-period";
 import { cn, formatCurrency } from "@/lib/utils";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { toast } from "sonner";
@@ -52,6 +64,9 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
   const [registering, setRegistering] = useState(false);
   const [togglingActive, setTogglingActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [note, setNote] = useState("");
+  const [registerCashflow, setRegisterCashflow] = useState(true);
 
   const isInactive = attendant.status === "inactive";
 
@@ -100,6 +115,20 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
     CommissionResult & { sales: unknown[]; has_commission_rule?: boolean }
   >(commissionUrl, fetcher);
 
+  // Histórico de pagamentos: usado para saber se o período atual já foi pago.
+  const { data: paymentsData, mutate: mutatePayments } = useSWR<{
+    payments: { period_start: string; period_end: string; status: string }[];
+  }>(`/api/attendants/${attendant.id}/payments`, fetcher);
+
+  const periodPaid = !!(
+    data &&
+    paymentsData?.payments?.some(
+      (p) =>
+        p.period_start === data.period.start &&
+        p.period_end === data.period.end
+    )
+  );
+
   const roleLabels: Record<string, string> = {
     closer: "Closer",
     sdr: "SDR",
@@ -142,11 +171,27 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
           fixed_per_sale_total: data.fixed_per_sale_total,
           platform_deductions: data.platform_deductions,
           total_to_pay: data.total_to_pay,
+          register_cashflow: registerCashflow,
+          note,
+          attendant_name: attendant.name,
         }),
       });
+      if (res.status === 409) {
+        toast.error("Este período já foi registrado");
+        setShowRegister(false);
+        mutatePayments();
+        return;
+      }
       if (!res.ok) throw new Error();
-      toast.success("Pagamento registrado");
+      const json = await res.json();
+      toast.success(
+        `Pagamento de ${formatCurrency(data.total_to_pay)} registrado para ${attendant.name}.` +
+          (json.cashflow_registered ? " Lançado no Fluxo de Caixa." : "")
+      );
+      setShowRegister(false);
+      setNote("");
       mutate();
+      mutatePayments();
     } catch {
       toast.error("Erro ao registrar pagamento");
     } finally {
@@ -201,6 +246,11 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               <Calendar className="h-3 w-3" />
               Dia {attendant.payment_closing_day}
             </Badge>
+            {data?.period && (
+              <span className="text-[11px] text-muted-foreground">
+                {formatPeriodRange(data.period.start, data.period.end)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -291,7 +341,14 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
 
             {/* Total */}
             <div className="flex items-center justify-between rounded-md bg-success/10 px-3 py-2">
-              <span className="text-sm font-medium text-foreground">Total a pagar</span>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                Total a pagar
+                {periodPaid && (
+                  <Badge className="gap-1 border-success/30 bg-success/15 text-success">
+                    <CheckCircle2 className="h-3 w-3" /> Pago
+                  </Badge>
+                )}
+              </span>
               <span className="text-lg font-bold text-success">
                 <SensitiveValue>{formatCurrency(data.total_to_pay)}</SensitiveValue>
               </span>
@@ -318,11 +375,18 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               <Button
                 size="sm"
                 className="flex-1 min-w-[7rem] bg-brand hover:bg-brand/90"
-                disabled={registering || data.total_to_pay <= 0}
-                onClick={handleRegisterPayment}
+                disabled={data.total_to_pay <= 0 || periodPaid}
+                onClick={() => setShowRegister(true)}
               >
-                <Wallet className="mr-1.5 h-3.5 w-3.5" />
-                {registering ? "..." : "Registrar"}
+                {periodPaid ? (
+                  <>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Pago
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="mr-1.5 h-3.5 w-3.5" /> Registrar
+                  </>
+                )}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -356,9 +420,99 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
                 </AlertDialogContent>
               </AlertDialog>
             </div>
+
+            {/* Modal de confirmação do registro de pagamento */}
+            <Dialog open={showRegister} onOpenChange={setShowRegister}>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Registrar pagamento</DialogTitle>
+                  <DialogDescription>
+                    Confirme os dados do pagamento de {attendant.name}.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-2 rounded-lg border border-border bg-card-elevated p-3 text-sm">
+                  <RegisterLine label="Atendente" value={attendant.name} />
+                  <RegisterLine
+                    label="Período"
+                    value={formatPeriodRange(data.period.start, data.period.end)}
+                  />
+                  <RegisterLine label="Vendas pagas" value={String(data.total_sales)} />
+                  <RegisterLine
+                    label="Comissão"
+                    value={formatCurrency(data.commission_value)}
+                  />
+                  <RegisterLine
+                    label="Bônus"
+                    value={formatCurrency(data.bonus_total)}
+                  />
+                  {data.fixed_per_sale_total > 0 && (
+                    <RegisterLine
+                      label="Fixo por venda"
+                      value={formatCurrency(data.fixed_per_sale_total)}
+                    />
+                  )}
+                  <div className="flex items-center justify-between border-t border-border pt-2 font-semibold">
+                    <span className="text-foreground">Total a pagar</span>
+                    <span className="text-success">
+                      {formatCurrency(data.total_to_pay)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="pay-note" className="text-xs">
+                    Observação (opcional)
+                  </Label>
+                  <Textarea
+                    id="pay-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Ex.: pago via PIX"
+                    className="bg-card-elevated border-border"
+                    rows={2}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <Checkbox
+                    checked={registerCashflow}
+                    onCheckedChange={(v) => setRegisterCashflow(v === true)}
+                  />
+                  Registrar no Fluxo de Caixa
+                </label>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRegister(false)}
+                    disabled={registering}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-brand hover:bg-brand/90"
+                    onClick={handleRegisterPayment}
+                    disabled={registering}
+                  >
+                    {registering ? "Registrando..." : "Confirmar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Linha "rótulo ..... valor" do resumo de confirmação. */
+function RegisterLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
+    </div>
   );
 }
