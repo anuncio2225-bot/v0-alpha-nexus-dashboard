@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
+import {
+  upsertManualTransaction,
+  deleteManualTransaction,
+  isPaidStatusName,
+} from "@/lib/collections/manual-transaction";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -172,13 +177,60 @@ export async function PATCH(request: Request, { params }: Params) {
     });
   }
 
+  // Espelhamento no Dashboard para pedidos MANUAIS (ver manual-transaction.ts).
+  // Pedidos de webhook (transaction_id aponta para transação NÃO-manual) são
+  // ignorados aqui — eles já têm sua própria transação.
+  {
+    const scopedUserId = await getEffectiveUserId(supabase, user.id);
+
+    let isWebhookOrder = false;
+    if (current.transaction_id) {
+      const { data: linkedTx } = await supabase
+        .from("transactions")
+        .select("gateway")
+        .eq("id", current.transaction_id)
+        .eq("user_id", scopedUserId)
+        .maybeSingle();
+      isWebhookOrder = !!linkedTx && linkedTx.gateway !== "manual";
+    }
+
+    if (!isWebhookOrder) {
+      if (isPaidStatusName(data.status_name)) {
+        // Virou/continua "Pago": cria ou atualiza a transação espelho e vincula.
+        const txId = await upsertManualTransaction(supabase, scopedUserId, data);
+        if (txId && data.transaction_id !== txId) {
+          await supabase
+            .from("collection_clients")
+            .update({ transaction_id: txId })
+            .eq("id", id)
+            .eq("user_id", scopedUserId);
+          data.transaction_id = txId;
+        }
+      } else {
+        // Saiu de "Pago": remove a transação espelho e desvincula (não fica
+        // contando no Dashboard). Só afeta o espelho manual, nunca webhooks.
+        await deleteManualTransaction(supabase, scopedUserId, id);
+        if (current.transaction_id) {
+          await supabase
+            .from("collection_clients")
+            .update({ transaction_id: null })
+            .eq("id", id)
+            .eq("user_id", scopedUserId);
+          data.transaction_id = null;
+        }
+      }
+    }
+  }
+
   return NextResponse.json({ client: data });
 }
 
 // DELETE /api/collections/[id]
-// Remove o cliente SOMENTE da Cobranca (collection_clients + collection_history).
-// NUNCA toca na tabela transactions — a transacao original permanece intacta e o
-// cliente pode ser re-importado depois pelo "Importar do Webhook".
+// Remove o cliente da Cobranca (collection_clients + collection_history).
+// Para pedidos de WEBHOOK, NUNCA toca na tabela transactions — a transacao
+// original permanece intacta e o cliente pode ser re-importado depois.
+// EXCECAO: pedidos MANUAIS têm uma transacao espelho (gateway "manual",
+// external_id "manual_<id>") que TAMBEM é excluida aqui.
 export async function DELETE(_request: Request, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
@@ -188,6 +240,11 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const scopedUserId = await getEffectiveUserId(supabase, user.id);
+
+  // Remove a transacao espelho do pedido manual, se existir (só afeta manuais).
+  await deleteManualTransaction(supabase, scopedUserId, id);
 
   // Remove o historico vinculado primeiro (caso nao haja cascade no banco)
   await supabase
