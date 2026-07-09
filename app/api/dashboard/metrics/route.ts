@@ -31,6 +31,7 @@ type Tx = {
   product_name: string | null;
   product_id: string | null;
   attendant_id: string | null;
+  src: string | null;
   sale_date: string | null;
   payment_date: string | null;
   webhook_id: string | null;
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
     let txQuery = supabase
       .from("transactions")
       .select(
-        "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_name, product_id, attendant_id, sale_date, payment_date, webhook_id, created_at"
+        "status, sale_type, amount, total_value, paid_value, commission, affiliate_commission, producer_commission, product_name, product_id, attendant_id, src, sale_date, payment_date, webhook_id, created_at"
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       // Apenas vendas PRÓPRIAS. Afiliados externos (affiliate_incoming) ficam de
@@ -698,15 +699,23 @@ export async function GET(request: Request) {
     // 8. Attendant ranking
     const { data: attendantsRaw } = await supabase
       .from("attendants")
-      .select("id, name, monthly_goal")
+      .select("id, name, monthly_goal, src")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("status", "active");
 
     const attendants: AttendantRanking[] = (attendantsRaw || [])
       .map((att) => {
-        const attTx = workingList.filter(
-          (t) => t.attendant_id === att.id && t.status === "pago"
-        );
+        // Vendas são vinculadas ao atendente pelo SRC (nome), não por
+        // attendant_id (que fica vazio nas transações). Casamento
+        // case-insensitive, igual à rota de comissão individual.
+        const attSrc = (att.src || "").trim().toLowerCase();
+        const attTx = attSrc
+          ? workingList.filter(
+              (t) =>
+                (t.src || "").trim().toLowerCase() === attSrc &&
+                t.status === "pago"
+            )
+          : [];
         const revenue = safeNumber(sumValue(attTx));
         const commission = safeNumber(sumCommission(attTx));
         const goal = safeNumber(att.monthly_goal);
