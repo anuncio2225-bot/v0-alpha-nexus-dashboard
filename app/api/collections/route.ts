@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId, getTeamDataScope } from "@/lib/team/scope";
+import {
+  upsertManualTransaction,
+  isPaidStatusName,
+} from "@/lib/collections/manual-transaction";
 import { NextResponse } from "next/server";
 
 // GET /api/collections — lista clientes com filtros e paginacao
@@ -182,6 +186,21 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Pedido manual (sem webhook) e PAGO: cria a transação espelho para aparecer
+  // no Dashboard principal (Pagas no Período, ROI, CPA, Lucro) e vincula.
+  if (data && !data.transaction_id && isPaidStatusName(data.status_name)) {
+    const scopedUserId = await getEffectiveUserId(supabase, user.id);
+    const txId = await upsertManualTransaction(supabase, scopedUserId, data);
+    if (txId) {
+      await supabase
+        .from("collection_clients")
+        .update({ transaction_id: txId })
+        .eq("id", data.id)
+        .eq("user_id", scopedUserId);
+      data.transaction_id = txId;
+    }
   }
 
   return NextResponse.json({ client: data });
