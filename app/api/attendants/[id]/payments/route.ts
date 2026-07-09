@@ -42,6 +42,25 @@ export async function POST(
 
   const b = await request.json();
 
+  // Impede registrar o MESMO período duas vezes para a mesma atendente.
+  const { data: existing } = await supabase
+    .from("attendant_payments")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("attendant_id", id)
+    .eq("period_start", b.period_start)
+    .eq("period_end", b.period_end)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json(
+      { error: "already_registered", message: "Este período já foi registrado." },
+      { status: 409 }
+    );
+  }
+
+  const totalToPay = Number(b.total_to_pay) || 0;
+
   const { data, error } = await supabase
     .from("attendant_payments")
     .insert({
@@ -55,7 +74,7 @@ export async function POST(
       bonus_total: Number(b.bonus_total) || 0,
       fixed_per_sale_total: Number(b.fixed_per_sale_total) || 0,
       platform_deductions: Number(b.platform_deductions) || 0,
-      total_to_pay: Number(b.total_to_pay) || 0,
+      total_to_pay: totalToPay,
       status: "paid",
       paid_at: new Date().toISOString(),
     })
@@ -63,5 +82,33 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ payment: data });
+
+  // Lançamento opcional no Fluxo de Caixa (saída na categoria "Atendente").
+  let cashflowRegistered = false;
+  if (b.register_cashflow && totalToPay > 0) {
+    const name = (b.attendant_name || "atendente").toString();
+    const fmt = (d: string) => {
+      if (!d) return "";
+      const [, m, day] = d.split("-");
+      return `${day}/${m}`;
+    };
+    const description = `Comissão ${name} - Período ${fmt(b.period_start)} a ${fmt(b.period_end)}`;
+    const note = (b.note || "").toString().trim();
+
+    const { error: cashErr } = await supabase.from("cashflow").insert({
+      user_id: userId,
+      type: "expense",
+      category: "Atendente",
+      description,
+      amount: totalToPay,
+      date: new Date().toISOString(),
+      payment_method: "pix",
+      notes: note || null,
+      source: "atendente",
+    });
+    if (!cashErr) cashflowRegistered = true;
+    else console.error("[v0] cashflow insert error:", cashErr.message);
+  }
+
+  return NextResponse.json({ payment: data, cashflow_registered: cashflowRegistered });
 }
