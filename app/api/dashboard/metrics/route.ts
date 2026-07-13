@@ -50,8 +50,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
+  const fromRaw = searchParams.get("from");
+  const toRaw = searchParams.get("to");
   const attendantId = searchParams.get("src");
   // Multi product filter: comma-separated list of product ids/names. Empty = all products.
   const productsParam = searchParams.get("products");
@@ -67,12 +67,22 @@ export async function GET(request: Request) {
   // Para compatibilidade com código legado que usava "mode" singular:
   const mode = modes.length === 1 ? modes[0] : modes.length === 0 ? "all" : "multi";
 
-  if (!from || !to) {
+  if (!fromRaw || !toRaw) {
     return NextResponse.json(
       { error: "Missing from/to params" },
       { status: 400 }
     );
   }
+
+  // O front envia horário de parede de Brasília SEM fuso (ex.: "2026-07-12T00:00:00").
+  // O banco roda em UTC, então uma comparação ingênua joga vendas do fim da noite
+  // (ex.: 22:56 BRT = 01:56 UTC do dia seguinte) para fora do dia. Anexamos o
+  // offset de Brasília (-03:00) para que TODAS as comparações de data (sale_date,
+  // payment_date, created_at) respeitem o dia-calendário de Brasília.
+  const withSpOffset = (v: string) =>
+    /[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? v : `${v}-03:00`;
+  const from = withSpOffset(fromRaw);
+  const to = withSpOffset(toRaw);
 
   try {
     // 1. Fetch ALL transactions in period
