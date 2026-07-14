@@ -1,4 +1,5 @@
 import type { NormalizedEvent } from "../types";
+import { normalizeGatewayDate } from "../date-utils";
 
 /**
  * Braip status mapping - handles ALL known status values
@@ -396,24 +397,28 @@ export function normalizeBraip(
     : "antecipado";
 
   // Dates
-  const saleDate = safeString(
-    pickFirst(payload, [
-      "trans_createdate",
-      "sale_date",
-      "data_compra",
-      "created_at",
-      "data_venda",
-    ])
+  const saleDate = normalizeGatewayDate(
+    safeString(
+      pickFirst(payload, [
+        "trans_createdate",
+        "sale_date",
+        "data_compra",
+        "created_at",
+        "data_venda",
+      ])
+    )
   );
 
-  const paymentDate = safeString(
-    pickFirst(payload, [
-      "trans_paydate",
-      "trans_payment_date",
-      "payment_date",
-      "data_pagamento",
-      "paid_at",
-    ])
+  const paymentDate = normalizeGatewayDate(
+    safeString(
+      pickFirst(payload, [
+        "trans_paydate",
+        "trans_payment_date",
+        "payment_date",
+        "data_pagamento",
+        "paid_at",
+      ])
+    )
   );
 
   const guaranteeDate = safeString(
