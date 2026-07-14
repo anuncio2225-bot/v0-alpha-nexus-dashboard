@@ -120,7 +120,7 @@ export async function POST(request: Request) {
   }
 
   const total = Number(body.total_value) || 0;
-  const paid = Number(body.paid_value) || 0;
+  let paid = Number(body.paid_value) || 0;
 
   // Resolve nomes denormalizados de status/plataforma/atendente
   let statusName = body.status_name || null;
@@ -133,6 +133,15 @@ export async function POST(request: Request) {
       .single();
     statusName = st?.name || null;
   }
+
+  // Se o pedido é marcado como "Pago", ele está QUITADO: o valor pago é o total
+  // e não há nada pendente. Evita a contradição de status "Pago" com saldo
+  // restante (ex.: total 390, pago 360, pendente 30). Isso também mantém a
+  // Cobrança coerente com a transação espelho, que recebe o total no pix manual.
+  if (isPaidStatusName(statusName) && total > 0) {
+    paid = total;
+  }
+  const remaining = Math.max(0, total - paid);
   let platformName = body.platform_name || null;
   if (body.platform_id && !platformName) {
     const { data: pl } = await supabase
@@ -171,7 +180,7 @@ export async function POST(request: Request) {
       src: body.src || null,
       total_value: total,
       paid_value: paid,
-      remaining_value: total - paid,
+      remaining_value: remaining,
       payment_method: body.payment_method || null,
       payment_link: body.payment_link || null,
       status_id: body.status_id || null,
