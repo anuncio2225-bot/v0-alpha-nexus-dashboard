@@ -1,4 +1,5 @@
 import type { NormalizedEvent, WebhookGateway } from "../types";
+import { normalizeGatewayDate } from "../date-utils";
 
 /**
  * Generic normalizer for payment platforms whose exact payload shape is not
@@ -368,28 +369,32 @@ export function normalizeGeneric(
     ])
   ).toLowerCase();
 
-  const saleDate = safeString(
-    pickFirst(payload, [
-      "started_at",
-      "transaction.created_at",
-      "sale_date",
-      "created_at",
-      "data_compra",
-      "data_venda",
-      "date",
-    ])
+  const saleDate = normalizeGatewayDate(
+    safeString(
+      pickFirst(payload, [
+        "started_at",
+        "transaction.created_at",
+        "sale_date",
+        "created_at",
+        "data_compra",
+        "data_venda",
+        "date",
+      ])
+    )
   );
 
-  const paymentDate = safeString(
-    pickFirst(payload, [
-      "transaction.paid_at",
-      "transaction.updated_at",
-      "payment_date",
-      "paid_at",
-      "data_pagamento",
-      "approved_date",
-      "updated_at",
-    ])
+  const paymentDate = normalizeGatewayDate(
+    safeString(
+      pickFirst(payload, [
+        "transaction.paid_at",
+        "transaction.updated_at",
+        "payment_date",
+        "paid_at",
+        "data_pagamento",
+        "approved_date",
+        "updated_at",
+      ])
+    )
   );
 
   const utmSource = safeString(pickFirst(payload, ["utm_source", "link.sources.src"]));

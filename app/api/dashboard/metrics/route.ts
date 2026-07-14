@@ -116,8 +116,15 @@ export async function GET(request: Request) {
         .gte("payment_date", from)
         .lte("payment_date", to);
     } else {
+      // Trazemos as transações por 3 critérios (união):
+      //  1) sale_date dentro do período (pedidos feitos no período);
+      //  2) sem sale_date, mas created_at no período (fallback de rows antigas);
+      //  3) payment_date dentro do período (vendas PAGAS no período, mesmo que o
+      //     pedido tenha sido feito em outro dia — ex.: PIX/boleto pago depois).
+      // O critério (3) garante que "Pagas no Período" conte pelo dia do PAGAMENTO,
+      // evitando que uma venda paga hoje mas pedida ontem suma do filtro "hoje".
       txQuery = txQuery.or(
-        `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
+        `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to}),and(payment_date.gte.${from},payment_date.lte.${to})`
       );
     }
 
