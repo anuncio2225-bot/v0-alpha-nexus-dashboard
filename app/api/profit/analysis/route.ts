@@ -179,7 +179,20 @@ export async function GET(request: Request) {
       return s;
     return s + num(a.investment_value);
   }, 0);
-  const adsInvestment = manualSpend + metaSpendTotal;
+
+  // Imposto sobre ads: o dashboard principal calcula o "Investimento" como
+  // (manual + Meta) * (1 + ads_tax_percentage/100). Aplicamos EXATAMENTE a mesma
+  // fórmula aqui para que investimento, ROI e CPA batam com o dashboard e fiquem
+  // em tempo real (ambos leem meta_ads_performance + ad_investments).
+  const { data: settingsRow } = await supabase
+    .from("settings")
+    .select("ads_tax_percentage")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const adsTaxPercent = num(settingsRow?.ads_tax_percentage ?? 6);
+
+  const rawSpend = manualSpend + metaSpendTotal;
+  const adsInvestment = rawSpend + rawSpend * (adsTaxPercent / 100);
 
   // 6. Saídas do fluxo de caixa (excluindo categorias configuradas p/ evitar
   // dupla contagem, ex.: investimento em ads já descontado na operação interna)
