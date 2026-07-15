@@ -5,6 +5,7 @@ import {
   deleteManualTransaction,
   isPaidStatusName,
 } from "@/lib/collections/manual-transaction";
+import { syncStockForTransactionId } from "@/lib/stock/sync";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -216,9 +217,20 @@ export async function PATCH(request: Request, { params }: Params) {
             .eq("user_id", scopedUserId);
           data.transaction_id = txId;
         }
+        // Dá baixa no estoque (idempotente: não duplica se já houve saída).
+        if (txId) await syncStockForTransactionId(supabase, scopedUserId, txId);
       } else {
-        // Saiu de "Pago": remove a transação espelho e desvincula (não fica
-        // contando no Dashboard). Só afeta o espelho manual, nunca webhooks.
+        // Saiu de "Pago": estorna o estoque (devolve os potes) ANTES de remover a
+        // transação espelho, e desvincula (não fica contando no Dashboard).
+        if (current.transaction_id) {
+          await syncStockForTransactionId(
+            supabase,
+            scopedUserId,
+            current.transaction_id,
+            { forceStatus: "cancelado" }
+          );
+        }
+        // Só afeta o espelho manual, nunca webhooks.
         await deleteManualTransaction(supabase, scopedUserId, id);
         if (current.transaction_id) {
           await supabase
@@ -252,6 +264,23 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
 
   const scopedUserId = await getEffectiveUserId(supabase, user.id);
+
+  // Se o pedido manual tinha transação espelho paga, estorna o estoque (devolve
+  // os potes) antes de excluir. Busca o vínculo atual do cliente.
+  const { data: toDelete } = await supabase
+    .from("collection_clients")
+    .select("transaction_id")
+    .eq("id", id)
+    .eq("user_id", scopedUserId)
+    .maybeSingle();
+  if (toDelete?.transaction_id) {
+    await syncStockForTransactionId(
+      supabase,
+      scopedUserId,
+      toDelete.transaction_id,
+      { forceStatus: "cancelado" }
+    );
+  }
 
   // Remove a transacao espelho do pedido manual, se existir (só afeta manuais).
   await deleteManualTransaction(supabase, scopedUserId, id);

@@ -13,9 +13,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, AlertTriangle } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  AlertTriangle,
+  Pencil,
+  Check,
+  X,
+  Loader2,
+} from "lucide-react";
 import type { StockMovement } from "./types";
 
 const PAGE_SIZE = 15;
@@ -28,11 +37,49 @@ function formatDate(iso: string) {
 export function StockTable({
   movements,
   isLoading,
+  onEdited,
 }: {
   movements: StockMovement[];
   isLoading: boolean;
+  onEdited?: () => void;
 }) {
   const [page, setPage] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function startEdit(m: StockMovement) {
+    setEditingId(m.id);
+    setDraft(String(m.quantity));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft("");
+  }
+
+  async function saveEdit(id: string) {
+    const q = Math.trunc(Number(draft));
+    if (!Number.isFinite(q) || q <= 0) {
+      cancelEdit();
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/stock/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: q }),
+      });
+      if (!res.ok) throw new Error();
+      cancelEdit();
+      onEdited?.();
+    } catch {
+      // Mantém em edição para o usuário tentar de novo.
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (isLoading) {
     return <Skeleton className="h-96 w-full rounded-xl" />;
@@ -111,14 +158,62 @@ export function StockTable({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right text-sm font-medium tabular-nums",
-                        isEntry ? "text-emerald-500" : "text-destructive"
+                    <TableCell className="text-right">
+                      {editingId === m.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={draft}
+                            autoFocus
+                            disabled={saving}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.nativeEvent.isComposing || e.keyCode === 229)
+                                return;
+                              if (e.key === "Enter") saveEdit(m.id);
+                              if (e.key === "Escape") cancelEdit();
+                            }}
+                            className="h-7 w-16 text-right text-sm tabular-nums"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-emerald-500"
+                            disabled={saving}
+                            onClick={() => saveEdit(m.id)}
+                          >
+                            {saving ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground"
+                            disabled={saving}
+                            onClick={cancelEdit}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(m)}
+                          title="Clique para editar a quantidade"
+                          className={cn(
+                            "group inline-flex items-center gap-1 rounded px-1 text-sm font-medium tabular-nums transition-colors hover:bg-muted",
+                            isEntry ? "text-emerald-500" : "text-destructive"
+                          )}
+                        >
+                          {isEntry ? "+" : "−"}
+                          {m.quantity}
+                          <Pencil className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60" />
+                        </button>
                       )}
-                    >
-                      {isEntry ? "+" : "−"}
-                      {m.quantity}
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                       {isEntry ? (

@@ -4,6 +4,7 @@ import {
   upsertManualTransaction,
   isPaidStatusName,
 } from "@/lib/collections/manual-transaction";
+import { syncStockForTransactionId } from "@/lib/stock/sync";
 import { NextResponse } from "next/server";
 
 // GET /api/collections — lista clientes com filtros e paginacao
@@ -209,6 +210,8 @@ export async function POST(request: Request) {
         .eq("id", data.id)
         .eq("user_id", scopedUserId);
       data.transaction_id = txId;
+      // Venda manual paga também dá baixa no ESTOQUE (mesma lógica do webhook).
+      await syncStockForTransactionId(supabase, scopedUserId, txId);
     }
   }
 
