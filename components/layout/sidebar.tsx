@@ -56,17 +56,17 @@ const navItems: {
 }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard" },
   { href: "/dashboard/profit", label: "Análise de Lucro", icon: TrendingUp, perm: "financeiro" },
-  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone, perm: "investimento_ads" },
-  { href: "/dashboard/connect", label: "Integrações", icon: Link2, perm: "integracoes" },
-  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook, perm: "webhooks" },
   { href: "/dashboard/attendants", label: "Atendentes", icon: Users, perm: "atendentes" },
   { href: "/dashboard/affiliation", label: "Afiliação", icon: Handshake, perm: "atendentes" },
   { href: "/dashboard/collections", label: "Cobrança", icon: PhoneCall, perm: "cobranca" },
-  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet, perm: "financeiro" },
   { href: "/dashboard/cashflow", label: "Fluxo de Caixa", icon: ArrowLeftRight, perm: "cashflow" },
+  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet, perm: "financeiro" },
   { href: "/dashboard/stock", label: "Estoque", icon: Package, perm: "financeiro" },
-  { href: "/dashboard/logs", label: "Logs", icon: FileText, perm: "logs" },
+  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone, perm: "investimento_ads" },
   { href: "/dashboard/team", label: "Equipe", icon: ShieldCheck, perm: "equipe", ownerOnly: true },
+  { href: "/dashboard/connect", label: "Integrações", icon: Link2, perm: "integracoes" },
+  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook, perm: "webhooks" },
+  { href: "/dashboard/logs", label: "Logs", icon: FileText, perm: "logs" },
   { href: "/dashboard/settings", label: "Configurações", icon: Settings, perm: "settings" },
 ];
 

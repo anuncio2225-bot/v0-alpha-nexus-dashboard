@@ -259,6 +259,7 @@ export default function StockPage() {
       <StockTable
         movements={movesData?.movements ?? []}
         isLoading={movesLoading}
+        onEdited={refresh}
       />
 
       <EntryDialog

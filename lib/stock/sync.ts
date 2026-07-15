@@ -124,3 +124,39 @@ export async function syncStockForTransaction(
 
   return "noop";
 }
+
+/**
+ * Conveniência para os pedidos MANUAIS da Cobrança: dado o id de uma transação
+ * espelho, carrega os dados dela e aplica a movimentação de estoque.
+ *
+ * Chamado quando um pedido manual passa a "Pago" (cria saída) ou deixa de ser
+ * pago / é excluído (o status vira reverso e restaura o saldo). Não-bloqueante:
+ * qualquer erro é logado e engolido para não quebrar o fluxo da Cobrança.
+ */
+export async function syncStockForTransactionId(
+  supabase: SB,
+  userId: string,
+  transactionId: string,
+  opts?: { forceStatus?: string }
+): Promise<void> {
+  try {
+    const { data: tx } = await supabase
+      .from("transactions")
+      .select(
+        "id, status, plan_name, product_name, customer_name, payment_date, sale_date, created_at"
+      )
+      .eq("id", transactionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!tx) return;
+    const kits = await fetchKits(supabase, userId);
+    await syncStockForTransaction(
+      supabase,
+      userId,
+      { ...(tx as StockTx), status: opts?.forceStatus ?? tx.status },
+      kits
+    );
+  } catch (err) {
+    console.error("[v0] syncStockForTransactionId error (non-blocking):", err);
+  }
+}
