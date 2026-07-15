@@ -6,6 +6,7 @@ export interface ProfitAnalysis {
     ads_investment: number;
     profit: number;
     roi: number;
+    cpa: number;
   };
   affiliate_external: {
     commission_total: number;

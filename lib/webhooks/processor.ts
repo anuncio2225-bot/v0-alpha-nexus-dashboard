@@ -9,6 +9,7 @@ import {
   buildStatusMap,
   syncTransactionToCollection,
 } from "@/lib/collections/sync";
+import { fetchKits, syncStockForTransaction } from "@/lib/stock/sync";
 import type { NormalizedEvent, ProcessResult, WebhookGateway } from "./types";
 
 export interface ProcessOptions {
@@ -504,6 +505,29 @@ export async function processWebhook(
       }
     } catch (collErr) {
       console.error("[v0] collection sync error (non-blocking):", collErr);
+    }
+
+    // 6c. Sincroniza o ESTOQUE (somente leitura de transactions/product_costs +
+    // gravação em stock_movements). Vale para vendas próprias E de afiliados —
+    // em ambos o produto sai do estoque. Idempotente e não-bloqueante.
+    try {
+      const kits = await fetchKits(supabase, userId);
+      await syncStockForTransaction(
+        supabase,
+        userId,
+        {
+          id: upserted?.id as string,
+          status: event.status || null,
+          plan_name: event.plan_name || null,
+          product_name: event.product_name || null,
+          customer_name: event.customer_name || null,
+          payment_date: event.payment_date || null,
+          sale_date: event.sale_date || null,
+        },
+        kits
+      );
+    } catch (stockErr) {
+      console.error("[v0] stock sync error (non-blocking):", stockErr);
     }
 
     // 7. Mark log as processed
