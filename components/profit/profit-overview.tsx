@@ -67,10 +67,11 @@ export function ProfitOverview({
             }
           />
           <SimStat label="ROI" value={<span>{sim.roi.toFixed(2)}x</span>} />
+          <SimStat label="CPA" value={<Money value={sim.cpa} />} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Simulação de referência com base nas suas vendas próprias (comissão de{" "}
-          afiliado − custo dos kits − investimento em ads).
+          afiliado − investimento em ads). O afiliado não arca com custo de kits.
         </p>
       </div>
 

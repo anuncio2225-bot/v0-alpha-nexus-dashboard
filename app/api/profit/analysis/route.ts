@@ -204,6 +204,10 @@ export async function GET(request: Request) {
   // ---- CÁLCULOS ----
 
   // 2.2 Simulação como afiliado (só das vendas próprias)
+  // Base da receita = PREÇO DO PRODUTO (product_price, sem juros de parcelamento),
+  // com fallback para o valor da venda quando o preço não está disponível.
+  // O afiliado NÃO arca com custo de kit/envio (quem paga o produto é o produtor),
+  // então o lucro/ROI da simulação consideram apenas o investimento em ads.
   let simRevenue = 0;
   let ownKitCosts = 0;
   for (const t of ownTxs) {
@@ -213,11 +217,11 @@ export async function GET(request: Request) {
       gross * (1 - config.affiliate_platform_fee / 100) -
       config.affiliate_platform_fixed;
     simRevenue += Math.max(0, net);
-    ownKitCosts += kitCostFor(t);
+    ownKitCosts += kitCostFor(t); // reutilizado na operação interna (2.4)
   }
-  const simProfit = simRevenue - ownKitCosts - adsInvestment;
-  const simCost = ownKitCosts + adsInvestment;
-  const simRoi = simCost > 0 ? simRevenue / simCost : 0;
+  const simProfit = simRevenue - adsInvestment;
+  const simRoi = adsInvestment > 0 ? simRevenue / adsInvestment : 0;
+  const simCpa = ownTxs.length > 0 ? adsInvestment / ownTxs.length : 0;
 
   // 2.3 Lucro com afiliados externos (receita = comissão de produtor)
   let affCommission = 0;
@@ -257,6 +261,7 @@ export async function GET(request: Request) {
       ads_investment: adsInvestment,
       profit: simProfit,
       roi: simRoi,
+      cpa: simCpa,
     },
     affiliate_external: {
       commission_total: affCommission,
