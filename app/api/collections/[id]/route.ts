@@ -151,6 +151,16 @@ export async function PATCH(request: Request, { params }: Params) {
       .single();
     newStatusName = st?.name || null;
     updates.status_name = newStatusName;
+  } else if ("status_name" in body) {
+    newStatusName = body.status_name || null;
+  }
+
+  // Se o pedido está (ou passou a estar) "Pago", ele está QUITADO: valor pago =
+  // total e nada pendente. Evita a contradição de status "Pago" com saldo
+  // restante e mantém a Cobrança coerente com a transação espelho.
+  if (isPaidStatusName(newStatusName) && total > 0) {
+    updates.paid_value = total;
+    updates.remaining_value = 0;
   }
 
   const { data, error } = await supabase
