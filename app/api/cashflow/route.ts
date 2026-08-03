@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { type, category, description, amount, date, payment_method, notes } = body;
+  const { type, category, description, amount, date, payment_method, notes, include_in_profit } = body;
 
   if (!type || !category || !amount) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       payment_method: payment_method || "pix",
       notes: notes || null,
       source: "manual",
+      include_in_profit: include_in_profit === undefined ? true : !!include_in_profit,
     })
     .select()
     .single();
@@ -70,23 +71,33 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { id, type, category, description, amount, date, payment_method, notes } = body;
+  const { id } = body;
 
   if (!id) {
     return NextResponse.json({ error: "ID required" }, { status: 400 });
   }
 
+  // Update parcial: só grava os campos enviados. Permite o toggle inline
+  // (que manda apenas { id, include_in_profit }) sem apagar os demais campos.
+  const updates: Record<string, unknown> = {};
+  for (const key of [
+    "type",
+    "category",
+    "description",
+    "amount",
+    "date",
+    "payment_method",
+    "notes",
+  ]) {
+    if (key in body) updates[key] = body[key];
+  }
+  if ("include_in_profit" in body) {
+    updates.include_in_profit = !!body.include_in_profit;
+  }
+
   const { data, error } = await supabase
     .from("cashflow")
-    .update({
-      type,
-      category,
-      description,
-      amount,
-      date,
-      payment_method,
-      notes,
-    })
+    .update(updates)
     .eq("id", id)
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .select()
