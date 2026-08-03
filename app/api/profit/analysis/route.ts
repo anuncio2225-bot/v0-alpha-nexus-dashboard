@@ -201,7 +201,7 @@ export async function GET(request: Request) {
   );
   const { data: cashflowRaw } = await supabase
     .from("cashflow")
-    .select("type, category, amount, date")
+    .select("type, category, amount, date, include_in_profit")
     .eq("user_id", userId)
     .gte("date", fromTs)
     .lte("date", toTs);
@@ -210,6 +210,11 @@ export async function GET(request: Request) {
     const isExpense =
       (row.type || "").toLowerCase() === "expense" || num(row.amount) < 0;
     if (!isExpense) return s;
+    // Controle por lançamento: o usuário pode marcar uma saída para NÃO entrar
+    // na Análise de Lucro. include_in_profit === false exclui explicitamente.
+    if (row.include_in_profit === false) return s;
+    // Filtro adicional por categoria (ex.: Investimento Ads) evita dupla
+    // contagem, já que ads já é descontado na operação interna.
     if (excluded.has((row.category || "").trim().toLowerCase())) return s;
     return s + Math.abs(num(row.amount));
   }, 0);

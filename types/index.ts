@@ -385,6 +385,7 @@ export interface CashflowEntry {
   status: string;
   source: string;
   transaction_id: string | null;
+  include_in_profit: boolean;
   created_at: string;
   updated_at: string;
 }

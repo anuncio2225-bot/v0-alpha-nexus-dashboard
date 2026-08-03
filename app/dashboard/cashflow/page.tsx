@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -72,6 +73,8 @@ export default function CashflowPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [entryType, setEntryType] = useState<"income" | "expense">("income");
+  const [includeInProfit, setIncludeInProfit] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filterMonth, setFilterMonth] = useState("Todos");
   const [filterYear, setFilterYear] = useState(
     new Date().getFullYear().toString()
@@ -87,6 +90,7 @@ export default function CashflowPage() {
     date: "",
     payment_method: "pix",
     notes: "",
+    include_in_profit: true,
   });
 
   // Tax percentage from settings
@@ -170,14 +174,17 @@ export default function CashflowPage() {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    const type = formData.get("type");
     const payload = {
-      type: formData.get("type"),
+      type,
       category: formData.get("category"),
       description: formData.get("description") || null,
       amount: parseFloat(formData.get("amount") as string) || 0,
       date: formData.get("date") || new Date().toISOString(),
       payment_method: formData.get("payment_method") || "pix",
       notes: formData.get("notes") || null,
+      // Entradas não afetam a Análise de Lucro (só saídas), então gravamos true.
+      include_in_profit: type === "expense" ? includeInProfit : true,
     };
     try {
       const res = await fetch("/api/cashflow", {
@@ -188,6 +195,7 @@ export default function CashflowPage() {
       if (!res.ok) throw new Error();
       toast.success("Lançamento criado");
       setOpen(false);
+      setIncludeInProfit(true);
       mutate();
     } catch {
       toast.error("Erro ao criar lançamento");
@@ -207,6 +215,26 @@ export default function CashflowPage() {
     }
   }
 
+  async function toggleIncludeInProfit(entry: CashflowEntry, next: boolean) {
+    setTogglingId(entry.id);
+    try {
+      const res = await fetch("/api/cashflow", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.id, include_in_profit: next }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(
+        next ? "Passou a contar na Análise de Lucro" : "Fora da Análise de Lucro"
+      );
+      mutate();
+    } catch {
+      toast.error("Erro ao atualizar");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   function openEditModal(entry: CashflowEntry) {
     // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
     const dateStr = typeof entry.date === "string" 
@@ -221,6 +249,7 @@ export default function CashflowPage() {
       date: dateStr,
       payment_method: (entry as CashflowEntry & { payment_method?: string }).payment_method || "pix",
       notes: (entry as CashflowEntry & { notes?: string }).notes || "",
+      include_in_profit: entry.include_in_profit !== false,
     });
     setEditingEntry(entry);
   }
@@ -243,6 +272,8 @@ export default function CashflowPage() {
           date: editForm.date, // Salvar como string YYYY-MM-DD
           payment_method: editForm.payment_method,
           notes: editForm.notes || null,
+          include_in_profit:
+            editForm.type === "expense" ? editForm.include_in_profit : true,
         }),
       });
       if (!res.ok) throw new Error();
@@ -412,6 +443,23 @@ export default function CashflowPage() {
                     className="bg-card-elevated border-border resize-none"
                   />
                 </div>
+                {entryType === "expense" && (
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-card-elevated p-3">
+                    <div className="pr-4">
+                      <p className="text-sm font-medium">
+                        Contar na Análise de Lucro
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Se ativo, esta saída é descontada no cálculo da repartição
+                        de lucros.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={includeInProfit}
+                      onCheckedChange={setIncludeInProfit}
+                    />
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
                   <Button
                     type="button"
@@ -577,6 +625,7 @@ export default function CashflowPage() {
                   <TableHead>Descrição</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">Lucro</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -628,6 +677,22 @@ export default function CashflowPage() {
                           {entry.type === "income" ? "+" : "-"}
                           {formatCurrency(entry.amount)}
                         </SensitiveValue>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {entry.type === "expense" ? (
+                          <Switch
+                            checked={entry.include_in_profit !== false}
+                            disabled={togglingId === entry.id}
+                            onCheckedChange={(v) =>
+                              toggleIncludeInProfit(entry, v)
+                            }
+                            aria-label="Contar na Análise de Lucro"
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            —
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -770,6 +835,25 @@ export default function CashflowPage() {
                 className="bg-card-elevated border-border resize-none"
               />
             </div>
+            {editForm.type === "expense" && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-card-elevated p-3">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">
+                    Contar na Análise de Lucro
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Se ativo, esta saída é descontada no cálculo da repartição de
+                    lucros.
+                  </p>
+                </div>
+                <Switch
+                  checked={editForm.include_in_profit}
+                  onCheckedChange={(v) =>
+                    setEditForm({ ...editForm, include_in_profit: v })
+                  }
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
