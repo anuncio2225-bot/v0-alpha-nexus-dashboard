@@ -37,7 +37,7 @@ export async function GET() {
   // Contas já salvas (para marcar seleção/ativas e trazer o IOF configurado).
   const { data: savedAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, is_active, iof_percent")
+    .select("account_id, is_active, iof_percent, apply_meta_tax")
     .eq("user_id", effectiveId);
   const savedMap = new Map(
     (savedAccounts || []).map((a) => [a.account_id, a])
@@ -65,6 +65,8 @@ export async function GET() {
           isSelected: savedMap.has(acc.accountId),
           isActive: saved?.is_active ?? false,
           iofPercent: Number(saved?.iof_percent ?? 0),
+          // default true: conta nova entra no imposto da Meta (comportamento atual)
+          applyMetaTax: saved?.apply_meta_tax ?? true,
         });
       }
       // conexão OK: reflete status
@@ -139,6 +141,7 @@ export async function PUT(request: Request) {
           accountStatus?: number;
           connectionId?: string | null;
           iofPercent?: number;
+          applyMetaTax?: boolean;
         }) => ({
           user_id: scopedId,
           account_id: acc.id,
@@ -153,6 +156,8 @@ export async function PUT(request: Request) {
             Number.isFinite(Number(acc.iofPercent)) && Number(acc.iofPercent) >= 0
               ? Number(acc.iofPercent)
               : 0,
+          // se não vier no payload, mantém true (não isenta) por padrão
+          apply_meta_tax: acc.applyMetaTax !== false,
           is_active: true,
           updated_at: new Date().toISOString(),
         })

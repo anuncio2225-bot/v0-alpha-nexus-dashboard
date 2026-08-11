@@ -153,24 +153,33 @@ export async function GET(request: Request) {
 
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id")
+    .select("account_id, apply_meta_tax")
     .eq("user_id", userId)
     .eq("is_active", true);
   const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
+  // Contas ISENTAS do imposto da Meta (só conversão/IOF, sem ads_tax).
+  const exemptMetaIds = new Set(
+    (activeMetaAccounts || [])
+      .filter((a) => a.apply_meta_tax === false)
+      .map((a) => a.account_id)
+  );
 
   const metaAutoDateSet = new Set<string>();
   let metaSpendTotal = 0;
+  let metaExemptSpend = 0;
   if (activeMetaIds.length > 0) {
     const { data: metaPerf } = await supabase
       .from("meta_ads_performance")
-      .select("date, spend")
+      .select("ad_account_id, date, spend")
       .eq("user_id", userId)
       .in("ad_account_id", activeMetaIds)
       .gte("date", fromDate)
       .lte("date", toDate);
     (metaPerf || []).forEach((row) => {
-      metaSpendTotal += num(row.spend);
-      if (num(row.spend) > 0) metaAutoDateSet.add(row.date as string);
+      const spend = num(row.spend);
+      metaSpendTotal += spend;
+      if (exemptMetaIds.has(row.ad_account_id)) metaExemptSpend += spend;
+      if (spend > 0) metaAutoDateSet.add(row.date as string);
     });
   }
 
@@ -191,8 +200,12 @@ export async function GET(request: Request) {
     .maybeSingle();
   const adsTaxPercent = num(settingsRow?.ads_tax_percentage ?? 6);
 
+  // O imposto da Meta incide só sobre a parcela NÃO isenta (manual + Meta com
+  // apply_meta_tax=true). Contas isentas entram só convertidas/IOF, sem imposto.
   const rawSpend = manualSpend + metaSpendTotal;
-  const adsInvestment = rawSpend + rawSpend * (adsTaxPercent / 100);
+  const taxableSpend = rawSpend - metaExemptSpend;
+  const adsInvestment =
+    taxableSpend + taxableSpend * (adsTaxPercent / 100) + metaExemptSpend;
 
   // 6. Saídas do fluxo de caixa (excluindo categorias configuradas p/ evitar
   // dupla contagem, ex.: investimento em ads já descontado na operação interna)

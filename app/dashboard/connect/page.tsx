@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { cn, formatDate } from "@/lib/utils";
@@ -53,6 +54,7 @@ interface AdAccount {
   isSelected: boolean;
   isActive: boolean;
   iofPercent: number;
+  applyMetaTax: boolean;
 }
 
 interface MetaConnection {
@@ -82,6 +84,10 @@ export default function ConnectPage() {
   );
   // IOF (%) editável por conta (account_id -> valor string do input)
   const [iofByAccount, setIofByAccount] = useState<Record<string, string>>({});
+  // Imposto da Meta por conta (account_id -> aplica sim/não). true = não isenta.
+  const [metaTaxByAccount, setMetaTaxByAccount] = useState<
+    Record<string, boolean>
+  >({});
 
   // Formulario de nova conexao (System User Token)
   const [token, setToken] = useState("");
@@ -126,6 +132,16 @@ export default function ConnectPage() {
         for (const a of accounts) {
           if (next[a.id] === undefined) {
             next[a.id] = String(a.iofPercent ?? 0);
+          }
+        }
+        return next;
+      });
+      // inicializa o toggle do imposto da Meta com os valores salvos
+      setMetaTaxByAccount((prev) => {
+        const next = { ...prev };
+        for (const a of accounts) {
+          if (next[a.id] === undefined) {
+            next[a.id] = a.applyMetaTax !== false;
           }
         }
         return next;
@@ -212,6 +228,7 @@ export default function ConnectPage() {
           return {
             ...a,
             iofPercent: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+            applyMetaTax: metaTaxByAccount[a.id] !== false,
           };
         });
       await fetch("/api/meta/accounts", {
@@ -669,6 +686,31 @@ export default function ConnectPage() {
                                 />
                               </div>
 
+                              {/* Imposto da Meta por conta: ligado = converte e
+                                  aplica o imposto; desligado = conta isenta (só
+                                  converte p/ BRL + IOF, sem imposto da Meta). */}
+                              <div className="flex items-center gap-1.5">
+                                <Switch
+                                  id={`metatax-${account.id}`}
+                                  checked={metaTaxByAccount[account.id] !== false}
+                                  onCheckedChange={(v) =>
+                                    setMetaTaxByAccount((prev) => ({
+                                      ...prev,
+                                      [account.id]: v,
+                                    }))
+                                  }
+                                  disabled={!checked}
+                                />
+                                <Label
+                                  htmlFor={`metatax-${account.id}`}
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  {metaTaxByAccount[account.id] !== false
+                                    ? "Imposto Meta"
+                                    : "Isenta"}
+                                </Label>
+                              </div>
+
                               <Badge
                                 variant="outline"
                                 className={cn(
@@ -690,7 +732,10 @@ export default function ConnectPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Contas em dólar são convertidas para R$ com a cotação travada
-                    do dia + o IOF configurado por conta.
+                    do dia + o IOF configurado por conta. Com{" "}
+                    <strong>Imposto Meta</strong> ligado, o gasto ainda recebe o
+                    imposto da Meta; marcando como <strong>Isenta</strong>, a
+                    conta entra apenas convertida (sem o imposto da Meta).
                   </p>
                   <Button
                     onClick={handleSaveAccounts}
