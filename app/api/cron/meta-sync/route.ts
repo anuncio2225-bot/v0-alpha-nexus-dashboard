@@ -27,49 +27,36 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
 
   try {
-    // Usuarios conectados. token_expires_at IS NULL = nunca expira (valido!),
-    // por isso NAO filtramos por expiracao aqui (null seria excluido).
-    const { data: configs, error: configError } = await supabase
-      .from("meta_config")
-      .select("user_id, access_token, token_expires_at")
-      .eq("is_connected", true);
+    // Usuários com ao menos uma conexão (BM) cadastrada. O token de cada conta
+    // é resolvido por conexão dentro do syncUser.
+    const { data: conns, error: connError } = await supabase
+      .from("meta_connections")
+      .select("user_id");
 
-    if (configError) {
-      console.error("[v0] Error fetching configs:", configError.message);
-      return NextResponse.json({ error: "Config fetch failed" }, { status: 500 });
+    if (connError) {
+      console.error("[v0] Error fetching connections:", connError.message);
+      return NextResponse.json(
+        { error: "Connections fetch failed" },
+        { status: 500 }
+      );
     }
 
-    if (!configs || configs.length === 0) {
+    const userIds = Array.from(
+      new Set((conns || []).map((c) => c.user_id as string))
+    );
+
+    if (userIds.length === 0) {
       return NextResponse.json({ message: "No users to sync", synced: 0 });
     }
 
-    const now = Date.now();
     let usersProcessed = 0;
-    let usersSkipped = 0;
     let totalRows = 0;
 
-    for (const config of configs) {
-      // Pula tokens comprovadamente expirados (mas null = nunca expira = ok)
-      if (
-        config.token_expires_at &&
-        new Date(config.token_expires_at).getTime() < now
-      ) {
-        usersSkipped++;
-        await supabase
-          .from("meta_config")
-          .update({ validation_status: "expired", is_connected: false })
-          .eq("user_id", config.user_id);
-        continue;
-      }
-
-      if (!config.access_token) {
-        usersSkipped++;
-        continue;
-      }
-
+    for (const userId of userIds) {
       const result = await syncUser(supabase, {
-        userId: config.user_id,
-        token: config.access_token,
+        userId,
+        // token real vem de cada conexão dentro do syncUser
+        token: "",
         level: "account",
         lookbackDays: 3,
       });
@@ -81,7 +68,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       usersProcessed,
-      usersSkipped,
       totalRows,
     });
   } catch (error) {

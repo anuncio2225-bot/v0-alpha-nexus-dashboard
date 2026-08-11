@@ -45,14 +45,14 @@ export async function POST(request: Request) {
     // Tudo (config, lock, contas, performance) e chaveado por esse id.
     const effectiveId = await getEffectiveUserId(supabase, user.id);
 
-    // Config + token
-    const { data: config } = await supabase
-      .from("meta_config")
-      .select("access_token, is_connected, validation_status")
-      .eq("user_id", effectiveId)
-      .single();
+    // Exige ao menos uma conexão (BM) cadastrada. O token de cada conta é
+    // resolvido dentro do syncUser via meta_connections.
+    const { count: connCount } = await supabase
+      .from("meta_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", effectiveId);
 
-    if (!config?.is_connected || !config?.access_token) {
+    if (!connCount) {
       return NextResponse.json(
         { error: "Meta nao conectado" },
         { status: 400 }
@@ -70,7 +70,8 @@ export async function POST(request: Request) {
 
     const result = await syncUser(supabase, {
       userId: effectiveId,
-      token: config.access_token,
+      // O token real vem de cada conexão (meta_connections) dentro do syncUser.
+      token: "",
       level,
       lookbackDays,
       since,

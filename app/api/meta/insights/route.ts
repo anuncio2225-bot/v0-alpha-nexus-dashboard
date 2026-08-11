@@ -32,16 +32,28 @@ export async function GET(request: Request) {
     // Contas ativas do usuario (so consideramos essas nos calculos)
     const { data: activeAccounts } = await supabase
       .from("meta_ad_accounts")
-      .select("account_id, account_name")
+      .select("account_id, account_name, currency, business_name")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
 
     const activeIds = (activeAccounts || []).map((a) => a.account_id);
-    // Mapa id -> nome amigavel da conta (para exibir no historico)
+    // Mapa id -> metadados da conta (nome, moeda e BM) para o relatório.
     const accountNames = new Map<string, string>(
       (activeAccounts || []).map((a) => [
         a.account_id,
         a.account_name || `act_${a.account_id}`,
+      ])
+    );
+    const accountMeta = new Map<
+      string,
+      { currency: string; businessName: string | null }
+    >(
+      (activeAccounts || []).map((a) => [
+        a.account_id,
+        {
+          currency: (a.currency as string) || "BRL",
+          businessName: (a.business_name as string) || null,
+        },
       ])
     );
 
@@ -69,7 +81,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("meta_ads_performance")
       .select(
-        "ad_account_id, date, spend, impressions, clicks, reach, conversions, conversion_value"
+        "ad_account_id, date, spend, spend_original, currency, impressions, clicks, reach, conversions, conversion_value"
       )
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .in("ad_account_id", accountFilter)
@@ -121,17 +133,28 @@ export async function GET(request: Request) {
       .map(([date, spend]) => ({ date, spend }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Spend por conta
-    const byAccountMap = new Map<string, number>();
+    // Spend por conta (BRL + valor original na moeda da conta)
+    const byAccountMap = new Map<
+      string,
+      { spend: number; spendOriginal: number }
+    >();
     for (const row of rows) {
-      const prev = byAccountMap.get(row.ad_account_id) || 0;
-      byAccountMap.set(row.ad_account_id, prev + (Number(row.spend) || 0));
+      const prev = byAccountMap.get(row.ad_account_id) || {
+        spend: 0,
+        spendOriginal: 0,
+      };
+      prev.spend += Number(row.spend) || 0;
+      prev.spendOriginal += Number(row.spend_original ?? row.spend) || 0;
+      byAccountMap.set(row.ad_account_id, prev);
     }
     const byAccount = Array.from(byAccountMap.entries()).map(
-      ([accountId, spend]) => ({
+      ([accountId, v]) => ({
         accountId,
         accountName: accountNames.get(accountId) || `act_${accountId}`,
-        spend,
+        businessName: accountMeta.get(accountId)?.businessName || null,
+        currency: accountMeta.get(accountId)?.currency || "BRL",
+        spend: v.spend,
+        spendOriginal: v.spendOriginal,
       })
     );
 
@@ -139,21 +162,34 @@ export async function GET(request: Request) {
     // Agrega ad/campaign/adset do mesmo dia+conta num unico item diario.
     const historyMap = new Map<
       string,
-      { date: string; accountId: string; accountName: string; spend: number }
+      {
+        date: string;
+        accountId: string;
+        accountName: string;
+        businessName: string | null;
+        currency: string;
+        spend: number;
+        spendOriginal: number;
+      }
     >();
     for (const row of rows) {
       const key = `${row.date}__${row.ad_account_id}`;
       const existing = historyMap.get(key);
       const spend = Number(row.spend) || 0;
+      const spendOriginal = Number(row.spend_original ?? row.spend) || 0;
       if (existing) {
         existing.spend += spend;
+        existing.spendOriginal += spendOriginal;
       } else {
         historyMap.set(key, {
           date: row.date,
           accountId: row.ad_account_id,
           accountName:
             accountNames.get(row.ad_account_id) || `act_${row.ad_account_id}`,
+          businessName: accountMeta.get(row.ad_account_id)?.businessName || null,
+          currency: accountMeta.get(row.ad_account_id)?.currency || "BRL",
           spend,
+          spendOriginal,
         });
       }
     }

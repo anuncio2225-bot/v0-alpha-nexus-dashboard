@@ -340,7 +340,16 @@ export interface PerformanceRow {
   ad_id: string;
   ad_name: string | null;
   date: string;
+  /** spend JÁ EM BRL (após câmbio + IOF). Dashboard/profit leem esta coluna. */
   spend: number;
+  /** valor original na moeda da conta (antes de câmbio/IOF) */
+  spend_original: number;
+  /** moeda da conta de anúncio (ISO: USD, BRL...) */
+  currency: string;
+  /** taxa USD->BRL travada no dia (1 para contas BRL) */
+  exchange_rate: number;
+  /** IOF aplicado (%) nesta conta */
+  iof_percent: number;
   impressions: number;
   clicks: number;
   reach: number;
@@ -356,12 +365,31 @@ export interface PerformanceRow {
 export function toPerformanceRow(
   userId: string,
   accountId: string,
-  insight: RawInsight
+  insight: RawInsight,
+  fx?: {
+    /** moeda da conta (ISO). Default BRL */
+    currency?: string;
+    /** taxa USD->BRL travada no dia. Default 1 (contas BRL) */
+    exchangeRate?: number;
+    /** IOF (%) da conta. Default 0 */
+    iofPercent?: number;
+  }
 ): PerformanceRow {
-  const spend = num(insight.spend);
+  const spendOriginal = num(insight.spend);
+  const currency = (fx?.currency || "BRL").toUpperCase();
+  const isBrl = currency === "BRL";
+  // Contas BRL não convertem nem sofrem câmbio; contas em dólar convertem pela
+  // taxa travada e ainda somam o IOF por cima.
+  const exchangeRate = isBrl ? 1 : fx?.exchangeRate || 1;
+  const iofPercent = fx?.iofPercent || 0;
+  const spendBrl = isBrl
+    ? spendOriginal
+    : spendOriginal * exchangeRate * (1 + iofPercent / 100);
+
   const conversions = extractConversions(insight.actions);
   const conversionValue = extractConversionValue(insight.action_values);
-  const costPerConversion = conversions > 0 ? spend / conversions : 0;
+  // custo por conversão calculado sobre o valor em BRL (consistente com o resto)
+  const costPerConversion = conversions > 0 ? spendBrl / conversions : 0;
 
   return {
     user_id: userId,
@@ -374,7 +402,11 @@ export function toPerformanceRow(
     ad_id: insight.ad_id ?? "",
     ad_name: insight.ad_name ?? null,
     date: insight.date_start,
-    spend,
+    spend: spendBrl,
+    spend_original: spendOriginal,
+    currency,
+    exchange_rate: exchangeRate,
+    iof_percent: iofPercent,
     impressions: num(insight.impressions),
     clicks: num(insight.clicks),
     reach: num(insight.reach),

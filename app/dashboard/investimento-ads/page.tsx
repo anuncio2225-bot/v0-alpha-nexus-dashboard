@@ -118,7 +118,10 @@ export default function InvestimentoAdsPage() {
       date: string;
       accountId: string;
       accountName: string;
+      businessName: string | null;
+      currency: string;
       spend: number;
+      spendOriginal: number;
     }[];
   }>(`/api/meta/insights?from=${monthStart}&to=${monthEnd}`, fetcher, {
     refreshInterval: 60000,
@@ -215,6 +218,12 @@ export default function InvestimentoAdsPage() {
     investment?: AdInvestment;
     /** true = manual suprimido pelo automatico do Meta naquela data */
     superseded?: boolean;
+    /** Meta: nome da Business Manager (quando disponível) */
+    businessName?: string | null;
+    /** Meta: moeda original da conta (USD/BRL...) */
+    currency?: string;
+    /** Meta: gasto original na moeda da conta, antes de câmbio+IOF */
+    spendOriginal?: number;
   };
 
   const unifiedHistory = useMemo<HistoryEntry[]>(() => {
@@ -244,6 +253,9 @@ export default function InvestimentoAdsPage() {
           value: h.spend,
           source: "meta",
           label: h.accountName,
+          businessName: h.businessName,
+          currency: h.currency,
+          spendOriginal: h.spendOriginal,
         }))
       : [];
 
@@ -772,12 +784,31 @@ export default function InvestimentoAdsPage() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {entry.source === "meta" ? (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-400"
-                          >
-                            Automatico (Meta)
-                          </Badge>
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-400"
+                            >
+                              Automatico (Meta)
+                            </Badge>
+                            {entry.businessName && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-muted text-muted-foreground"
+                              >
+                                {entry.businessName}
+                              </Badge>
+                            )}
+                            {entry.currency &&
+                              entry.currency.toUpperCase() !== "BRL" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                >
+                                  {entry.currency} → R$
+                                </Badge>
+                              )}
+                          </>
                         ) : (
                           <Badge
                             variant="outline"
@@ -806,11 +837,34 @@ export default function InvestimentoAdsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={cn("text-sm font-bold", entry.superseded ? "text-muted-foreground line-through" : "text-foreground")}>
-                      <SensitiveValue>
-                        {formatCurrency(entry.value)}
-                      </SensitiveValue>
-                    </span>
+                    <div className="text-right">
+                      <span
+                        className={cn(
+                          "text-sm font-bold",
+                          entry.superseded
+                            ? "text-muted-foreground line-through"
+                            : "text-foreground"
+                        )}
+                      >
+                        <SensitiveValue>
+                          {formatCurrency(entry.value)}
+                        </SensitiveValue>
+                      </span>
+                      {entry.source === "meta" &&
+                        entry.currency &&
+                        entry.currency.toUpperCase() !== "BRL" &&
+                        entry.spendOriginal !== undefined && (
+                          <p className="text-[10px] text-muted-foreground">
+                            <SensitiveValue>
+                              {entry.currency}{" "}
+                              {entry.spendOriginal.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </SensitiveValue>
+                          </p>
+                        )}
+                    </div>
                     {/* Acoes so para lancamentos manuais; o Meta e automatico */}
                     {entry.source === "manual" && entry.investment && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

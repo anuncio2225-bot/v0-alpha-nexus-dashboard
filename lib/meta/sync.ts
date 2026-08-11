@@ -19,6 +19,7 @@ import {
   PERFORMANCE_CONFLICT_TARGET,
   type InsightLevel,
 } from "./graph";
+import { preloadUsdBrlRange, getUsdBrlRate, isBRL } from "./fx";
 
 // Client minimamente tipado (compativel com supabase-js)
 type SupabaseLike = {
@@ -108,12 +109,35 @@ export async function syncUser(
     errors: [],
   };
 
-  // Contas ativas do usuario
+  // Contas ativas do usuario, com moeda/IOF e a conexão (token da BM).
   const { data: accounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id")
+    .select("account_id, currency, iof_percent, connection_id")
     .eq("user_id", userId)
     .eq("is_active", true);
+
+  // Mapa connection_id -> token (cada BM tem seu próprio System User Token).
+  const { data: connections } = await supabase
+    .from("meta_connections")
+    .select("id, access_token")
+    .eq("user_id", userId);
+  const tokenByConnection = new Map<string, string>();
+  for (const c of connections || []) {
+    if (c.id && c.access_token) tokenByConnection.set(c.id, c.access_token);
+  }
+  // Fallback: se a conta não tiver conexão vinculada, usa o token recebido
+  // (compatibilidade com o fluxo antigo de token único).
+  const resolveToken = (connId: string | null): string =>
+    (connId && tokenByConnection.get(connId)) || token;
+
+  // Pré-carrega o câmbio USD->BRL do período (uma chamada só) caso exista ao
+  // menos uma conta em moeda diferente de BRL.
+  const hasForeign = (accounts || []).some(
+    (a: { currency: string | null }) => !isBRL(a.currency)
+  );
+  if (hasForeign) {
+    await preloadUsdBrlRange(since, until);
+  }
 
   result.accountsTotal = accounts?.length || 0;
   if (!accounts || accounts.length === 0) {
@@ -134,12 +158,16 @@ export async function syncUser(
 
   for (const account of accounts) {
     const accountId = account.account_id as string;
+    const accountToken = resolveToken(account.connection_id as string | null);
+    const currency = (account.currency as string) || "BRL";
+    const iofPercent = num(account.iof_percent);
+    const brl = isBRL(currency);
     try {
       // Divide o periodo em blocos de 30 dias (importacao de historico longo).
       const blocks = chunkDateRange(since, until, 30);
       const insights = [];
       for (const block of blocks) {
-        const part = await fetchInsights(token, accountId, {
+        const part = await fetchInsights(accountToken, accountId, {
           since: block.since,
           until: block.until,
           level,
@@ -153,7 +181,18 @@ export async function syncUser(
         continue;
       }
 
-      const rows = insights.map((i) => toPerformanceRow(userId, accountId, i));
+      // Converte cada linha para BRL usando a taxa TRAVADA do dia da linha.
+      const rows = [];
+      for (const i of insights) {
+        const exchangeRate = brl ? 1 : await getUsdBrlRate(i.date_start);
+        rows.push(
+          toPerformanceRow(userId, accountId, i, {
+            currency,
+            exchangeRate,
+            iofPercent,
+          })
+        );
+      }
 
       const { error: upsertError } = await supabase
         .from("meta_ads_performance")
@@ -178,19 +217,35 @@ export async function syncUser(
             : "Erro desconhecido";
       result.errors.push({ accountId, message });
 
-      // Token invalido afeta todas as contas: aborta o resto e desconecta
+      // Token inválido agora afeta apenas a CONEXÃO (BM) daquela conta — as
+      // demais BMs continuam sincronizando normalmente. Marcamos a conexão como
+      // expirada e seguimos para a próxima conta.
       if (err instanceof MetaApiError && err.kind === "invalid_token") {
-        await supabase
-          .from("meta_config")
-          .update({
-            validation_status: "expired",
-            is_connected: false,
-            sync_status: "error",
-            sync_error: message,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", userId);
-        return result;
+        const connId = account.connection_id as string | null;
+        if (connId) {
+          await supabase
+            .from("meta_connections")
+            .update({
+              status: "expired",
+              last_error: message,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", connId)
+            .eq("user_id", userId);
+        } else {
+          // Sem conexão vinculada (fluxo legado): mantém o comportamento antigo.
+          await supabase
+            .from("meta_config")
+            .update({
+              validation_status: "expired",
+              is_connected: false,
+              sync_status: "error",
+              sync_error: message,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+          return result;
+        }
       }
     }
   }

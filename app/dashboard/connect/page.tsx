@@ -28,9 +28,10 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  AlertTriangle,
   KeyRound,
   Building2,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import {
   MetaDateRangePicker,
@@ -47,8 +48,21 @@ interface AdAccount {
   timezoneName: string | null;
   businessId: string | null;
   businessName: string | null;
+  connectionId: string;
+  connectionLabel: string;
   isSelected: boolean;
   isActive: boolean;
+  iofPercent: number;
+}
+
+interface MetaConnection {
+  id: string;
+  label: string | null;
+  business_name: string | null;
+  status: string;
+  last_error: string | null;
+  last_synced_at: string | null;
+  created_at: string;
 }
 
 export default function ConnectPage() {
@@ -66,15 +80,16 @@ export default function ConnectPage() {
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(
     new Set()
   );
+  // IOF (%) editável por conta (account_id -> valor string do input)
+  const [iofByAccount, setIofByAccount] = useState<Record<string, string>>({});
 
-  // Formulario de conexao (System User Token)
+  // Formulario de nova conexao (System User Token)
   const [token, setToken] = useState("");
-  const [appId, setAppId] = useState("");
+  const [label, setLabel] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
-  // Status da conexao tambem alimenta o estado de sync.
-  // Enquanto sincroniza, sondamos rapido (5s) para refletir o fim do sync;
-  // ocioso, sondamos devagar (60s).
+  // Status/conexões. Enquanto sincroniza, sondamos rápido (5s); ocioso, 60s.
   const { data: metaStatus, mutate: mutateStatus } = useSWR(
     "/api/meta/connect",
     fetcher,
@@ -91,17 +106,30 @@ export default function ConnectPage() {
     webhooks: Array<{ id: string; is_active: boolean }>;
   }>("/api/webhooks", fetcher);
 
+  const connections: MetaConnection[] = metaStatus?.connections || [];
   const accounts: AdAccount[] = accountsData?.accounts || [];
+  const connErrors: { connectionId: string; message: string }[] =
+    accountsData?.errors || [];
   const webhooksCount = webhooksData?.webhooks?.length || 0;
   const activeWebhooks =
     webhooksData?.webhooks?.filter((w) => w.is_active).length || 0;
 
-  const isExpired = metaStatus?.validationStatus === "expired";
+  const isConnected = !!metaStatus?.connected;
 
   useEffect(() => {
     if (accounts.length > 0) {
       const selected = accounts.filter((a) => a.isSelected).map((a) => a.id);
       setSelectedAccounts(new Set(selected));
+      // inicializa os IOFs com os valores salvos
+      setIofByAccount((prev) => {
+        const next = { ...prev };
+        for (const a of accounts) {
+          if (next[a.id] === undefined) {
+            next[a.id] = String(a.iofPercent ?? 0);
+          }
+        }
+        return next;
+      });
     }
   }, [accounts]);
 
@@ -109,8 +137,9 @@ export default function ConnectPage() {
   const groupedAccounts = useMemo(() => {
     const groups = new Map<string, { name: string; items: AdAccount[] }>();
     for (const acc of accounts) {
-      const key = acc.businessId || "__no_bm__";
-      const name = acc.businessName || "Sem Business Manager";
+      const key = acc.businessId || acc.connectionId || "__no_bm__";
+      const name =
+        acc.businessName || acc.connectionLabel || "Sem Business Manager";
       if (!groups.has(key)) groups.set(key, { name, items: [] });
       groups.get(key)!.items.push(acc);
     }
@@ -129,18 +158,15 @@ export default function ConnectPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           access_token: token.trim(),
-          app_id: appId.trim() || undefined,
+          label: label.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(
-          data.neverExpires
-            ? "Conectado! Token sem data de expiração."
-            : "Conectado ao Meta Ads com sucesso."
-        );
+        toast.success("Business Manager conectado com sucesso.");
         setToken("");
-        setAppId("");
+        setLabel("");
+        setShowForm(false);
         mutateStatus();
         mutateAccounts();
       } else {
@@ -153,17 +179,23 @@ export default function ConnectPage() {
     }
   }
 
-  async function handleDisconnect() {
-    if (!confirm("Desconectar Meta Ads? O histórico de dados será mantido."))
+  async function handleRemoveConnection(id: string, name: string) {
+    if (
+      !confirm(
+        `Remover a conexão "${name}"? As contas dessa BM deixam de sincronizar. O histórico já importado é mantido.`
+      )
+    )
       return;
     setLoading(true);
     try {
-      await fetch("/api/meta/connect", { method: "DELETE" });
-      toast.success("Meta Ads desconectado.");
+      await fetch(`/api/meta/connect?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      toast.success("Conexão removida.");
       mutateStatus();
       mutateAccounts();
     } catch {
-      toast.error("Erro ao desconectar.");
+      toast.error("Erro ao remover conexão.");
     } finally {
       setLoading(false);
     }
@@ -172,7 +204,16 @@ export default function ConnectPage() {
   async function handleSaveAccounts() {
     setLoading(true);
     try {
-      const selected = accounts.filter((a) => selectedAccounts.has(a.id));
+      const selected = accounts
+        .filter((a) => selectedAccounts.has(a.id))
+        .map((a) => {
+          const raw = iofByAccount[a.id];
+          const parsed = raw !== undefined ? Number(raw.replace(",", ".")) : 0;
+          return {
+            ...a,
+            iofPercent: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+          };
+        });
       await fetch("/api/meta/accounts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -283,7 +324,7 @@ export default function ConnectPage() {
               <div>
                 <CardTitle className="text-lg">Meta Ads</CardTitle>
                 <CardDescription>
-                  Facebook e Instagram Ads via System User Token
+                  Conecte uma ou mais Business Managers via System User Token
                 </CardDescription>
               </div>
             </div>
@@ -291,14 +332,15 @@ export default function ConnectPage() {
               variant="outline"
               className={cn(
                 "font-medium",
-                metaStatus?.connected && !isExpired
+                isConnected
                   ? "border-success/30 bg-success/10 text-success"
                   : "border-muted text-muted-foreground"
               )}
             >
-              {metaStatus?.connected && !isExpired ? (
+              {isConnected ? (
                 <>
-                  <Check className="mr-1 h-3 w-3" /> Conectado
+                  <Check className="mr-1 h-3 w-3" /> {connections.length}{" "}
+                  {connections.length === 1 ? "conexão" : "conexões"}
                 </>
               ) : (
                 <>
@@ -309,31 +351,18 @@ export default function ConnectPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isExpired && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Conexão expirada</AlertTitle>
-              <AlertDescription>
-                Sua conexão com o Meta expirou. Gere um novo token e reconecte
-                abaixo.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {metaStatus?.connected && !isExpired ? (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  Conectado em{" "}
-                  {metaStatus.connectedAt
-                    ? formatDate(metaStatus.connectedAt, "dd/MM/yyyy HH:mm")
-                    : "-"}
-                </span>
+          {/* Lista de conexões (Business Managers) */}
+          {isConnected && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-foreground">
+                  Business Managers conectadas
+                </h4>
                 <div className="flex flex-wrap items-center gap-2">
                   <MetaDateRangePicker
                     value={importRange}
                     onChange={setImportRange}
-                    disabled={importing || metaStatus.syncStatus === "syncing"}
+                    disabled={importing || metaStatus?.syncStatus === "syncing"}
                   />
                   <Button
                     variant="outline"
@@ -342,14 +371,11 @@ export default function ConnectPage() {
                     disabled={
                       importing ||
                       syncing ||
-                      metaStatus.syncStatus === "syncing"
+                      metaStatus?.syncStatus === "syncing"
                     }
                   >
                     <RefreshCw
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        importing && "animate-spin"
-                      )}
+                      className={cn("mr-2 h-4 w-4", importing && "animate-spin")}
                     />
                     {importing ? "Importando..." : "Importar histórico"}
                   </Button>
@@ -357,140 +383,127 @@ export default function ConnectPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleSync}
-                    disabled={syncing || metaStatus.syncStatus === "syncing"}
+                    disabled={syncing || metaStatus?.syncStatus === "syncing"}
                   >
                     <RefreshCw
                       className={cn(
                         "mr-2 h-4 w-4",
-                        (syncing || metaStatus.syncStatus === "syncing") &&
+                        (syncing || metaStatus?.syncStatus === "syncing") &&
                           "animate-spin"
                       )}
                     />
-                    {syncing || metaStatus.syncStatus === "syncing"
+                    {syncing || metaStatus?.syncStatus === "syncing"
                       ? "Sincronizando..."
                       : "Sincronizar"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDisconnect}
-                    disabled={loading}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    Desconectar
                   </Button>
                 </div>
               </div>
 
+              {connections.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-card-elevated p-3"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/15">
+                    <Building2 className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {conn.label || conn.business_name || "Conexão Meta"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Conectado em{" "}
+                      {conn.created_at
+                        ? formatDate(conn.created_at, "dd/MM/yyyy HH:mm")
+                        : "-"}
+                    </p>
+                    {conn.status === "expired" && (
+                      <p className="text-xs text-destructive">
+                        Token expirado — gere um novo e reconecte esta BM.
+                      </p>
+                    )}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs",
+                      conn.status === "expired"
+                        ? "border-destructive/30 text-destructive"
+                        : "border-success/30 text-success"
+                    )}
+                  >
+                    {conn.status === "expired" ? "Expirada" : "Ativa"}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      handleRemoveConnection(
+                        conn.id,
+                        conn.label || conn.business_name || "Conexão Meta"
+                      )
+                    }
+                    disabled={loading}
+                    className="text-destructive hover:text-destructive"
+                    aria-label="Remover conexão"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
                 <span>
-                  Expira em:{" "}
-                  {metaStatus.expiresAt
-                    ? formatDate(metaStatus.expiresAt, "dd/MM/yyyy")
-                    : "Nunca (token de longa duração)"}
-                </span>
-                <span>
                   Última sincronização:{" "}
-                  {metaStatus.lastSyncAt
+                  {metaStatus?.lastSyncAt
                     ? formatDate(metaStatus.lastSyncAt, "dd/MM/yyyy HH:mm")
                     : "Ainda não sincronizado"}
                 </span>
               </div>
 
-              {metaStatus.syncError && (
+              {metaStatus?.syncError && (
                 <p className="text-xs text-destructive">
                   Último erro: {metaStatus.syncError}
                 </p>
               )}
+            </div>
+          )}
 
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-foreground">
-                  Contas de Anúncio
-                </h4>
-                {!accountsData ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ) : accountsData?.error ? (
-                  <p className="text-sm text-destructive">
-                    {accountsData.error}
-                  </p>
-                ) : accounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma conta encontrada para este token.
-                  </p>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {groupedAccounts.map((group) => (
-                        <div key={group.name} className="space-y-2">
-                          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                            <Building2 className="h-3.5 w-3.5" />
-                            {group.name}
-                          </div>
-                          {group.items.map((account) => (
-                            <label
-                              key={account.id}
-                              htmlFor={`acc-${account.id}`}
-                              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-card-elevated p-3"
-                            >
-                              <Checkbox
-                                id={`acc-${account.id}`}
-                                checked={selectedAccounts.has(account.id)}
-                                onCheckedChange={() =>
-                                  toggleAccount(account.id)
-                                }
-                              />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-foreground">
-                                  {account.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  act_{account.id} | {account.currency}
-                                </p>
-                              </div>
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-xs",
-                                  account.status === "active"
-                                    ? "border-success/30 text-success"
-                                    : "border-muted text-muted-foreground"
-                                )}
-                              >
-                                {account.status === "active"
-                                  ? "Ativa"
-                                  : "Inativa"}
-                              </Badge>
-                            </label>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                    <Button
-                      onClick={handleSaveAccounts}
-                      disabled={loading}
-                      className="bg-brand hover:bg-brand/90"
-                    >
-                      Salvar Seleção
-                    </Button>
-                  </>
-                )}
-              </div>
-            </>
+          {/* Botão / formulário para adicionar nova conexão */}
+          {!showForm ? (
+            <Button
+              variant="outline"
+              onClick={() => setShowForm(true)}
+              className="bg-card-elevated"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {isConnected
+                ? "Adicionar outra Business Manager"
+                : "Conectar Meta Ads"}
+            </Button>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-lg border border-border p-4">
               <Alert>
                 <KeyRound className="h-4 w-4" />
                 <AlertTitle>Conexão via System User Token</AlertTitle>
                 <AlertDescription>
                   Gere um System User Token no Business Manager do Meta (com as
                   permissões <strong>ads_read</strong> e{" "}
-                  <strong>ads_management</strong>) e cole abaixo. Esse método é
-                  mais estável que o login OAuth.
+                  <strong>ads_management</strong>) e cole abaixo.{" "}
+                  <strong>Use um token por Business Manager.</strong>
                 </AlertDescription>
               </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="meta-label">Nome da conexão (opcional)</Label>
+                <Input
+                  id="meta-label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="Ex: BM Loja Principal"
+                  className="text-sm"
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="meta-token">Access Token (obrigatório)</Label>
@@ -528,25 +541,166 @@ export default function ConnectPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meta-appid">App ID (opcional)</Label>
-                <Input
-                  id="meta-appid"
-                  value={appId}
-                  onChange={(e) => setAppId(e.target.value)}
-                  placeholder="Ex: 1234567890"
-                  className="font-mono text-xs"
-                />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleConnect}
+                  disabled={loading || !token.trim()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  {loading ? "Validando..." : "Conectar"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowForm(false);
+                    setToken("");
+                    setLabel("");
+                  }}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
               </div>
+            </div>
+          )}
 
-              <Button
-                onClick={handleConnect}
-                disabled={loading || !token.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <KeyRound className="mr-2 h-4 w-4" />
-                {loading ? "Validando..." : "Conectar Meta Ads"}
-              </Button>
+          {/* Seleção de contas + IOF por conta */}
+          {isConnected && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">
+                Contas de Anúncio
+              </h4>
+
+              {connErrors.length > 0 &&
+                connErrors.map((e) => (
+                  <p key={e.connectionId} className="text-xs text-destructive">
+                    {e.message}
+                  </p>
+                ))}
+
+              {!accountsData ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : accountsData?.error ? (
+                <p className="text-sm text-destructive">{accountsData.error}</p>
+              ) : accounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta encontrada para os tokens conectados.
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {groupedAccounts.map((group) => (
+                      <div key={group.name} className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <Building2 className="h-3.5 w-3.5" />
+                          {group.name}
+                        </div>
+                        {group.items.map((account) => {
+                          const isForeign =
+                            (account.currency || "BRL").toUpperCase() !== "BRL";
+                          const checked = selectedAccounts.has(account.id);
+                          return (
+                            <div
+                              key={account.id}
+                              className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card-elevated p-3"
+                            >
+                              <label
+                                htmlFor={`acc-${account.id}`}
+                                className="flex flex-1 cursor-pointer items-center gap-3"
+                              >
+                                <Checkbox
+                                  id={`acc-${account.id}`}
+                                  checked={checked}
+                                  onCheckedChange={() =>
+                                    toggleAccount(account.id)
+                                  }
+                                />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-foreground">
+                                    {account.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    act_{account.id}
+                                  </p>
+                                </div>
+                              </label>
+
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  isForeign
+                                    ? "border-amber-500/40 text-amber-500"
+                                    : "border-muted text-muted-foreground"
+                                )}
+                              >
+                                {account.currency}
+                                {isForeign ? " → R$" : ""}
+                              </Badge>
+
+                              {/* IOF por conta (só faz sentido para contas em moeda estrangeira,
+                                  mas deixamos editável sempre) */}
+                              <div className="flex items-center gap-1">
+                                <Label
+                                  htmlFor={`iof-${account.id}`}
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  IOF %
+                                </Label>
+                                <Input
+                                  id={`iof-${account.id}`}
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  inputMode="decimal"
+                                  value={iofByAccount[account.id] ?? "0"}
+                                  onChange={(e) =>
+                                    setIofByAccount((prev) => ({
+                                      ...prev,
+                                      [account.id]: e.target.value,
+                                    }))
+                                  }
+                                  disabled={!checked}
+                                  className="h-8 w-20 text-xs"
+                                />
+                              </div>
+
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  account.status === "active"
+                                    ? "border-success/30 text-success"
+                                    : "border-muted text-muted-foreground"
+                                )}
+                              >
+                                {account.status === "active"
+                                  ? "Ativa"
+                                  : "Inativa"}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Contas em dólar são convertidas para R$ com a cotação travada
+                    do dia + o IOF configurado por conta.
+                  </p>
+                  <Button
+                    onClick={handleSaveAccounts}
+                    disabled={loading}
+                    className="bg-brand hover:bg-brand/90"
+                  >
+                    Salvar Seleção
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </CardContent>
