@@ -670,17 +670,21 @@ export default function ConnectPage() {
                                 </Label>
                                 <Input
                                   id={`iof-${account.id}`}
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
+                                  type="text"
                                   inputMode="decimal"
+                                  placeholder="0"
                                   value={iofByAccount[account.id] ?? "0"}
-                                  onChange={(e) =>
+                                  onChange={(e) => {
+                                    // aceita vírgula OU ponto; ignora demais chars
+                                    const cleaned = e.target.value
+                                      .replace(/[^\d.,]/g, "")
+                                      .replace(/(,.*),/g, "$1")
+                                      .replace(/(\..*)\./g, "$1");
                                     setIofByAccount((prev) => ({
                                       ...prev,
-                                      [account.id]: e.target.value,
-                                    }))
-                                  }
+                                      [account.id]: cleaned,
+                                    }));
+                                  }}
                                   disabled={!checked}
                                   className="h-8 w-20 text-xs"
                                 />

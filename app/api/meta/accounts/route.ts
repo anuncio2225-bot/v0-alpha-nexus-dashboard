@@ -174,6 +174,19 @@ export async function PUT(request: Request) {
           { status: 500 }
         );
       }
+
+      // Reaplica o IOF sobre as linhas JÁ importadas de cada conta (usa o valor
+      // original + câmbio travado). Assim, mudar o IOF na tela já reflete no
+      // cálculo do investimento sem precisar reimportar da Meta.
+      await Promise.all(
+        rows.map((r) =>
+          supabase.rpc("recalc_meta_account_spend", {
+            p_user: scopedId,
+            p_account: r.account_id,
+            p_iof: r.iof_percent,
+          })
+        )
+      );
     }
 
     return NextResponse.json({ success: true, activeCount: accounts.length });
