@@ -284,19 +284,28 @@ export async function GET(request: Request) {
     // do periodo (por dia). NUNCA altera/insere dados aqui (somente leitura).
     const { data: activeMetaAccounts } = await supabase
       .from("meta_ad_accounts")
-      .select("account_id")
+      .select("account_id, apply_meta_tax")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
 
     const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
+    // Contas ISENTAS do imposto da Meta (apply_meta_tax = false): o gasto delas
+    // entra só convertido/IOF, mas NÃO recebe o ads_tax_percentage.
+    const exemptMetaIds = new Set(
+      (activeMetaAccounts || [])
+        .filter((a) => a.apply_meta_tax === false)
+        .map((a) => a.account_id)
+    );
 
     // Mapa de spend Meta por dia (YYYY-MM-DD) e total agregado do periodo.
     const metaSpendByDay = new Map<string, number>();
     let metaSpendTotal = 0;
+    // Parcela do gasto Meta que é ISENTA do imposto da Meta.
+    let metaExemptSpend = 0;
     if (activeMetaIds.length > 0) {
       const { data: metaPerf } = await supabase
         .from("meta_ads_performance")
-        .select("date, spend")
+        .select("ad_account_id, date, spend")
         .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .in("ad_account_id", activeMetaIds)
         .gte("date", dateFrom)
@@ -305,6 +314,7 @@ export async function GET(request: Request) {
       (metaPerf || []).forEach((row) => {
         const spend = safeNumber(row.spend);
         metaSpendTotal += spend;
+        if (exemptMetaIds.has(row.ad_account_id)) metaExemptSpend += spend;
         metaSpendByDay.set(
           row.date,
           (metaSpendByDay.get(row.date) || 0) + spend
@@ -402,8 +412,12 @@ export async function GET(request: Request) {
     // totalSpend combinado = manual deduplicado + Meta (mesma base da aba Investimento em Ads)
     const totalSpend = safeNumber(manualSpend + metaSpendTotal);
     const safeTaxPercent = safeNumber(adsTaxPercent);
+    // O imposto da Meta incide sobre manual + Meta NÃO isento. A parcela isenta
+    // (contas com apply_meta_tax = false) entra no investimento sem o imposto.
+    const exemptSpend = safeNumber(metaExemptSpend);
+    const taxableSpend = safeNumber(totalSpend - exemptSpend);
     const investimentoComImposto = safeNumber(
-      totalSpend + totalSpend * (safeTaxPercent / 100)
+      taxableSpend + taxableSpend * (safeTaxPercent / 100) + exemptSpend
     );
 
     // Quantidade de "lancamentos" considerando ambas as fontes (manual + dias com gasto Meta)
