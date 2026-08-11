@@ -3,15 +3,23 @@
 // Câmbio USD->BRL para converter o gasto de contas de anúncio em dólar.
 //
 // Estratégia: "travar a cotação do dia". Para cada dia importado buscamos a
-// cotação de fechamento daquele dia (endpoint daily da AwesomeAPI, gratuito e
-// sem chave) e gravamos a taxa usada em meta_ads_performance.exchange_rate.
-// Assim o histórico não muda quando o dólar oscila depois.
+// cotação daquele dia e gravamos a taxa usada em
+// meta_ads_performance.exchange_rate. Assim o histórico não muda quando o
+// dólar oscila depois.
 //
-// Fonte: https://economia.awesomeapi.com.br  (USD-BRL)
-//  - /json/daily/USD-BRL/<n>  -> últimas n cotações diárias
+// Fonte primária: Frankfurter (https://frankfurter.dev) — dados do BCE,
+// gratuito, sem chave e SEM quota, com histórico por data e séries por período.
+//   - /v1/<start>..<end>?base=USD&symbols=BRL  -> série do período
+//   - /v1/<date>?base=USD&symbols=BRL          -> cotação de um dia
+//   - /v1/latest?base=USD&symbols=BRL          -> cotação mais recente
+// Fonte de fallback: AwesomeAPI (pode ter quota excedida / 429).
+//
+// Observação: o BCE só publica em dias úteis; fins de semana/feriados usam o
+// pregão anterior mais próximo (getUsdBrlRate faz esse walk-back no cache).
 // Cache em memória por processo para não repetir requisições no mesmo sync.
 // ============================================================================
 
+const FRANKFURTER_BASE = "https://api.frankfurter.dev/v1";
 const AWESOME_BASE = "https://economia.awesomeapi.com.br/json";
 
 // cache: "YYYY-MM-DD" -> taxa (BRL por 1 USD)
@@ -21,6 +29,10 @@ interface AwesomeQuote {
   bid: string; // preço de compra
   ask?: string;
   timestamp: string; // unix seconds (string)
+}
+
+interface FrankfurterRange {
+  rates?: Record<string, { BRL?: number }>;
 }
 
 function toYmd(d: Date): string {
@@ -35,20 +47,45 @@ export async function preloadUsdBrlRange(
   since: string,
   until: string
 ): Promise<void> {
-  const start = new Date(`${since}T00:00:00Z`);
-  const end = new Date(`${until}T00:00:00Z`);
-  const days =
-    Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-  // margem extra para cair em fins de semana/feriados sem cotação
-  const n = Math.min(Math.max(days + 5, 1), 360);
-
+  // 1) Frankfurter (primária): série do período completo em uma requisição.
   try {
+    const res = await fetch(
+      `${FRANKFURTER_BASE}/${since}..${until}?base=USD&symbols=BRL`,
+      { next: { revalidate: 60 * 60 * 6 } }
+    );
+    if (res.ok) {
+      const json = (await res.json()) as FrankfurterRange;
+      const rates = json.rates || {};
+      let filled = 0;
+      for (const [ymd, obj] of Object.entries(rates)) {
+        const brl = Number(obj?.BRL);
+        if (Number.isFinite(brl) && brl > 0) {
+          rateCache.set(ymd, brl);
+          filled++;
+        }
+      }
+      if (filled > 0) return;
+    }
+  } catch {
+    // cai para a AwesomeAPI
+  }
+
+  // 2) AwesomeAPI (fallback): últimas N cotações diárias.
+  try {
+    const start = new Date(`${since}T00:00:00Z`);
+    const end = new Date(`${until}T00:00:00Z`);
+    const days =
+      Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    const extra =
+      Math.floor((Date.now() - end.getTime()) / (24 * 60 * 60 * 1000)) + 5;
+    const n = Math.min(Math.max(days + extra, 1), 360);
+
     const res = await fetch(`${AWESOME_BASE}/daily/USD-BRL/${n}`, {
-      // cache do fetch do Next por algumas horas
       next: { revalidate: 60 * 60 * 6 },
     });
     if (!res.ok) return;
     const quotes = (await res.json()) as AwesomeQuote[];
+    if (!Array.isArray(quotes)) return;
     for (const q of quotes) {
       const ts = Number(q.timestamp);
       if (!Number.isFinite(ts)) continue;
@@ -59,7 +96,7 @@ export async function preloadUsdBrlRange(
       }
     }
   } catch {
-    // silencioso: se falhar, getUsdBrlRate cai no fallback
+    // silencioso: se falhar, getUsdBrlRate cai no fallback spot
   }
 }
 
@@ -83,6 +120,24 @@ export async function getUsdBrlRate(date: string): Promise<number> {
     }
   }
 
+  // busca pontual na Frankfurter para o dia exato
+  try {
+    const res = await fetch(
+      `${FRANKFURTER_BASE}/${date}?base=USD&symbols=BRL`,
+      { next: { revalidate: 60 * 60 * 6 } }
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { rates?: { BRL?: number } };
+      const brl = Number(json.rates?.BRL);
+      if (Number.isFinite(brl) && brl > 0) {
+        rateCache.set(date, brl);
+        return brl;
+      }
+    }
+  } catch {
+    // cai no spot
+  }
+
   // fallback: cotação atual (spot)
   const spot = await getSpotUsdBrl();
   rateCache.set(date, spot);
@@ -96,6 +151,23 @@ export async function getSpotUsdBrl(): Promise<number> {
   if (spotCache && Date.now() - spotCache.at < 60 * 60 * 1000) {
     return spotCache.value;
   }
+  // 1) Frankfurter latest
+  try {
+    const res = await fetch(`${FRANKFURTER_BASE}/latest?base=USD&symbols=BRL`, {
+      next: { revalidate: 60 * 60 },
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { rates?: { BRL?: number } };
+      const brl = Number(json.rates?.BRL);
+      if (Number.isFinite(brl) && brl > 0) {
+        spotCache = { value: brl, at: Date.now() };
+        return brl;
+      }
+    }
+  } catch {
+    // tenta AwesomeAPI
+  }
+  // 2) AwesomeAPI last
   try {
     const res = await fetch(`${AWESOME_BASE}/last/USD-BRL`, {
       next: { revalidate: 60 * 60 },
