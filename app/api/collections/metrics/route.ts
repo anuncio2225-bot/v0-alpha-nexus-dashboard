@@ -41,6 +41,10 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const platforms = (searchParams.get("platforms") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const today = todaySaoPaulo();
   const scope = await getTeamDataScope(supabase, user.id);
@@ -69,6 +73,8 @@ export async function GET(request: Request) {
   }
   if (products.length > 0) clientsQuery = clientsQuery.in("product_name", products);
   else if (product) clientsQuery = clientsQuery.eq("product_name", product);
+  if (platforms.length > 0)
+    clientsQuery = clientsQuery.in("platform_name", platforms);
   if (search) {
     clientsQuery = clientsQuery.or(
       `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%`

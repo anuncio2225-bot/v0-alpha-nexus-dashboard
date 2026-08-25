@@ -44,6 +44,11 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  // Multi-selecao: lista de plataformas (por nome) — ex.: "PIX Manual"
+  const platforms = (searchParams.get("platforms") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -76,6 +81,7 @@ export async function GET(request: Request) {
   }
   if (products.length > 0) query = query.in("product_name", products);
   else if (product) query = query.eq("product_name", product);
+  if (platforms.length > 0) query = query.in("platform_name", platforms);
   if (searchParams.get("has_schedule") === "1") {
     query = query.not("next_collection_date", "is", null);
   }

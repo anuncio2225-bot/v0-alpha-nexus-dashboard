@@ -10,6 +10,7 @@ export interface CollectionFilters {
   statusIds: string[];
   attendants: string[];
   products: string[];
+  platforms: string[];
 }
 
 const DEFAULT_FILTERS: CollectionFilters = {
@@ -17,6 +18,7 @@ const DEFAULT_FILTERS: CollectionFilters = {
   statusIds: [],
   attendants: [],
   products: [],
+  platforms: [],
 };
 
 export default function CollectionsPage() {
