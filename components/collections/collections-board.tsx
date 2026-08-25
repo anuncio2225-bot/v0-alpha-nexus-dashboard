@@ -20,6 +20,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import {
   Plus,
   Download,
+  Upload,
   Search,
   LayoutGrid,
   TableIcon,
@@ -69,6 +70,7 @@ export function CollectionsBoard({
     statusIds,
     attendants: attendantFilters,
     products: productFilters,
+    platforms: platformFilters,
   } = filters;
   const setSearch = (v: string) =>
     onFiltersChange((p) => ({ ...p, search: v }));
@@ -78,14 +80,28 @@ export function CollectionsBoard({
     onFiltersChange((p) => ({ ...p, attendants: v }));
   const setProductFilters = (v: string[]) =>
     onFiltersChange((p) => ({ ...p, products: v }));
+  const setPlatformFilters = (v: string[]) =>
+    onFiltersChange((p) => ({ ...p, platforms: v }));
 
-  const query = new URLSearchParams();
-  if (search) query.set("search", search);
-  if (statusIds.length > 0) query.set("status_ids", statusIds.join(","));
+  // Query base dos filtros (compartilhada por lista e exportacao)
+  const filterQuery = new URLSearchParams();
+  if (search) filterQuery.set("search", search);
+  if (statusIds.length > 0) filterQuery.set("status_ids", statusIds.join(","));
   if (attendantFilters.length > 0)
-    query.set("attendants", attendantFilters.join(","));
+    filterQuery.set("attendants", attendantFilters.join(","));
   if (productFilters.length > 0)
-    query.set("products", productFilters.join(","));
+    filterQuery.set("products", productFilters.join(","));
+  if (platformFilters.length > 0)
+    filterQuery.set("platforms", platformFilters.join(","));
+
+  const hasActiveFilters =
+    !!search ||
+    statusIds.length > 0 ||
+    attendantFilters.length > 0 ||
+    productFilters.length > 0 ||
+    platformFilters.length > 0;
+
+  const query = new URLSearchParams(filterQuery);
   query.set("page_size", "200");
 
   const { data, isLoading, mutate } = useSWR<{
@@ -122,6 +138,37 @@ export function CollectionsBoard({
     for (const s of statuses) m[s.id] = s.is_system;
     return m;
   }, [statuses]);
+
+  const [exporting, setExporting] = useState(false);
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch(
+        `/api/collections/export?${filterQuery.toString()}`
+      );
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clientes-cobranca-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(
+        `Planilha exportada${
+          hasActiveFilters ? " (filtro aplicado)" : " (todos os clientes)"
+        }`
+      );
+    } catch {
+      toast.error("Erro ao exportar planilha");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function handleImport() {
     setImporting(true);
@@ -251,6 +298,16 @@ export function CollectionsBoard({
                 label: p,
               }))}
             />
+            <MultiSelectFilter
+              placeholder="Plataforma"
+              className="sm:w-44"
+              selected={platformFilters}
+              onChange={setPlatformFilters}
+              options={platforms.map((p) => ({
+                value: p.name,
+                label: p.name,
+              }))}
+            />
           </div>
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-border p-0.5">
@@ -271,6 +328,20 @@ export function CollectionsBoard({
                 <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting}
+              className="border-border"
+              title={
+                hasActiveFilters
+                  ? "Exporta apenas os clientes filtrados"
+                  : "Exporta todos os clientes"
+              }
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {exporting ? "Exportando..." : "Exportar"}
+            </Button>
             <Button
               variant="outline"
               onClick={handleImport}
