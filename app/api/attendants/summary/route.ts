@@ -7,6 +7,7 @@ import {
   type CommissionTx,
 } from "@/lib/attendants/commission";
 import type { Attendant, AttendantRule } from "@/types";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
     if (!att.src) continue;
     const period = fixedPeriod ?? getCurrentPeriod(att.payment_closing_day || 1);
 
-    const { data: txs } = await supabase
+    const { data: txs } = await fetchAll(supabase
       .from("transactions")
       .select(
         "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date"
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
       .eq("user_id", userId)
       .ilike("src", att.src)
       .or("origin_type.eq.own,origin_type.is.null")
-      .eq("status", "pago");
+      .eq("status", "pago"));
 
     const paidSales = ((txs || []) as CommissionTx[]).filter((tx) => {
       const ref = (tx.payment_date || tx.sale_date || "").slice(0, 10);

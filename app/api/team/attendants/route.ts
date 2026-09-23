@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTeamContext } from "@/lib/team/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // GET /api/team/attendants — atendentes da conta + SRCs detectados nos dados.
 // Usado no formulario de equipe para vincular um membro a um atendente (SRC).
@@ -26,11 +27,11 @@ export async function GET() {
     .order("name");
 
   // SRCs que realmente aparecem nos dados de cobranca (postback)
-  const { data: rows } = await supabase
+  const { data: rows } = await fetchAll(supabase
     .from("collection_clients")
     .select("src")
     .eq("user_id", user.id)
-    .not("src", "is", null);
+    .not("src", "is", null));
 
   const srcSet = new Set<string>();
   for (const r of rows || []) {

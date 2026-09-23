@@ -5,6 +5,7 @@ import {
   upsertManualTransaction,
   isPaidStatusName,
 } from "@/lib/collections/manual-transaction";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * Backfill: cria a transação espelho de pedidos MANUAIS da Cobrança que já
@@ -31,11 +32,11 @@ export async function POST() {
   const userId = await getEffectiveUserId(supabase, user.id);
 
   // Pedidos manuais (sem transaction_id) e pagos.
-  const { data: clients, error } = await supabase
+  const { data: clients, error } = await fetchAll(supabase
     .from("collection_clients")
     .select("*")
     .eq("user_id", userId)
-    .is("transaction_id", null);
+    .is("transaction_id", null));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

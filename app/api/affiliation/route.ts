@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 interface AffiliateTx {
   affiliate_name: string | null;
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await query;
+  const { data, error } = await fetchAll(query);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

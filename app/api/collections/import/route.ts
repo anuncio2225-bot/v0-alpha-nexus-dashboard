@@ -6,6 +6,7 @@ import {
   buildStatusMap,
   syncTransactionToCollection,
 } from "@/lib/collections/sync";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // POST /api/collections/import — importa/atualiza TODAS as transacoes para a
 // cobranca (independente de sale_type/status). Nao duplica (vinculo por
@@ -24,14 +25,14 @@ export async function POST() {
   await supabase.rpc("seed_collection_defaults", { p_user_id: await getEffectiveUserId(supabase, user.id) });
 
   // Busca TODAS as transacoes do usuario (qualquer status / sale_type)
-  const { data: txs, error: txErr } = await supabase
+  const { data: txs, error: txErr } = await fetchAll(supabase
     .from("transactions")
     .select(
       "id, transaction_code, customer_name, customer_phone, customer_email, customer_doc, product_name, product_id, plan_name, commission, affiliate_commission, total_value, amount, gateway, src, attendant_id, status, status_code, original_status, sale_date, payment_date, created_at, tracking_code, tracking_url, shipping_status, shipping_company, address_full, payment_method, payment_link"
     )
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
     // Vendas de afiliados externos não entram na Cobrança.
-    .or("origin_type.eq.own,origin_type.is.null");
+    .or("origin_type.eq.own,origin_type.is.null"));
 
   if (txErr) {
     return NextResponse.json({ error: txErr.message }, { status: 500 });

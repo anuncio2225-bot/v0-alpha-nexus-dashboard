@@ -8,6 +8,7 @@ import {
   type CommissionTx,
 } from "@/lib/attendants/commission";
 import type { Attendant, AttendantRule } from "@/types";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export async function GET(
   request: Request,
@@ -60,7 +61,7 @@ export async function GET(
   })[] = [];
 
   if (att.src) {
-    const { data: txs, error: txErr } = await supabase
+    const { data: txs, error: txErr } = await fetchAll(supabase
       .from("transactions")
       .select(
         "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
@@ -70,7 +71,7 @@ export async function GET(
       .ilike("src", att.src)
       // Afiliados externos não têm atendente — não entram no cálculo de comissão.
       .or("origin_type.eq.own,origin_type.is.null")
-      .eq("status", "pago");
+      .eq("status", "pago"));
 
     if (txErr) {
       return NextResponse.json({ error: txErr.message }, { status: 500 });
@@ -87,14 +88,14 @@ export async function GET(
   // que NÃO possuem transaction_id (vendas adicionadas manualmente). Assim não
   // duplicam com a fonte acima — as vendas vindas de transações já são cobertas
   // pelo src (que é propagado ao reatribuir o atendente na Cobrança).
-  const { data: manualClients } = await supabase
+  const { data: manualClients } = await fetchAll(supabase
     .from("collection_clients")
     .select(
       "name, product_name, total_value, order_total_value, paid_value, remaining_value, status_name, order_date, payment_date, created_at"
     )
     .eq("user_id", userId)
     .eq("attendant_id", id)
-    .is("transaction_id", null);
+    .is("transaction_id", null));
 
   const manualSales = (manualClients || [])
     .filter((cc) => {

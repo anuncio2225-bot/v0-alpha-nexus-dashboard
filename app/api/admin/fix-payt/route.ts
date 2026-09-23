@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * Fixes Payt webhooks that were mislabeled as Braip (or another gateway).
@@ -26,10 +27,10 @@ export async function POST() {
   const admin = createAdminClient();
 
   // Load all of this user's logs
-  const { data: logs, error: logsErr } = await admin
+  const { data: logs, error: logsErr } = await fetchAll(admin
     .from("webhook_logs")
     .select("id, webhook_id, gateway, payload")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id));
 
   if (logsErr) {
     return NextResponse.json({ error: logsErr.message }, { status: 500 });

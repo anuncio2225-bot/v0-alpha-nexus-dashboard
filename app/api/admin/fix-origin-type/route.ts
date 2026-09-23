@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/team/scope";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * Classifica (retroativamente) as transações do usuário em:
@@ -29,10 +30,10 @@ export async function POST() {
   const userId = await getEffectiveUserId(supabase, user.id);
   const admin = createAdminClient();
 
-  const { data: txs, error } = await admin
+  const { data: txs, error } = await fetchAll(admin
     .from("transactions")
     .select("id, gateway, origin_type, affiliate_name, raw_payload")
-    .eq("user_id", userId);
+    .eq("user_id", userId));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { cleanSrc } from "@/lib/collections/sync";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // GET /api/collections/suggestions
 // Retorna listas para preencher os dropdowns do cadastro manual e filtros:
@@ -18,10 +19,12 @@ export async function GET() {
   }
 
   const [txRes, attRes] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("product_name, src")
-      .eq("user_id", await getEffectiveUserId(supabase, user.id)),
+    fetchAll(
+      supabase
+        .from("transactions")
+        .select("product_name, src")
+        .eq("user_id", await getEffectiveUserId(supabase, user.id)),
+    ),
     supabase
       .from("attendants")
       .select("id, name")

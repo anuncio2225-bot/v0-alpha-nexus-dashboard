@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { resolveKitUnits, type KitRow } from "@/lib/stock/kit";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * POST /api/stock/sync — cria saídas de estoque para TODAS as vendas pagas
@@ -26,23 +27,23 @@ export async function POST() {
   const kits = (kitsRaw || []) as KitRow[];
 
   // Transações pagas
-  const { data: txsRaw, error: txErr } = await supabase
+  const { data: txsRaw, error: txErr } = await fetchAll(supabase
     .from("transactions")
     .select("id, status, plan_name, product_name, customer_name, payment_date, sale_date, created_at")
     .eq("user_id", userId)
     .eq("status", "pago")
-    .in("origin_type", ["own", "affiliate_incoming"]);
+    .in("origin_type", ["own", "affiliate_incoming"]));
   if (txErr)
     return NextResponse.json({ error: txErr.message }, { status: 500 });
   const txs = txsRaw || [];
 
   // Saídas já existentes (para não duplicar)
-  const { data: existingRaw } = await supabase
+  const { data: existingRaw } = await fetchAll(supabase
     .from("stock_movements")
     .select("transaction_id")
     .eq("user_id", userId)
     .eq("type", "exit")
-    .not("transaction_id", "is", null);
+    .not("transaction_id", "is", null));
   const existing = new Set(
     (existingRaw || []).map((r) => r.transaction_id as string)
   );

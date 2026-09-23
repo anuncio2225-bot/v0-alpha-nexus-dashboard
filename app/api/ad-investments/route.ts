@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse, type NextRequest } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   if (to) query = query.lte("date", to);
   if (platform && platform !== "all") query = query.eq("platform", platform);
 
-  const { data, error } = await query;
+  const { data, error } = await fetchAll(query);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Calculate totals
