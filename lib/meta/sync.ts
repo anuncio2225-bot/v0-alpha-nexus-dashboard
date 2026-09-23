@@ -156,6 +156,11 @@ export async function syncUser(
     return result;
   }
 
+  // Conexões (BMs) cujas contas sincronizaram / falharam nesta rodada, para
+  // gravar meta_connections.last_synced_at só onde tudo deu certo.
+  const connectionsOk = new Set<string>();
+  const connectionsFailed = new Set<string>();
+
   for (const account of accounts) {
     const accountId = account.account_id as string;
     const accountToken = resolveToken(account.connection_id as string | null);
@@ -178,6 +183,7 @@ export async function syncUser(
       // Sem dados no periodo => nao e erro, apenas pula
       if (insights.length === 0) {
         result.accountsOk++;
+        if (account.connection_id) connectionsOk.add(account.connection_id as string);
         continue;
       }
 
@@ -207,8 +213,10 @@ export async function syncUser(
 
       result.rowsUpserted += rows.length;
       result.accountsOk++;
+      if (account.connection_id) connectionsOk.add(account.connection_id as string);
     } catch (err) {
       result.accountsFailed++;
+      if (account.connection_id) connectionsFailed.add(account.connection_id as string);
       const message =
         err instanceof MetaApiError
           ? friendlyMetaMessage(err.kind)
@@ -248,6 +256,15 @@ export async function syncUser(
         }
       }
     }
+  }
+
+  const syncedConnections = [...connectionsOk].filter((id) => !connectionsFailed.has(id));
+  if (syncedConnections.length > 0) {
+    await supabase
+      .from("meta_connections")
+      .update({ last_synced_at: new Date().toISOString(), last_error: null })
+      .in("id", syncedConnections)
+      .eq("user_id", userId);
   }
 
   // Atualiza status final do usuario

@@ -264,8 +264,9 @@ export async function processWebhook(
         "UNKNOWN"
     );
 
+    // O payload completo (com nome, e-mail, telefone e endereço do comprador)
+    // NÃO vai para o log da Vercel — ele já fica guardado em webhook_logs.
     console.log("[v0] Webhook received:", { gateway, eventType, userId });
-    console.log("[v0] Payload:", JSON.stringify(payload).slice(0, 500));
 
     // Postback de TESTE do gateway (ex.: Payt "test": true) - SKIP SILENTLY.
     // Nao vira transacao nem log; e apenas o evento de teste do cadastro.

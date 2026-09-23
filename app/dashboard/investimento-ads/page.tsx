@@ -33,7 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, cn, todaySP } from "@/lib/utils";
 import {
   Plus,
   Trash2,
@@ -432,7 +432,7 @@ export default function InvestimentoAdsPage() {
                       type="date"
                       defaultValue={
                         editingInv?.date ||
-                        new Date().toISOString().split("T")[0]
+                        todaySP()
                       }
                       required
                       className="bg-card-elevated border-border"
