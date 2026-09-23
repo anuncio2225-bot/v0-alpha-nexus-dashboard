@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * ANÁLISE DE LUCRO (somente leitura).
@@ -121,14 +122,14 @@ export async function GET(request: Request) {
   }[];
 
   // 4. Transações pagas do período (own + affiliate_incoming)
-  const { data: txRaw } = await supabase
+  const { data: txRaw } = await fetchAll(supabase
     .from("transactions")
     .select(
       "origin_type, status, commission, producer_commission, affiliate_commission, product_price, total_value, amount, product_name, plan_name, sale_date, payment_date, created_at"
     )
     .eq("user_id", userId)
     .eq("status", "pago")
-    .in("origin_type", ["own", "affiliate_incoming"]);
+    .in("origin_type", ["own", "affiliate_incoming"]));
 
   const inPeriod = (tx: Tx): boolean => {
     const ref = tx.payment_date || tx.sale_date || tx.created_at;
@@ -144,12 +145,12 @@ export async function GET(request: Request) {
   const affTxs = txs.filter((t) => t.origin_type === "affiliate_incoming");
 
   // 5. Investimento em ads (mesma base do dashboard: manual deduplicado + Meta)
-  const { data: adInvestments } = await supabase
+  const { data: adInvestments } = await fetchAll(supabase
     .from("ad_investments")
     .select("investment_value, date, platform")
     .eq("user_id", userId)
     .gte("date", fromDate)
-    .lte("date", toDate);
+    .lte("date", toDate));
 
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
@@ -168,13 +169,13 @@ export async function GET(request: Request) {
   let metaSpendTotal = 0;
   let metaExemptSpend = 0;
   if (activeMetaIds.length > 0) {
-    const { data: metaPerf } = await supabase
+    const { data: metaPerf } = await fetchAll(supabase
       .from("meta_ads_performance")
       .select("ad_account_id, date, spend")
       .eq("user_id", userId)
       .in("ad_account_id", activeMetaIds)
       .gte("date", fromDate)
-      .lte("date", toDate);
+      .lte("date", toDate));
     (metaPerf || []).forEach((row) => {
       const spend = num(row.spend);
       metaSpendTotal += spend;
@@ -212,12 +213,12 @@ export async function GET(request: Request) {
   const excluded = new Set(
     config.excluded_cashflow_categories.map((c) => c.trim().toLowerCase())
   );
-  const { data: cashflowRaw } = await supabase
+  const { data: cashflowRaw } = await fetchAll(supabase
     .from("cashflow")
     .select("type, category, amount, date, include_in_profit")
     .eq("user_id", userId)
     .gte("date", fromTs)
-    .lte("date", toTs);
+    .lte("date", toTs));
 
   const cashflowExits = (cashflowRaw || []).reduce((s, row) => {
     const isExpense =

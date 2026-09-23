@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * GET /api/stock/balance?from=&to= — KPIs do estoque.
@@ -25,10 +26,10 @@ export async function GET(request: Request) {
   const fromMs = fromRaw ? new Date(`${fromRaw.slice(0, 10)}T00:00:00-03:00`).getTime() : -Infinity;
   const toMs = toRaw ? new Date(`${toRaw.slice(0, 10)}T23:59:59-03:00`).getTime() : Infinity;
 
-  const { data: movesRaw, error } = await supabase
+  const { data: movesRaw, error } = await fetchAll(supabase
     .from("stock_movements")
     .select("type, quantity, unit_cost, total_cost, date")
-    .eq("user_id", userId);
+    .eq("user_id", userId));
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 

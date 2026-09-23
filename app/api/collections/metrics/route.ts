@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId, getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // Data de "hoje" no fuso de Sao Paulo (YYYY-MM-DD)
 function todaySaoPaulo(): string {
@@ -81,20 +82,20 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data: clients } = await clientsQuery;
+  const { data: clients } = await fetchAll(clientsQuery);
 
   // Pagamentos registrados hoje — restritos aos clientes filtrados
   const clientIds = (clients || []).map((c) => c.id);
   let paymentsToday: { payment_amount: number | null }[] | null = [];
   if (clientIds.length > 0) {
-    const { data } = await supabase
+    const { data } = await fetchAll(supabase
       .from("collection_history")
       .select("payment_amount, created_at, client_id")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("type", "payment")
       .in("client_id", clientIds)
       .gte("created_at", `${today}T00:00:00`)
-      .lte("created_at", `${today}T23:59:59.999`);
+      .lte("created_at", `${today}T23:59:59.999`));
     paymentsToday = data;
   }
 

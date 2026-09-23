@@ -321,8 +321,6 @@ export default function DashboardPage() {
               const today = new Date();
               if (preset === "today") return `Hoje, ${fmt(range.from)}`;
               if (preset === "yesterday") return `Ontem, ${fmt(range.from)}`;
-              if (preset === "thisMonth")
-                return `${fmt(range.from)} - ${fmt(range.to)}`;
               // custom ou qualquer intervalo
               return `${fmt(range.from)} - ${fmt(range.to)}`;
             })();

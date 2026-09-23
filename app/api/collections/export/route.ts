@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // Sanitiza um campo para CSV separado por ";": remove quebras de linha e troca
 // o separador por espaço, mantendo o layout simples do modelo de importação.
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await query.order("name", { ascending: true });
+  const { data, error } = await fetchAll(query.order("name", { ascending: true }));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -111,11 +112,11 @@ export async function POST(_req: NextRequest) {
 
       // --- Fix transactions for this webhook ---
       // Only touch the columns we can confidently re-derive from the webhook.
-      const { data: txRows, error: txErr } = await supabase
+      const { data: txRows, error: txErr } = await fetchAll(supabase
         .from("transactions")
         .select("id, gateway, source, sale_type")
         .eq("user_id", await getEffectiveUserId(supabase, user.id))
-        .eq("webhook_id", wh.id);
+        .eq("webhook_id", wh.id));
 
       if (txErr) {
         console.error("[v0] reconcile tx fetch error:", txErr.message);
@@ -148,11 +149,11 @@ export async function POST(_req: NextRequest) {
 
       // --- Fix webhook_logs gateway for this webhook ---
       if (hasConcreteSource) {
-        const { data: logRows, error: logErr } = await supabase
+        const { data: logRows, error: logErr } = await fetchAll(supabase
           .from("webhook_logs")
           .select("id, gateway")
           .eq("user_id", await getEffectiveUserId(supabase, user.id))
-          .eq("webhook_id", wh.id);
+          .eq("webhook_id", wh.id));
 
         if (logErr) {
           console.error("[v0] reconcile log fetch error:", logErr.message);

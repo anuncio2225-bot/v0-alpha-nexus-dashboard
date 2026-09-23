@@ -33,7 +33,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, todaySP } from "@/lib/utils";
 import {
   Plus,
   ArrowUpCircle,
@@ -430,7 +430,7 @@ export default function CashflowPage() {
                   <Input
                     name="date"
                     type="date"
-                    defaultValue={new Date().toISOString().split("T")[0]}
+                    defaultValue={todaySP()}
                     className="bg-card-elevated border-border"
                   />
                 </div>

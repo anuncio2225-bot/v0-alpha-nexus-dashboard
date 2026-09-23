@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // ============================================================================
 // /api/meta/insights — agregados de performance para o dashboard.
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
     const accountFilter =
       account && activeIds.includes(account) ? [account] : activeIds;
 
-    const { data, error } = await supabase
+    const { data, error } = await fetchAll(supabase
       .from("meta_ads_performance")
       .select(
         "ad_account_id, date, spend, spend_original, currency, impressions, clicks, reach, conversions, conversion_value"
@@ -86,7 +87,7 @@ export async function GET(request: Request) {
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .in("ad_account_id", accountFilter)
       .gte("date", from)
-      .lte("date", to);
+      .lte("date", to));
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

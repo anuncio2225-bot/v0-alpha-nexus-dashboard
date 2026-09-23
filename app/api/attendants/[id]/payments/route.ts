@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 async function auth() {
   const supabase = await createClient();
@@ -20,12 +21,12 @@ export async function GET(
   const { supabase, userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const { data, error } = await fetchAll(supabase
     .from("attendant_payments")
     .select("*")
     .eq("attendant_id", id)
     .eq("user_id", userId)
-    .order("period_end", { ascending: false });
+    .order("period_end", { ascending: false }));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ payments: data });

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export async function GET() {
   const supabase = await createClient();
@@ -10,11 +11,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await fetchAll(supabase
     .from("cashflow")
     .select("*")
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
-    .order("date", { ascending: false });
+    .order("date", { ascending: false }));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

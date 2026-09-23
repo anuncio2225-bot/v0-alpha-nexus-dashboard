@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * GET /api/stock?from=&to= — lista as movimentações do período (mais recentes
@@ -21,12 +22,12 @@ export async function GET(request: Request) {
 
   // Busca TODAS as movimentações para computar o saldo acumulado corretamente;
   // depois filtra as do período para exibir.
-  const { data: allRaw, error } = await supabase
+  const { data: allRaw, error } = await fetchAll(supabase
     .from("stock_movements")
     .select("*")
     .eq("user_id", userId)
     .order("date", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }));
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /** Remove caracteres especiais soltos no final do SRC (colchetes, parênteses, chaves, pontos, vírgulas, espaços). */
 export function cleanSrc(src: string): string {
@@ -24,12 +25,12 @@ export async function POST() {
 
   const userId = await getEffectiveUserId(supabase, user.id);
 
-  const { data: srcs, error: srcErr } = await supabase
+  const { data: srcs, error: srcErr } = await fetchAll(supabase
     .from("transactions")
     .select("src")
     .eq("user_id", userId)
     .not("src", "is", null)
-    .neq("src", "");
+    .neq("src", ""));
 
   if (srcErr) {
     return NextResponse.json({ error: srcErr.message }, { status: 500 });

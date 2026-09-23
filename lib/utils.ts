@@ -14,6 +14,11 @@ export function nowSP() {
   return toZonedTime(new Date(), TZ);
 }
 
+/** Data de hoje em Brasília, "yyyy-MM-dd". Não use toISOString(): depois das 21h ele já é amanhã. */
+export function todaySP(): string {
+  return format(nowSP(), "yyyy-MM-dd");
+}
+
 export function formatCurrency(value: number): string {
   const safe = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat("pt-BR", {

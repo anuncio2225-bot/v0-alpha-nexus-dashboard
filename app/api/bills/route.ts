@@ -1,17 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const { data, error } = await fetchAll(supabase
     .from("bills")
     .select("*")
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
-    .order("vencimento", { ascending: true });
+    .order("vencimento", { ascending: true }));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data || []);

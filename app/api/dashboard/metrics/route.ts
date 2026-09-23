@@ -18,6 +18,7 @@ import type {
   AttendantRanking,
   ProductOption,
 } from "@/types";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 type Tx = {
   status: string | null;
@@ -149,7 +150,7 @@ export async function GET(request: Request) {
       txQuery = txQuery.or(orClauses);
     }
 
-    const { data: transactions, error: txError } = await txQuery;
+    const { data: transactions, error: txError } = await fetchAll(txQuery);
     if (txError) {
       console.error("[v0] Error fetching transactions:", txError);
       return NextResponse.json({ error: txError.message }, { status: 500 });
@@ -168,7 +169,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch product list (for filter dropdown) - ALWAYS the full list,
     // independent of current product filter, so the user can change selection.
-    const { data: allProductsRaw } = await supabase
+    const { data: allProductsRaw } = await fetchAll(supabase
       .from("transactions")
       .select("product_id, product_name, webhook_id, sale_date, created_at")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
@@ -176,7 +177,7 @@ export async function GET(request: Request) {
       .not("product_name", "is", null)
       .or(
         `and(sale_date.gte.${from},sale_date.lte.${to}),and(sale_date.is.null,created_at.gte.${from},created_at.lte.${to})`
-      );
+      ));
 
     // 2b. Fetch ALL webhooks to build product list AND webhook map
     const { data: webhooksRaw } = await supabase
@@ -265,17 +266,17 @@ export async function GET(request: Request) {
       paymentsQuery = paymentsQuery.or(orClauses);
     }
 
-    const { data: paymentsByPaymentDate } = await paymentsQuery;
+    const { data: paymentsByPaymentDate } = await fetchAll(paymentsQuery);
 
     // 3. Fetch Ad Investments (manual entries from ad_investments table)
     const dateFrom = from.split("T")[0];
     const dateTo = to.split("T")[0];
-    const { data: adInvestments } = await supabase
+    const { data: adInvestments } = await fetchAll(supabase
       .from("ad_investments")
       .select("investment_value, date, platform, campaign_name")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .gte("date", dateFrom)
-      .lte("date", dateTo);
+      .lte("date", dateTo));
 
     // 3b. Fetch Meta Ads spend (automatic) from meta_ads_performance.
     // Mesma logica/fonte usada em /api/meta/insights para que os numeros
@@ -303,13 +304,13 @@ export async function GET(request: Request) {
     // Parcela do gasto Meta que é ISENTA do imposto da Meta.
     let metaExemptSpend = 0;
     if (activeMetaIds.length > 0) {
-      const { data: metaPerf } = await supabase
+      const { data: metaPerf } = await fetchAll(supabase
         .from("meta_ads_performance")
         .select("ad_account_id, date, spend")
         .eq("user_id", await getEffectiveUserId(supabase, user.id))
         .in("ad_account_id", activeMetaIds)
         .gte("date", dateFrom)
-        .lte("date", dateTo);
+        .lte("date", dateTo));
 
       (metaPerf || []).forEach((row) => {
         const spend = safeNumber(row.spend);

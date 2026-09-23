@@ -5,6 +5,7 @@ import useSWR, { mutate as globalMutate } from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -65,6 +66,9 @@ export default function LogsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [resetting, setResetting] = useState(false);
   const [fixing, setFixing] = useState(false);
+  // "Resetar tudo" só libera depois de digitar APAGAR — o botão fica ao lado
+  // de ações do dia a dia e um clique errado apagava todas as vendas.
+  const [resetConfirmText, setResetConfirmText] = useState("");
 
   const params = new URLSearchParams();
   if (gatewayFilter !== "all") params.set("gateway", gatewayFilter);
@@ -178,7 +182,8 @@ export default function LogsPage() {
                 <AlertDialogDescription>
                   Isso vai apagar TODOS os logs de webhooks recebidos e erros
                   registrados. As transações já salvas e o dashboard NÃO serão
-                  afetados. Esta ação não pode ser desfeita.
+                  afetados. Se apagar por engano, o suporte recupera em até 30
+                  dias.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -196,7 +201,7 @@ export default function LogsPage() {
           </AlertDialog>
 
           {/* Reset completo (logs + transacoes + dashboard) */}
-          <AlertDialog>
+          <AlertDialog onOpenChange={(open) => !open && setResetConfirmText("")}>
             <AlertDialogTrigger asChild>
               <Button
                 variant="destructive"
@@ -229,17 +234,27 @@ export default function LogsPage() {
                     metas e lançamentos manuais de caixa.
                   </span>
                   <span className="block pt-2">
-                    Útil para reenviar postbacks do zero. Esta ação não pode
-                    ser desfeita.
+                    Útil para reenviar postbacks do zero. Se apagar por engano,
+                    o suporte recupera em até 30 dias.
+                  </span>
+                  <span className="block pt-2 font-semibold text-foreground">
+                    Para confirmar, digite APAGAR:
                   </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <Input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="APAGAR"
+                autoComplete="off"
+                disabled={resetting}
+              />
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={resetting}>
                   Cancelar
                 </AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={resetting}
+                  disabled={resetting || resetConfirmText.trim().toUpperCase() !== "APAGAR"}
                   onClick={() => handleReset("all")}
                   className="bg-danger text-danger-foreground hover:bg-danger/90"
                 >
