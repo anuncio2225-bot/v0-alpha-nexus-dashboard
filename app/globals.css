@@ -133,9 +133,15 @@
 }
 
 @theme inline {
-  --font-sans: "DM Sans", "DM Sans Fallback", system-ui, sans-serif;
-  --font-heading: "Syne", "Syne Fallback", system-ui, sans-serif;
+  /* Painel de operação: UMA família (Geist) para títulos, rótulos e números.
+     Syne fica só no logotipo — é identidade, não voz da interface. */
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-heading: var(--font-geist), system-ui, sans-serif;
+  --font-logo: var(--font-syne), var(--font-geist), system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
+
+  /* Movimento: curva de saída forte, nada acima de 300 ms (Emil Kowalski). */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -197,11 +203,36 @@
   
   body {
     @apply bg-background text-foreground antialiased;
+    caret-color: var(--brand);
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     @apply font-semibold tracking-tight;
+    text-wrap: balance;
+  }
+
+  /* Superfícies do navegador também carregam o design. */
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 30%, transparent);
+    color: var(--foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Dinheiro alinhado: números de tabela com largura fixa. */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -209,22 +240,20 @@
   /* Metric display - large numbers */
   .metric {
     font-family: var(--font-heading);
-    @apply text-3xl font-bold tracking-tight;
+    font-variant-numeric: tabular-nums;
+    @apply text-3xl font-semibold tracking-tight;
   }
-  
+
   .metric-sm {
     font-family: var(--font-heading);
+    font-variant-numeric: tabular-nums;
     @apply text-xl font-semibold tracking-tight;
   }
-  
-  /* Brand gradient text */
-  .text-gradient {
-    @apply bg-gradient-to-r from-brand to-emerald-400 bg-clip-text text-transparent;
-  }
-  
-  /* Card hover effect */
+
+  /* Card de dado não "levanta" nem brilha: só a borda responde ao mouse. */
   .card-hover {
-    @apply transition-all duration-200 hover:border-brand/30 hover:shadow-lg hover:shadow-brand/5 hover:-translate-y-0.5;
+    transition: border-color 150ms var(--ease-out);
+    @apply hover:border-foreground/15;
   }
   
   /* Card hover background */
@@ -258,35 +287,13 @@
     }
   }
   
-  /* Fade up animation */
-  .fade-up {
-    animation: fadeUp 0.4s ease-out forwards;
-    opacity: 0;
-  }
-  
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Stagger children animation */
+  /* .fade-up e .stagger ficam sem animação de propósito: painel carrega direto
+     na tarefa, sem coreografia de entrada em cada bloco. As classes continuam
+     existindo para não quebrar quem as usa. */
+  .fade-up,
   .stagger > * {
-    animation: fadeUp 0.4s ease-out forwards;
-    opacity: 0;
+    opacity: 1;
   }
-  
-  .stagger > *:nth-child(1) { animation-delay: 0ms; }
-  .stagger > *:nth-child(2) { animation-delay: 50ms; }
-  .stagger > *:nth-child(3) { animation-delay: 100ms; }
-  .stagger > *:nth-child(4) { animation-delay: 150ms; }
-  .stagger > *:nth-child(5) { animation-delay: 200ms; }
-  .stagger > *:nth-child(6) { animation-delay: 250ms; }
 
   /* Table row hover */
   .table-row-hover tbody tr {

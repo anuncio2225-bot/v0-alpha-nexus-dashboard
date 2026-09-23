@@ -31,7 +31,10 @@ export default async function DashboardLayout({
     <HideValuesProvider>
       <div className="flex min-h-screen bg-background">
         <Sidebar profile={profile as Profile | null} />
-        <main className="flex-1 min-h-screen p-6 transition-all duration-300">
+        {/* min-w-0: sem ele, uma tabela larga (Cobrança) empurra a página
+            inteira para o lado em vez de rolar dentro do próprio card.
+            pt-20 no celular: espaço da barra superior com o botão do menu. */}
+        <main className="flex-1 min-w-0 min-h-screen px-4 pb-6 pt-20 sm:px-6 lg:p-6">
           <RouteAccessGuard>{children}</RouteAccessGuard>
         </main>
       </div>

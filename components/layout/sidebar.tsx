@@ -32,6 +32,8 @@ import {
   Handshake,
   ChevronLeft,
   ChevronRight,
+  Menu,
+  X,
   Eye,
   EyeOff,
   ShieldCheck,
@@ -73,7 +75,7 @@ const navItems: {
 export function Sidebar({ profile }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isCollapsed, isHydrated, toggle } = useSidebar();
+  const { isCollapsed: storedCollapsed, isHydrated, toggle } = useSidebar();
   const { hidden: valuesHidden, toggle: toggleValues } = useHideValues();
   const { isOwner, isMember, permissions, ownerName, isLoading } =
     useTeamPermissions();
@@ -81,6 +83,20 @@ export function Sidebar({ profile }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const isDark = resolvedTheme !== "light";
+
+  // Abaixo de 1024 px o menu vira gaveta: fica fora da tela e abre pelo botão
+  // da barra superior. "Recolhido" só existe no computador.
+  const [isDesktop, setIsDesktop] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setIsDesktop(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
+  }, []);
+  useEffect(() => setMobileOpen(false), [pathname]);
+  const isCollapsed = storedCollapsed && isDesktop;
 
   // Itens visiveis: dono ve tudo; membro ve apenas o que tem permissao.
   // "Equipe" e exclusivo do dono. Enquanto carrega, mostramos tudo (evita flash
@@ -109,10 +125,38 @@ export function Sidebar({ profile }: SidebarProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
+      {/* Barra superior do celular: botão do menu + logotipo */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/95 px-4 backdrop-blur lg:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileOpen(true)}
+          className="h-9 w-9 text-sidebar-foreground/70"
+          aria-label="Abrir menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <Link href="/dashboard" className="text-lg font-bold font-logo tracking-tight">
+          <span className="text-brand">Alpha</span>
+          <span className="text-sidebar-foreground">Nexus</span>
+        </Link>
+      </header>
+
+      {/* Fundo escurecido atrás da gaveta aberta */}
+      <div
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+        className={cn(
+          "fixed inset-0 z-40 bg-black/60 transition-opacity duration-200 lg:hidden",
+          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+      />
+
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
-          sidebarWidth
+          "fixed left-0 top-0 z-50 flex h-dvh flex-col border-r border-sidebar-border bg-sidebar transition-[width,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] lg:z-40",
+          isDesktop ? sidebarWidth : "w-[264px]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Logo + Toggle */}
@@ -124,7 +168,7 @@ export function Sidebar({ profile }: SidebarProps) {
               isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
             )}
           >
-            <span className="text-xl font-bold font-heading tracking-tight whitespace-nowrap">
+            <span className="text-xl font-bold font-logo tracking-tight whitespace-nowrap">
               <span className="text-brand">Alpha</span>
               <span className="text-sidebar-foreground">Nexus</span>
             </span>
@@ -134,13 +178,16 @@ export function Sidebar({ profile }: SidebarProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={toggle}
+                onClick={isDesktop ? toggle : () => setMobileOpen(false)}
+                aria-label={isDesktop ? (isCollapsed ? "Expandir menu" : "Recolher menu") : "Fechar menu"}
                 className={cn(
                   "h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent shrink-0",
                   isCollapsed && "mx-auto"
                 )}
               >
-                {isCollapsed ? (
+                {!isDesktop ? (
+                  <X className="h-4 w-4" />
+                ) : isCollapsed ? (
                   <ChevronRight className="h-4 w-4" />
                 ) : (
                   <ChevronLeft className="h-4 w-4" />
@@ -148,7 +195,7 @@ export function Sidebar({ profile }: SidebarProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {isCollapsed ? "Expandir menu" : "Recolher menu"}
+              {!isDesktop ? "Fechar menu" : isCollapsed ? "Expandir menu" : "Recolher menu"}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -181,7 +228,7 @@ export function Sidebar({ profile }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300",
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
                       isActive
                         ? "bg-brand/15 text-brand"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -220,10 +267,12 @@ export function Sidebar({ profile }: SidebarProps) {
 
         {/* User section */}
         <div className="border-t border-sidebar-border p-3">
+          {/* Nome e e-mail ganham a linha inteira; as ações vão para a linha de
+              baixo. Na mesma linha, o nome sumia em "Cl…". */}
           <div
             className={cn(
-              "flex items-center gap-3 transition-all duration-300",
-              isCollapsed && "flex-col gap-2"
+              "flex flex-wrap items-center gap-x-3 gap-y-2",
+              isCollapsed && "flex-col flex-nowrap gap-2"
             )}
           >
             <Avatar
@@ -239,8 +288,8 @@ export function Sidebar({ profile }: SidebarProps) {
             </Avatar>
             <div
               className={cn(
-                "flex-1 overflow-hidden transition-all duration-300",
-                isCollapsed ? "w-0 h-0 opacity-0" : "w-auto opacity-100"
+                "min-w-0 flex-1 overflow-hidden",
+                isCollapsed ? "hidden" : "basis-[calc(100%-48px)]"
               )}
             >
               <p className="truncate text-sm font-medium text-sidebar-foreground">
@@ -319,7 +368,7 @@ export function Sidebar({ profile }: SidebarProps) {
       {/* Spacer for main content - syncs with sidebar width */}
       <div
         className={cn(
-          "shrink-0 transition-all duration-300 ease-in-out",
+          "hidden shrink-0 transition-[width] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] lg:block",
           isHydrated ? sidebarWidth : "w-[232px]"
         )}
         aria-hidden="true"

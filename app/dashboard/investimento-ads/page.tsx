@@ -386,7 +386,7 @@ export default function InvestimentoAdsPage() {
             Registre e acompanhe seus gastos com trafego pago
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={handleSync}
@@ -504,7 +504,7 @@ export default function InvestimentoAdsPage() {
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={prevMonth}>
             <ChevronLeft className="h-4 w-4" />
@@ -517,7 +517,7 @@ export default function InvestimentoAdsPage() {
           </Button>
         </div>
         <Select value={filterPlatform} onValueChange={setFilterPlatform}>
-          <SelectTrigger className="w-[220px] bg-card-elevated border-border">
+          <SelectTrigger className="w-full bg-card-elevated border-border sm:w-[220px]">
             <Megaphone className="h-4 w-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Todas plataformas" />
           </SelectTrigger>

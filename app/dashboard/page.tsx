@@ -54,7 +54,20 @@ import { SensitiveValue } from "@/components/ui/sensitive-value";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const PIE_COLORS = ["#22c55e", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"];
+// Sem roxo/índigo: é a paleta "de IA" e não significa nada aqui.
+const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444", "#71717a", "#38bdf8"];
+
+// Eixo em reais legível em qualquer escala: "R$ 340", "R$ 1,2 mil", "R$ 3,4 mi".
+// O formato antigo (`R$${v/1000}k`) mostrava "R$0k" em todas as marcas abaixo de mil.
+const axisBRL = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+function formatAxisBRL(value: number): string {
+  return axisBRL.format(value);
+}
 
 export default function DashboardPage() {
   const [preset, setPreset] = useState<FilterPreset>("7d");
@@ -108,9 +121,13 @@ export default function DashboardPage() {
     return "Boa noite";
   })();
 
-  const formattedDate = now
-    ? format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
-    : "";
+  // "Quarta-feira, 23 de setembro de 2026": só a primeira letra maiúscula.
+  // (A classe CSS `capitalize` fazia "Quarta-Feira, 23 De Setembro De 2026".)
+  const formattedDate = (() => {
+    if (!now) return "";
+    const s = format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
 
   const from = format(range.from, "yyyy-MM-dd'T'00:00:00");
   const to = format(range.to, "yyyy-MM-dd'T'23:59:59");
@@ -204,32 +221,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Saudacao personalizada */}
-      {greeting && (
-        <div className="fade-up">
-          <h2 className="text-2xl font-bold text-foreground sm:text-3xl text-balance">
-            {greeting}
-            {firstName ? `, ${firstName}` : ""} {"\u{1F44B}"}
-          </h2>
+      {/* Cabeçalho único: a saudação é o título; os filtros ficam ao lado. */}
+      <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {greeting || "Dashboard"}
+            {greeting && firstName ? `, ${firstName}` : ""}
+          </h1>
           {formattedDate && (
-            <p className="mt-1 text-sm capitalize text-muted-foreground">
-              {formattedDate}
-            </p>
+            <p className="mt-1 whitespace-nowrap text-sm text-muted-foreground">{formattedDate}</p>
           )}
         </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground font-heading">
-            Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Visão geral das suas operações
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Botao de Refresh Manual */}
           <Button
             variant="outline"
@@ -336,39 +339,35 @@ export default function DashboardPage() {
           })()}
           icon={CheckCircle}
           loading={isLoading}
-          className="h-28"
           textSize="text-2xl"
         />
         <KpiCard
           data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
           icon={Calendar}
           loading={isLoading}
-          className="h-28"
           textSize="text-2xl"
         />
         <KpiCard
           data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
           icon={AlertTriangle}
           loading={isLoading}
-          className="h-28"
           textSize="text-2xl"
         />
         <KpiCard
           data={(() => {
             const raw = kpis?.roi;
-            if (!raw) return { label: "ROI", value: 0, formatted: "1.00", color: "neutral" as const };
+            if (!raw) return { label: "ROI", value: 0, formatted: "1,00x", color: "neutral" as const };
             const roiPct = raw.value ?? 0;
             const multiplier = 1 + roiPct / 100;
             const color = multiplier < 1 ? "danger" : multiplier === 1 ? "warning" : "success";
             return {
               ...raw,
-              formatted: multiplier.toFixed(2),
+              formatted: `${multiplier.toFixed(2).replace(".", ",")}x`,
               color: color as "danger" | "warning" | "success",
             };
           })()}
           icon={Percent}
           loading={isLoading}
-          className="h-28"
           textSize="text-2xl"
         />
       </div>
@@ -505,7 +504,7 @@ export default function DashboardPage() {
                 ...kpis.lucro,
                 label: "Margem de Lucro",
                 formatted: kpis.investimento?.value
-                  ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1)}%`
+                  ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1).replace(".", ",")}%`
                   : "0%",
                 value: kpis.investimento?.value
                   ? (kpis.lucro.value / kpis.investimento.value) * 100
@@ -561,7 +560,8 @@ export default function DashboardPage() {
                   <YAxis
                     tick={{ fill: "#a1a1aa", fontSize: 12 }}
                     axisLine={{ stroke: "#262626" }}
-                    tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
+                    width={72}
+                    tickFormatter={formatAxisBRL}
                   />
                   <Tooltip
                     contentStyle={{
@@ -606,9 +606,12 @@ export default function DashboardPage() {
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[300px] w-full" />
-            ) : dailyData.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no período
+            ) : dailyData.every((d) => !d.pagas && !d.agendadas && !d.frustradas) ? (
+              <div className="flex h-[300px] flex-col items-center justify-center gap-1 text-center">
+                <p className="text-sm text-foreground">Nenhuma venda neste período</p>
+                <p className="text-xs text-muted-foreground">
+                  Pagas, agendadas e frustradas aparecem aqui dia a dia.
+                </p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -652,7 +655,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-brand" />
               Distribuição Financeira
             </CardTitle>
           </CardHeader>
@@ -662,6 +664,15 @@ export default function DashboardPage() {
             ) : financialBreakdown.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
                 Sem dados financeiros no período
+              </div>
+            ) : financialBreakdown.length === 1 ? (
+              // Rosca de uma fatia só não compara nada: diz em texto.
+              <div className="flex h-[300px] flex-col items-center justify-center gap-1 text-center">
+                <p className="text-xs text-muted-foreground">Todo o valor do período é</p>
+                <p className="text-sm text-foreground">{financialBreakdown[0].label}</p>
+                <p className="metric-sm text-foreground">
+                  <SensitiveValue>{formatCurrency(financialBreakdown[0].value)}</SensitiveValue>
+                </p>
               </div>
             ) : (
               <div className="flex flex-col items-center">
@@ -706,7 +717,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-brand" />
               Funil Operacional
             </CardTitle>
           </CardHeader>
@@ -773,7 +783,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-brand" />
               Top Plataformas de Ads
             </CardTitle>
           </CardHeader>
@@ -826,7 +835,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <Users className="h-4 w-4 text-brand" />
               Ranking Atendentes
             </CardTitle>
           </CardHeader>
@@ -872,7 +880,12 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-brand">
+                        <p
+                          className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            att.revenue > 0 ? "text-foreground" : "text-muted-foreground"
+                          )}
+                        >
                           <SensitiveValue>{formatCurrency(att.revenue)}</SensitiveValue>
                         </p>
                       </div>

@@ -35,7 +35,7 @@ export function formatNumber(value: number): string {
 
 export function formatPercent(value: number): string {
   const safe = Number.isFinite(value) ? value : 0;
-  return `${safe.toFixed(1)}%`;
+  return `${safe.toFixed(1).replace(".", ",")}%`;
 }
 
 export function formatDate(date: string | Date, fmt = "dd/MM/yyyy"): string {

@@ -270,7 +270,7 @@ export default function WebhooksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold text-foreground">
             Webhooks
@@ -279,7 +279,7 @@ export default function WebhooksPage() {
             Crie um webhook diferente para cada produto ou plataforma
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={reconcilePlatforms}
@@ -338,12 +338,12 @@ export default function WebhooksPage() {
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10">
                         <Webhook className="h-5 w-5 text-brand" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <CardTitle className="text-base">{w.name}</CardTitle>
                           <Badge
                             variant="outline"
@@ -391,7 +391,7 @@ export default function WebhooksPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
                       <Switch
                         checked={w.is_active}
                         onCheckedChange={() => toggleActive(w)}

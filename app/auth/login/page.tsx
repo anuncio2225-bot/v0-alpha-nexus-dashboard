@@ -83,7 +83,7 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-sans tracking-tight">
+          <h1 className="text-3xl font-bold font-logo tracking-tight">
             <span className="text-brand">Alpha</span>
             <span className="text-foreground">Nexus</span>
           </h1>
@@ -145,7 +145,7 @@ function LoginContent() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="********"
+                  placeholder="Sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

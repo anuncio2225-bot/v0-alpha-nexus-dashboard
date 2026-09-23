@@ -256,8 +256,8 @@ export function CollectionsBoard({
     <div className="space-y-4">
       {/* Filtros e acoes */}
       <Card className="border-border bg-card p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -309,7 +309,7 @@ export function CollectionsBoard({
               }))}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-border p-0.5">
               <Button
                 variant="ghost"
@@ -449,7 +449,12 @@ export function CollectionsBoard({
                     <TableCell className="text-right">
                       <SensitiveValue>{formatCurrency(Number(c.total_value) || 0)}</SensitiveValue>
                     </TableCell>
-                    <TableCell className="text-right text-success">
+                    <TableCell
+                      className={cn(
+                        "text-right",
+                        Number(c.paid_value) > 0 ? "text-success" : "text-muted-foreground"
+                      )}
+                    >
                       <SensitiveValue>{formatCurrency(Number(c.paid_value) || 0)}</SensitiveValue>
                     </TableCell>
                     <TableCell className="text-right">

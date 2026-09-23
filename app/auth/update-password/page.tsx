@@ -54,7 +54,7 @@ export default function UpdatePasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-sans tracking-tight">
+          <h1 className="text-3xl font-bold font-logo tracking-tight">
             <span className="text-brand">Alpha</span>
             <span className="text-foreground">Nexus</span>
           </h1>
@@ -98,7 +98,7 @@ export default function UpdatePasswordPage() {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="********"
+                placeholder="Nova senha"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
