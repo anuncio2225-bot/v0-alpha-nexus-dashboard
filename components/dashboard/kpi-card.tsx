@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -9,11 +9,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Info } from "lucide-react";
 import type { KpiData } from "@/types";
 import type { LucideIcon } from "lucide-react";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { GlowCard } from "@/components/ui/spotlight-card";
+import { Sparkline } from "@/components/dashboard/sparkline";
 
 interface KpiCardProps {
   data: KpiData;
@@ -22,128 +22,149 @@ interface KpiCardProps {
   className?: string;
   /** Tailwind text-size class for the value, e.g. "text-2xl", "text-xl", "text-lg" */
   textSize?: string;
-  /** Removes extra padding for smaller faixas */
+  /** Cartão menor (grade de métricas). */
   compact?: boolean;
-  /** Even more compact: smaller icon, xs label */
+  /** Ainda menor. */
   mini?: boolean;
+  /** Série para o mini-gráfico luminoso no rodapé (cartões de destaque). */
+  trend?: number[];
+  /** Classes do item da grade (ex.: quantas colunas ocupa). */
+  itemClassName?: string;
 }
 
-const colorClasses = {
-  brand: {
-    bg: "bg-brand/10",
-    text: "text-brand",
-    icon: "text-brand",
-  },
-  success: {
-    bg: "bg-success/10",
-    text: "text-success",
-    icon: "text-success",
-  },
-  warning: {
-    bg: "bg-warning/10",
-    text: "text-warning",
-    icon: "text-warning",
-  },
-  danger: {
-    bg: "bg-danger/10",
-    text: "text-danger",
-    icon: "text-danger",
-  },
-  neutral: {
-    bg: "bg-muted",
-    text: "text-foreground",
-    icon: "text-muted-foreground",
-  },
+type Tone = "brand" | "success" | "warning" | "danger" | "neutral" | "info";
+
+// Cor de cada tom: azulejo do ícone, barrinha, brilho de fundo e mini-gráfico.
+const TONES: Record<Tone, { hex: string; ambient: string }> = {
+  brand: { hex: "#10b981", ambient: "rgba(16,185,129,0.20)" },
+  success: { hex: "#22c55e", ambient: "rgba(34,197,94,0.18)" },
+  warning: { hex: "#f59e0b", ambient: "rgba(245,158,11,0.20)" },
+  danger: { hex: "#f43f5e", ambient: "rgba(244,63,94,0.20)" },
+  neutral: { hex: "#94a3b8", ambient: "rgba(148,163,184,0.14)" },
+  info: { hex: "#60a5fa", ambient: "rgba(96,165,250,0.18)" },
 };
 
-export function KpiCard({ data, icon: Icon, loading, className, textSize, compact, mini }: KpiCardProps) {
-  // If color not set, auto-color negative values red and positive green
-  const autoColor = !data.color
-    ? data.value < 0
-      ? "danger"
-      : data.value > 0
-        ? "success"
-        : "neutral"
-    : data.color;
-  const colors = colorClasses[autoColor];
+function resolveTone(data: KpiData): Tone {
+  if (data.value < 0) return "danger";
+  const c = data.color as string | undefined;
+  if (c && c in TONES) return c as Tone;
+  return data.value > 0 ? "brand" : "neutral";
+}
 
-  const padding = mini ? "p-3" : compact ? "p-3.5" : "p-4";
-  const labelSize = mini ? "text-xs" : "text-sm";
-  const valueSize = textSize ?? "metric";
-  const iconSize = mini ? "h-4 w-4" : "h-5 w-5";
-  const iconPad = mini ? "p-2" : "p-2.5";
+export function KpiCard({ data, icon: Icon, loading, className, textSize, compact, mini, trend, itemClassName }: KpiCardProps) {
+  const small = compact || mini;
+  const tone = resolveTone(data);
+  const { hex, ambient } = TONES[tone];
+  const negative = data.value < 0;
 
   if (loading) {
     return (
-      <Card className={cn("bg-card border-border", className)}>
-        <CardContent className={padding}>
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className={cn("w-32", mini ? "h-5" : compact ? "h-6" : "h-8")} />
-            </div>
-            <Skeleton className={cn("rounded-lg", mini ? "h-8 w-8" : "h-10 w-10")} />
+      <Card className={cn("gap-0 py-0 rounded-[20px] border-[var(--border-glass)]", small ? "min-h-[112px]" : "min-h-[196px]", className, itemClassName)}>
+        <div className={cn("space-y-3", small ? "p-4" : "p-5")}>
+          <div className="flex items-center gap-3">
+            <Skeleton className={cn("rounded-xl", small ? "h-8 w-8" : "h-10 w-10")} />
+            <Skeleton className="h-4 w-24" />
           </div>
-        </CardContent>
+          <Skeleton className={cn("w-36", small ? "h-6" : "h-9")} />
+        </div>
       </Card>
     );
   }
 
+  const label = (
+    <span
+      className={cn(
+        "truncate text-[13px] text-muted-foreground",
+        data.tooltip && "cursor-help underline decoration-dotted decoration-muted-foreground/30 underline-offset-4"
+      )}
+    >
+      {data.label}
+    </span>
+  );
+
+  const valueClass = cn(
+    small ? "metric-sm" : "metric",
+    !small && textSize ? textSize : "",
+    small ? "text-[22px]" : "text-[30px]",
+    negative
+      ? "bg-[linear-gradient(90deg,#fda4af,#f43f5e_60%,#be123c)] bg-clip-text text-transparent"
+      : "text-metal-fade"
+  );
+
   return (
-    <TooltipProvider delayDuration={200}>
-      <GlowCard glowColor={autoColor} className="fade-up">
+    <TooltipProvider delayDuration={300}>
+      <GlowCard glowColor={tone === "info" ? "neutral" : tone} className={cn("h-full rounded-[20px]", itemClassName)}>
         <Card
           className={cn(
-            "bg-card border-border card-hover h-full overflow-hidden",
+            "ambient card-hover relative h-full gap-0 overflow-hidden rounded-[20px] border-[var(--border-glass)] py-0",
+            small ? "min-h-[112px]" : "min-h-[196px]",
             className
           )}
+          style={{ ["--tone" as string]: ambient }}
         >
-        <CardContent className={cn(padding, "h-full flex flex-col justify-center")}>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className={cn(labelSize, "text-muted-foreground truncate")}>
-                  {data.label}
+          <div className={cn("relative z-10 flex h-full flex-col", small ? "p-4" : "p-5")}>
+            {/* Ícone + rótulo */}
+            <div className="flex items-center gap-3">
+              {Icon && (
+                <span
+                  className={cn("icon-tile shrink-0", small ? "h-8 w-8" : "h-10 w-10")}
+                  style={{ ["--tile" as string]: hex }}
+                >
+                  <Icon className={small ? "h-4 w-4" : "h-[18px] w-[18px]"} />
                 </span>
-                {data.tooltip && (
+              )}
+              <div className="min-w-0 leading-tight">
+                {data.tooltip ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
-                    </TooltipTrigger>
+                    <TooltipTrigger asChild>{label}</TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       {data.tooltip}
                     </TooltipContent>
                   </Tooltip>
+                ) : (
+                  label
+                )}
+                {data.subtitle && !small && (
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground/60">{data.subtitle}</p>
                 )}
               </div>
-              <p className={cn(valueSize === "metric" ? "metric" : `font-bold tabular-nums ${valueSize}`, colors.text)}>
+            </div>
+
+            {/* Valor com barrinha de destaque na borda, como nas referências */}
+            <div className={cn("relative", small ? "mt-3" : "mt-5")}>
+              <span
+                className="absolute -left-5 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full"
+                style={{ background: hex, boxShadow: `0 0 12px ${hex}` }}
+                aria-hidden="true"
+              />
+              <p className={valueClass}>
                 <SensitiveValue>{data.formatted}</SensitiveValue>
               </p>
-              {data.subtitle && (
-                <p className="text-xs leading-none mt-0.5 text-muted-foreground truncate">{data.subtitle}</p>
-              )}
-              {data.changeLabel && (
-                <p
-                  className={cn(
-                    "text-xs",
-                    data.change && data.change >= 0
-                      ? "text-success"
-                      : "text-danger"
-                  )}
-                >
-                  {data.change && data.change >= 0 ? "+" : ""}
-                  {data.change?.toFixed(1)}% {data.changeLabel}
-                </p>
+              {data.subtitle && small && (
+                <p className="mt-1 truncate text-[11px] text-muted-foreground/60">{data.subtitle}</p>
               )}
             </div>
-            {Icon && (
-              <div className={cn("rounded-lg shrink-0", iconPad, colors.bg)}>
-                <Icon className={cn(iconSize, colors.icon)} />
-              </div>
+
+            {data.changeLabel && (
+              <span
+                className={cn(
+                  "mt-3 inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums",
+                  data.change && data.change >= 0 ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                )}
+              >
+                {data.change && data.change >= 0 ? "+ " : "- "}
+                {Math.abs(data.change ?? 0).toFixed(1).replace(".", ",")}% {data.changeLabel}
+              </span>
             )}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Mini-gráfico luminoso no rodapé */}
+          {trend && !small && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72px] opacity-90">
+              <Sparkline data={trend} color={hex} />
+            </div>
+          )}
+        </Card>
       </GlowCard>
     </TooltipProvider>
   );

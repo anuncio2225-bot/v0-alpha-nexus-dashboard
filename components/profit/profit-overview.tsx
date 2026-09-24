@@ -66,7 +66,7 @@ export function ProfitOverview({
               />
             }
           />
-          <SimStat label="ROI" value={<span>{sim.roi.toFixed(2)}x</span>} />
+          <SimStat label="ROI" value={<span>{sim.roi.toFixed(2).replace(".", ",")}x</span>} />
           <SimStat label="CPA" value={<Money value={sim.cpa} />} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">

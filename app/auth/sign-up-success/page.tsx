@@ -1,24 +1,17 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MailCheck } from "lucide-react";
+import { AuthShell } from "@/components/layout/auth-shell";
 
 export default function SignUpSuccessPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-sans tracking-tight">
-            <span className="text-brand">Alpha</span>
-            <span className="text-foreground">Nexus</span>
-          </h1>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-8 shadow-xl text-center">
+    <AuthShell>
+        <div className="text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center mb-4">
             <MailCheck className="h-8 w-8 text-brand" />
           </div>
 
-          <h2 className="text-xl font-semibold text-foreground mb-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-metal mb-2">
             Verifique seu email
           </h2>
 
@@ -42,7 +35,6 @@ export default function SignUpSuccessPage() {
             <Link href="/auth/login">Voltar para login</Link>
           </Button>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

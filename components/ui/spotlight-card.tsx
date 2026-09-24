@@ -20,7 +20,7 @@ const glowColorMap: Record<
   GlowColor,
   { hue: number; saturation: number; lightness: number }
 > = {
-  brand: { hue: 199, saturation: 89, lightness: 55 }, // teal/blue brand
+  brand: { hue: 160, saturation: 84, lightness: 45 }, // esmeralda da marca
   success: { hue: 142, saturation: 71, lightness: 45 },
   warning: { hue: 38, saturation: 92, lightness: 50 },
   danger: { hue: 0, saturation: 84, lightness: 60 },

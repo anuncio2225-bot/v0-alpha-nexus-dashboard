@@ -12,26 +12,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import {
+  CommissionInvestmentChart,
+  FinancialDonut,
+  OperationalFunnel,
+  SalesStatusChart,
+} from "@/components/dashboard/charts";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
 import { getDateRange, formatCurrency, cn } from "@/lib/utils";
 import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode, Profile } from "@/types";
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
 import {
   Calendar,
   Clock,
@@ -46,6 +37,7 @@ import {
   Zap,
   Inbox,
   Wallet,
+  Megaphone,
   BarChart3,
   ShoppingCart,
   RefreshCw,
@@ -53,8 +45,6 @@ import {
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-const PIE_COLORS = ["#22c55e", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"];
 
 export default function DashboardPage() {
   const [preset, setPreset] = useState<FilterPreset>("7d");
@@ -108,9 +98,13 @@ export default function DashboardPage() {
     return "Boa noite";
   })();
 
-  const formattedDate = now
-    ? format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
-    : "";
+  // "Quarta-feira, 23 de setembro de 2026": só a primeira letra maiúscula.
+  // (A classe CSS `capitalize` fazia "Quarta-Feira, 23 De Setembro De 2026".)
+  const formattedDate = (() => {
+    if (!now) return "";
+    const s = format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
 
   const from = format(range.from, "yyyy-MM-dd'T'00:00:00");
   const to = format(range.to, "yyyy-MM-dd'T'23:59:59");
@@ -204,32 +198,22 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Saudacao personalizada */}
-      {greeting && (
-        <div className="fade-up">
-          <h2 className="text-2xl font-bold text-foreground sm:text-3xl text-balance">
-            {greeting}
-            {firstName ? `, ${firstName}` : ""} {"\u{1F44B}"}
-          </h2>
-          {formattedDate && (
-            <p className="mt-1 text-sm capitalize text-muted-foreground">
-              {formattedDate}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground font-heading">
-            Dashboard
+      {/* Cabeçalho compacto: saudação numa linha e filtros ao lado quando cabem
+          (flex-wrap joga os filtros para baixo sozinho em telas estreitas) */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="live-dot" />
+            <span>
+              Ao vivo{formattedDate ? ` · ${formattedDate}` : ""}
+            </span>
+          </div>
+          {/* Saudação pelo horário + primeiro nome da conta logada */}
+          <h1 className="mt-1.5 text-[28px] font-semibold leading-tight sm:text-[32px]">
+            {greeting || "Olá"}{firstName ? `, ${firstName}` : ""}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Visão geral das suas operações
-          </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Botao de Refresh Manual */}
           <Button
             variant="outline"
@@ -310,459 +294,116 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================ */}
-      {/* FAIXA 1 — DESTAQUE: Pagas, Agendadas, Investimento, ROI */}
+      {/* DESTAQUES — 5 cartões iguais com mini-gráfico dos dias do período */}
       {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 stagger">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 xl:grid-cols-5">
         <KpiCard
           data={(() => {
-            const fmt = (d: Date) =>
-              format(d, "dd/MM", { locale: ptBR });
-            const subtitle = (() => {
-              const today = new Date();
-              if (preset === "today") return `Hoje, ${fmt(range.from)}`;
-              if (preset === "yesterday") return `Ontem, ${fmt(range.from)}`;
-              // custom ou qualquer intervalo
-              return `${fmt(range.from)} - ${fmt(range.to)}`;
-            })();
+            const fmt = (d: Date) => format(d, "dd/MM", { locale: ptBR });
+            const subtitle =
+              preset === "today"
+                ? `Hoje, ${fmt(range.from)}`
+                : preset === "yesterday"
+                  ? `Ontem, ${fmt(range.from)}`
+                  : `${fmt(range.from)} – ${fmt(range.to)}`;
             return kpis?.entradasHoje
-              ? { ...kpis.entradasHoje, subtitle }
-              : {
-                  label: "Pagas no Período",
-                  subtitle,
-                  value: 0,
-                  formatted: "R$ 0",
-                  color: "success" as const,
-                };
+              ? { ...kpis.entradasHoje, subtitle, color: "brand" as const }
+              : { label: "Pagas no Período", subtitle, value: 0, formatted: "R$ 0,00", color: "brand" as const };
           })()}
           icon={CheckCircle}
           loading={isLoading}
-          className="h-28"
-          textSize="text-2xl"
+          itemClassName="lg:col-span-3 xl:col-span-1"
+          trend={dailyData.map((d) => d.pagas)}
         />
         <KpiCard
-          data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
+          data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), color: "info" as const }}
           icon={Calendar}
           loading={isLoading}
-          className="h-28"
-          textSize="text-2xl"
+          itemClassName="lg:col-span-3 xl:col-span-1"
+          trend={dailyData.map((d) => d.agendadas)}
         />
         <KpiCard
-          data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
-          icon={AlertTriangle}
+          data={{ ...(kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0,00" }), color: "warning" as const }}
+          icon={Megaphone}
           loading={isLoading}
-          className="h-28"
-          textSize="text-2xl"
+          itemClassName="lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => d.investimento)}
+        />
+        <KpiCard
+          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0,00" }}
+          icon={Zap}
+          loading={isLoading}
+          itemClassName="lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => d.comissao - d.investimento)}
         />
         <KpiCard
           data={(() => {
             const raw = kpis?.roi;
-            if (!raw) return { label: "ROI", value: 0, formatted: "1.00", color: "neutral" as const };
-            const roiPct = raw.value ?? 0;
-            const multiplier = 1 + roiPct / 100;
-            const color = multiplier < 1 ? "danger" : multiplier === 1 ? "warning" : "success";
+            if (!raw) return { label: "ROI", value: 0, formatted: "1,00x", color: "neutral" as const };
+            const multiplier = 1 + (raw.value ?? 0) / 100;
             return {
               ...raw,
-              formatted: multiplier.toFixed(2),
-              color: color as "danger" | "warning" | "success",
+              formatted: `${multiplier.toFixed(2).replace(".", ",")}x`,
+              color: (multiplier >= 1 ? "brand" : "danger") as "brand" | "danger",
             };
           })()}
           icon={Percent}
           loading={isLoading}
-          className="h-28"
-          textSize="text-2xl"
+          itemClassName="sm:col-span-2 lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => (d.investimento > 0 ? d.comissao / d.investimento : 0))}
         />
       </div>
 
       {/* ================================================================ */}
-      {/* FAIXA 2 — IMPORTANTE: Lucro, CPA, Comissão Real, Antecipadas, Recuperação */}
+      {/* MÉTRICAS — 12 cartões do mesmo tamanho (divide por 2, 3, 4 e 6)  */}
       {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 stagger">
-        <KpiCard
-          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0" }}
-          icon={Zap}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0" }}
-          icon={ShoppingCart}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0" }}
-          icon={DollarSign}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
-          icon={Clock}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
-          icon={RefreshCw}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-      </div>
-
-      {/* ================================================================ */}
-      {/* FAIXA 3 — SECUNDÁRIO: Comissão Projetada, A Receber, Ticket Médio, */}
-      {/*            Taxa Conversão, Taxa Frustração, Frustradas             */}
-      {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 stagger">
-        <KpiCard
-          data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0" }}
-          icon={TrendingUp}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0" }}
-          icon={Target}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0" }}
-          icon={BarChart3}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0%" }}
-          icon={Target}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0%" }}
-          icon={XCircle}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0" }}
-          icon={XCircle}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-      </div>
-
-      {/* ================================================================ */}
-      {/* FAIXA 4 — RESUMO: Caixa Esperado + Margem */}
-      {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 stagger">
-        <KpiCard
-          data={
-            kpis?.caixaEsperado || {
-              label: "Caixa Esperado",
-              value: 0,
-              formatted: "R$ 0",
-              color: "brand",
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="live-dot" />
+          <h2 className="text-sm font-medium text-muted-foreground">Métricas do período</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <KpiCard data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0,00" }} icon={ShoppingCart} loading={isLoading} compact />
+          <KpiCard data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0,00" }} icon={DollarSign} loading={isLoading} compact />
+          <KpiCard data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0,00" }} icon={Clock} loading={isLoading} compact />
+          <KpiCard data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00" }} icon={RefreshCw} loading={isLoading} compact />
+          <KpiCard data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0,00" }} icon={TrendingUp} loading={isLoading} compact />
+          <KpiCard data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0,00" }} icon={Target} loading={isLoading} compact />
+          <KpiCard data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0,00" }} icon={BarChart3} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0,0%" }), color: "info" as const }} icon={Target} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0,0%" }), color: "warning" as const }} icon={AlertTriangle} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0,00" }), color: "danger" as const }} icon={XCircle} loading={isLoading} compact />
+          <KpiCard data={kpis?.caixaEsperado || { label: "Caixa Esperado", value: 0, formatted: "R$ 0,00", color: "brand" }} icon={Wallet} loading={isLoading} compact />
+          <KpiCard
+            data={
+              kpis?.lucro
+                ? {
+                    ...kpis.lucro,
+                    label: "Margem de Lucro",
+                    formatted: kpis.investimento?.value
+                      ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1).replace(".", ",")}%`
+                      : "0,0%",
+                    value: kpis.investimento?.value ? (kpis.lucro.value / kpis.investimento.value) * 100 : 0,
+                  }
+                : { label: "Margem de Lucro", value: 0, formatted: "0,0%" }
             }
-          }
-          icon={Wallet}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.lucro
-            ? {
-                ...kpis.lucro,
-                label: "Margem de Lucro",
-                formatted: kpis.investimento?.value
-                  ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1)}%`
-                  : "0%",
-                value: kpis.investimento?.value
-                  ? (kpis.lucro.value / kpis.investimento.value) * 100
-                  : 0,
-              }
-            : { label: "Margem de Lucro", value: 0, formatted: "0%" }
-          }
-          icon={Percent}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
+            icon={Percent}
+            loading={isLoading}
+            compact
+          />
+        </div>
       </div>
 
       {/* ================================================================ */}
-      {/* GRAFICOS: Comissao vs Investimento + Vendas por Status */}
+      {/* GRÁFICOS — componentes em components/dashboard/charts.tsx          */}
       {/* ================================================================ */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Comissao vs Investimento */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground">
-              Comissão vs Investimento
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : dailyData.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no período
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={dailyData}>
-                  <defs>
-                    <linearGradient id="colorComissao" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorInvestimento" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
-                    tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #262626",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#fafafa" }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="comissao"
-                    name="Comissão"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorComissao)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="investimento"
-                    name="Investimento"
-                    stroke="#f59e0b"
-                    fillOpacity={1}
-                    fill="url(#colorInvestimento)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Vendas por Status */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground">
-              Vendas por Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : dailyData.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no período
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dailyData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
-                    width={50}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #262626",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#fafafa" }}
-                  />
-                  <Bar dataKey="pagas" name="Pagas" fill="#22c55e" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="agendadas" name="Agendadas" fill="#a1a1aa" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="frustradas" name="Frustradas" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <CommissionInvestmentChart data={dailyData} loading={isLoading} />
+        <SalesStatusChart data={dailyData} loading={isLoading} />
       </div>
-
-      {/* ================================================================ */}
-      {/* GRAFICOS NOVOS: Pizza Financeiro + Funil Operacional */}
-      {/* ================================================================ */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Pizza Financeiro */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-brand" />
-              Distribuição Financeira
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : financialBreakdown.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados financeiros no período
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={financialBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="value"
-                      nameKey="label"
-                    >
-                      {financialBreakdown.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#141414",
-                        border: "1px solid #262626",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      formatter={(value: string) => (
-                        <span className="text-sm text-muted-foreground">{value}</span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Funil Operacional */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-brand" />
-              Funil Operacional
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : operationalFunnel.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados operacionais no período
-              </div>
-            ) : (
-              <div className="space-y-4 py-4">
-                {operationalFunnel.map((step, idx) => {
-                  const maxVal = Math.max(...operationalFunnel.map((s) => s.value));
-                  const pct = maxVal > 0 ? (step.value / maxVal) * 100 : 0;
-                  const totalAll = operationalFunnel.reduce((s, f) => s + f.value, 0);
-                  const share = totalAll > 0 ? ((step.value / totalAll) * 100).toFixed(1) : "0";
-
-                  return (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">
-                          {step.label}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-foreground">
-                            {step.value}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ({share}%)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor:
-                              step.label === "Pagas"
-                                ? "#22c55e"
-                                : step.label === "Frustradas"
-                                  ? "#ef4444"
-                                  : step.label === "Antecipadas"
-                                    ? "#6366f1"
-                                    : "#a1a1aa",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <FinancialDonut data={financialBreakdown} loading={isLoading} />
+        <OperationalFunnel steps={operationalFunnel} loading={isLoading} />
       </div>
 
       {/* ================================================================ */}
@@ -773,7 +414,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-brand" />
               Top Plataformas de Ads
             </CardTitle>
           </CardHeader>
@@ -826,7 +466,6 @@ export default function DashboardPage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              <Users className="h-4 w-4 text-brand" />
               Ranking Atendentes
             </CardTitle>
           </CardHeader>
@@ -872,7 +511,12 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-brand">
+                        <p
+                          className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            att.revenue > 0 ? "text-foreground" : "text-muted-foreground"
+                          )}
+                        >
                           <SensitiveValue>{formatCurrency(att.revenue)}</SensitiveValue>
                         </p>
                       </div>

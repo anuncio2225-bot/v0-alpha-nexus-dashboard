@@ -1,19 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Syne, DM_Sans } from "next/font/google";
+import { Syne, Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
+// Syne só no logotipo; a interface inteira usa Geist (ver app/globals.css).
 const syne = Syne({
   subsets: ["latin"],
-  variable: "--font-heading",
+  variable: "--font-syne",
   display: "swap",
 });
 
-const dmSans = DM_Sans({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-geist",
   display: "swap",
 });
 
@@ -40,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${syne.variable} ${dmSans.variable}`}
+      className={`${syne.variable} ${geist.variable}`}
       suppressHydrationWarning
     >
       <body className="font-sans antialiased bg-background text-foreground">

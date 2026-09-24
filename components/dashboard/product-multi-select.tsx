@@ -58,7 +58,7 @@ export function ProductMultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full sm:w-[260px] justify-between bg-card border-border"
+          className="w-full sm:w-[200px] justify-between bg-card border-border"
         >
           <span className="flex items-center gap-2 min-w-0">
             <Package className="h-4 w-4 text-muted-foreground shrink-0" />

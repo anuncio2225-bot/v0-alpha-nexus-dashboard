@@ -73,7 +73,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
     },
     {
       label: "Taxa de recuperação",
-      value: m ? `${m.recovery_rate.toFixed(1)}%` : "—",
+      value: m ? `${m.recovery_rate.toFixed(1).replace(".", ",")}%` : "—",
       icon: TrendingUp,
       color: "text-success",
     },

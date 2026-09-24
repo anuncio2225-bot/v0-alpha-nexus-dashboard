@@ -452,7 +452,7 @@ export interface KpiData {
   change?: number;
   changeLabel?: string;
   tooltip?: string;
-  color?: "brand" | "success" | "warning" | "danger" | "neutral";
+  color?: "brand" | "success" | "warning" | "danger" | "neutral" | "info";
 }
 
 export interface DailyData {

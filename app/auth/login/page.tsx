@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { AuthShell } from "@/components/layout/auth-shell";
 
 function LoginContent() {
   const router = useRouter();
@@ -80,21 +81,10 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-sans tracking-tight">
-            <span className="text-brand">Alpha</span>
-            <span className="text-foreground">Nexus</span>
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Gestão inteligente de operações
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-8 shadow-xl">
+    <AuthShell>
+        <div>
           <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-2xl font-semibold tracking-tight text-metal">
               Entrar na sua conta
             </h2>
             <p className="text-muted-foreground text-sm mt-1">
@@ -145,7 +135,7 @@ function LoginContent() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="********"
+                  placeholder="Sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -196,8 +186,7 @@ function LoginContent() {
             </Link>
           </p>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
 
