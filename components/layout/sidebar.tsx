@@ -44,6 +44,7 @@ import type { Profile, TeamPermissionKey } from "@/types";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useHideValues } from "@/contexts/hide-values-context";
 import { useTeamPermissions } from "@/hooks/use-team-permissions";
+import { BrandMark } from "@/components/layout/brand-mark";
 
 interface SidebarProps {
   profile: Profile | null;
@@ -55,21 +56,22 @@ const navItems: {
   icon: typeof LayoutDashboard;
   perm: TeamPermissionKey;
   ownerOnly?: boolean;
+  group: string;
 }[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard" },
-  { href: "/dashboard/profit", label: "Análise de Lucro", icon: TrendingUp, perm: "financeiro" },
-  { href: "/dashboard/attendants", label: "Atendentes", icon: Users, perm: "atendentes" },
-  { href: "/dashboard/affiliation", label: "Afiliação", icon: Handshake, perm: "atendentes" },
-  { href: "/dashboard/collections", label: "Cobrança", icon: PhoneCall, perm: "cobranca" },
-  { href: "/dashboard/cashflow", label: "Fluxo de Caixa", icon: ArrowLeftRight, perm: "cashflow" },
-  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet, perm: "financeiro" },
-  { href: "/dashboard/stock", label: "Estoque", icon: Package, perm: "financeiro" },
-  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone, perm: "investimento_ads" },
-  { href: "/dashboard/team", label: "Equipe", icon: ShieldCheck, perm: "equipe", ownerOnly: true },
-  { href: "/dashboard/connect", label: "Integrações", icon: Link2, perm: "integracoes" },
-  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook, perm: "webhooks" },
-  { href: "/dashboard/logs", label: "Logs", icon: FileText, perm: "logs" },
-  { href: "/dashboard/settings", label: "Configurações", icon: Settings, perm: "settings" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard" , group: "Visão geral" },
+  { href: "/dashboard/profit", label: "Análise de Lucro", icon: TrendingUp, perm: "financeiro" , group: "Visão geral" },
+  { href: "/dashboard/attendants", label: "Atendentes", icon: Users, perm: "atendentes" , group: "Vendas" },
+  { href: "/dashboard/affiliation", label: "Afiliação", icon: Handshake, perm: "atendentes" , group: "Vendas" },
+  { href: "/dashboard/collections", label: "Cobrança", icon: PhoneCall, perm: "cobranca" , group: "Vendas" },
+  { href: "/dashboard/cashflow", label: "Fluxo de Caixa", icon: ArrowLeftRight, perm: "cashflow" , group: "Financeiro" },
+  { href: "/dashboard/financial", label: "Financeiro", icon: Wallet, perm: "financeiro" , group: "Financeiro" },
+  { href: "/dashboard/stock", label: "Estoque", icon: Package, perm: "financeiro" , group: "Financeiro" },
+  { href: "/dashboard/investimento-ads", label: "Investimento Ads", icon: Megaphone, perm: "investimento_ads" , group: "Marketing" },
+  { href: "/dashboard/team", label: "Equipe", icon: ShieldCheck, perm: "equipe", ownerOnly: true , group: "Sistema" },
+  { href: "/dashboard/connect", label: "Integrações", icon: Link2, perm: "integracoes" , group: "Sistema" },
+  { href: "/dashboard/webhooks", label: "Webhooks", icon: Webhook, perm: "webhooks" , group: "Sistema" },
+  { href: "/dashboard/logs", label: "Logs", icon: FileText, perm: "logs" , group: "Sistema" },
+  { href: "/dashboard/settings", label: "Configurações", icon: Settings, perm: "settings" , group: "Sistema" },
 ];
 
 export function Sidebar({ profile }: SidebarProps) {
@@ -113,6 +115,13 @@ export function Sidebar({ profile }: SidebarProps) {
     router.push("/auth/login");
   }
 
+  const firstName = (profile?.full_name || profile?.name || "").trim().split(/\s+/)[0] || "";
+  const [todayLabel, setTodayLabel] = useState("");
+  useEffect(() => {
+    const s = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+    setTodayLabel(s.charAt(0).toUpperCase() + s.slice(1));
+  }, []);
+
   const initials = profile?.full_name
     ?.split(" ")
     .map((n) => n[0])
@@ -121,7 +130,7 @@ export function Sidebar({ profile }: SidebarProps) {
     .toUpperCase() || "U";
 
   // Prevent layout shift during hydration
-  const sidebarWidth = isCollapsed ? "w-[72px]" : "w-[232px]";
+  const sidebarWidth = isCollapsed ? "w-[76px]" : "w-[256px]";
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -136,9 +145,9 @@ export function Sidebar({ profile }: SidebarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <Link href="/dashboard" className="text-lg font-bold font-logo tracking-tight">
-          <span className="text-brand">Alpha</span>
-          <span className="text-sidebar-foreground">Nexus</span>
+        <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold font-logo tracking-tight">
+          <BrandMark className="h-7 w-7" />
+          <span className="text-metal">AlphaNexus</span>
         </Link>
       </header>
 
@@ -155,23 +164,20 @@ export function Sidebar({ profile }: SidebarProps) {
       <aside
         className={cn(
           "fixed left-0 top-0 z-50 flex h-dvh flex-col border-r border-sidebar-border bg-sidebar transition-[width,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] lg:z-40",
-          isDesktop ? sidebarWidth : "w-[264px]",
+          isDesktop ? sidebarWidth : "w-[272px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Logo + Toggle */}
-        <div className="flex h-16 items-center justify-between px-4">
-          <Link
-            href="/dashboard"
-            className={cn(
-              "flex items-center gap-2 overflow-hidden transition-all duration-300",
-              isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+        <div className={cn("flex h-[72px] items-center justify-between gap-2 px-4", isCollapsed && "h-auto flex-col justify-center gap-3 py-4")}>
+          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+            <BrandMark className="h-9 w-9 shrink-0" />
+            {!isCollapsed && (
+              <span className="min-w-0 leading-tight">
+                <span className="block truncate text-[17px] font-bold font-logo tracking-tight text-metal">AlphaNexus</span>
+                <span className="block truncate text-[11px] text-sidebar-foreground/45">Gestão inteligente de operações</span>
+              </span>
             )}
-          >
-            <span className="text-xl font-bold font-logo tracking-tight whitespace-nowrap">
-              <span className="text-brand">Alpha</span>
-              <span className="text-sidebar-foreground">Nexus</span>
-            </span>
           </Link>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -180,10 +186,7 @@ export function Sidebar({ profile }: SidebarProps) {
                 size="icon"
                 onClick={isDesktop ? toggle : () => setMobileOpen(false)}
                 aria-label={isDesktop ? (isCollapsed ? "Expandir menu" : "Recolher menu") : "Fechar menu"}
-                className={cn(
-                  "h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent shrink-0",
-                  isCollapsed && "mx-auto"
-                )}
+                className="btn-glass h-8 w-8 shrink-0 rounded-lg text-sidebar-foreground/60 hover:text-sidebar-foreground"
               >
                 {!isDesktop ? (
                   <X className="h-4 w-4" />
@@ -200,45 +203,65 @@ export function Sidebar({ profile }: SidebarProps) {
           </Tooltip>
         </div>
 
-        {/* Selo de membro de equipe */}
-        {isMember && !isCollapsed && (
-          <div className="mx-3 mb-1 flex items-center gap-2 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-brand" />
-            <div className="overflow-hidden">
-              <p className="text-[11px] font-medium leading-tight text-brand">
-                Acesso de equipe
-              </p>
-              <p className="truncate text-[11px] leading-tight text-sidebar-foreground/60">
-                {ownerName ? `Conta de ${ownerName}` : "Conta compartilhada"}
-              </p>
-            </div>
+        <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        {/* Saudação grande, como nas referências */}
+        {!isCollapsed && (
+          <div className="px-5 pb-3 pt-4">
+            <p className="text-[20px] font-semibold leading-[1.15] tracking-tight text-metal">
+              Bem-vindo de volta,
+              <br />
+              {firstName || "tudo pronto"}
+            </p>
+            {todayLabel && (
+              <p className="mt-2 text-xs text-sidebar-foreground/45">{todayLabel}</p>
+            )}
+            {isMember && (
+              <div className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand" />
+                <span className="truncate text-[11px] text-brand">
+                  {ownerName ? `Equipe · ${ownerName}` : "Acesso de equipe"}
+                </span>
+              </div>
+            )}
           </div>
         )}
+        <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-          {visibleItems.map((item) => {
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
+          {visibleItems.map((item, index) => {
+            const showGroup = index === 0 || visibleItems[index - 1].group !== item.group;
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
             return (
-              <Tooltip key={item.href}>
+              <div key={item.href}>
+                {showGroup && !isCollapsed && (
+                  <p className="mb-1 mt-3 px-3 text-[11px] font-medium text-sidebar-foreground/35">
+                    {item.group}
+                  </p>
+                )}
+                {showGroup && isCollapsed && index > 0 && (
+                  <div className="mx-3 my-3 h-px bg-white/[0.06]" />
+                )}
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                      "group relative mb-0.5 flex items-center gap-3 rounded-xl border px-3 py-2 text-[13.5px] font-medium transition-[color,background-color,border-color] duration-200",
                       isActive
-                        ? "bg-brand/15 text-brand"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                        ? "shine-top border-white/10 bg-[linear-gradient(90deg,rgba(255,255,255,0.09),rgba(255,255,255,0.02))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_24px_-12px_rgba(0,0,0,0.9)]"
+                        : "border-transparent text-sidebar-foreground/60 hover:bg-white/[0.035] hover:text-sidebar-foreground",
                       isCollapsed && "justify-center px-2"
                     )}
                   >
                     <item.icon
                       className={cn(
-                        "h-5 w-5 shrink-0",
-                        isActive ? "text-brand" : "text-sidebar-foreground/50"
+                        "h-[18px] w-[18px] shrink-0 transition-colors",
+                        isActive ? "text-brand drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70"
                       )}
                     />
                     <span
@@ -250,7 +273,7 @@ export function Sidebar({ profile }: SidebarProps) {
                       {item.label}
                     </span>
                     {isActive && !isCollapsed && (
-                      <div className="ml-auto h-1.5 w-1.5 rounded-full bg-brand shrink-0" />
+                      <span className="ml-auto h-4 w-[3px] shrink-0 rounded-full bg-brand shadow-[0_0_10px_var(--brand-glow)]" />
                     )}
                   </Link>
                 </TooltipTrigger>
@@ -261,12 +284,13 @@ export function Sidebar({ profile }: SidebarProps) {
                   {item.label}
                 </TooltipContent>
               </Tooltip>
+              </div>
             );
           })}
         </nav>
 
         {/* User section */}
-        <div className="border-t border-sidebar-border p-3">
+        <div className="m-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           {/* Nome e e-mail ganham a linha inteira; as ações vão para a linha de
               baixo. Na mesma linha, o nome sumia em "Cl…". */}
           <div
@@ -369,7 +393,7 @@ export function Sidebar({ profile }: SidebarProps) {
       <div
         className={cn(
           "hidden shrink-0 transition-[width] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] lg:block",
-          isHydrated ? sidebarWidth : "w-[232px]"
+          isHydrated ? sidebarWidth : "w-[256px]"
         )}
         aria-hidden="true"
       />

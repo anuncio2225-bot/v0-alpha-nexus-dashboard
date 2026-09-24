@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { SalesTicker } from "@/components/dashboard/sales-ticker";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
@@ -46,6 +47,7 @@ import {
   Zap,
   Inbox,
   Wallet,
+  Megaphone,
   BarChart3,
   ShoppingCart,
   RefreshCw,
@@ -53,6 +55,15 @@ import {
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+// Caixa de detalhe dos gráficos em vidro escuro.
+const GLASS_TOOLTIP = {
+  backgroundColor: "rgba(15, 16, 19, 0.92)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  borderRadius: "12px",
+  boxShadow: "0 20px 40px -16px rgba(0, 0, 0, 0.9)",
+  backdropFilter: "blur(12px)",
+};
 
 // Sem roxo/índigo: é a paleta "de IA" e não significa nada aqui.
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444", "#71717a", "#38bdf8"];
@@ -221,16 +232,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho único: a saudação é o título; os filtros ficam ao lado. */}
-      <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+      {/* Faixa de vendas recentes, correndo (pausa ao passar o mouse) */}
+      <SalesTicker />
+
+      {/* Cabeçalho: título metálico grande + filtros de vidro */}
+      <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {greeting || "Dashboard"}
-            {greeting && firstName ? `, ${firstName}` : ""}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="live-dot" />
+            <span>
+              Ao vivo{formattedDate ? ` · ${formattedDate}` : ""}
+            </span>
+          </div>
+          <h1 className="mt-3 text-[34px] font-semibold leading-[1.05] sm:text-[40px]">
+            Visão geral
+            <br />
+            da operação
           </h1>
-          {formattedDate && (
-            <p className="mt-1 whitespace-nowrap text-sm text-muted-foreground">{formattedDate}</p>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Botao de Refresh Manual */}
@@ -313,211 +331,104 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================ */}
-      {/* FAIXA 1 — DESTAQUE: Pagas, Agendadas, Investimento, ROI */}
+      {/* DESTAQUES — 5 cartões iguais com mini-gráfico dos dias do período */}
       {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 stagger">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 xl:grid-cols-5">
         <KpiCard
           data={(() => {
-            const fmt = (d: Date) =>
-              format(d, "dd/MM", { locale: ptBR });
-            const subtitle = (() => {
-              const today = new Date();
-              if (preset === "today") return `Hoje, ${fmt(range.from)}`;
-              if (preset === "yesterday") return `Ontem, ${fmt(range.from)}`;
-              // custom ou qualquer intervalo
-              return `${fmt(range.from)} - ${fmt(range.to)}`;
-            })();
+            const fmt = (d: Date) => format(d, "dd/MM", { locale: ptBR });
+            const subtitle =
+              preset === "today"
+                ? `Hoje, ${fmt(range.from)}`
+                : preset === "yesterday"
+                  ? `Ontem, ${fmt(range.from)}`
+                  : `${fmt(range.from)} – ${fmt(range.to)}`;
             return kpis?.entradasHoje
-              ? { ...kpis.entradasHoje, subtitle }
-              : {
-                  label: "Pagas no Período",
-                  subtitle,
-                  value: 0,
-                  formatted: "R$ 0",
-                  color: "success" as const,
-                };
+              ? { ...kpis.entradasHoje, subtitle, color: "brand" as const }
+              : { label: "Pagas no Período", subtitle, value: 0, formatted: "R$ 0,00", color: "brand" as const };
           })()}
           icon={CheckCircle}
           loading={isLoading}
-          textSize="text-2xl"
+          itemClassName="lg:col-span-3 xl:col-span-1"
+          trend={dailyData.map((d) => d.pagas)}
         />
         <KpiCard
-          data={kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0" }}
+          data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), color: "info" as const }}
           icon={Calendar}
           loading={isLoading}
-          textSize="text-2xl"
+          itemClassName="lg:col-span-3 xl:col-span-1"
+          trend={dailyData.map((d) => d.agendadas)}
         />
         <KpiCard
-          data={kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0" }}
-          icon={AlertTriangle}
+          data={{ ...(kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0,00" }), color: "warning" as const }}
+          icon={Megaphone}
           loading={isLoading}
-          textSize="text-2xl"
+          itemClassName="lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => d.investimento)}
+        />
+        <KpiCard
+          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0,00" }}
+          icon={Zap}
+          loading={isLoading}
+          itemClassName="lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => d.comissao - d.investimento)}
         />
         <KpiCard
           data={(() => {
             const raw = kpis?.roi;
             if (!raw) return { label: "ROI", value: 0, formatted: "1,00x", color: "neutral" as const };
-            const roiPct = raw.value ?? 0;
-            const multiplier = 1 + roiPct / 100;
-            const color = multiplier < 1 ? "danger" : multiplier === 1 ? "warning" : "success";
+            const multiplier = 1 + (raw.value ?? 0) / 100;
             return {
               ...raw,
               formatted: `${multiplier.toFixed(2).replace(".", ",")}x`,
-              color: color as "danger" | "warning" | "success",
+              color: (multiplier >= 1 ? "brand" : "danger") as "brand" | "danger",
             };
           })()}
           icon={Percent}
           loading={isLoading}
-          textSize="text-2xl"
+          itemClassName="sm:col-span-2 lg:col-span-2 xl:col-span-1"
+          trend={dailyData.map((d) => (d.investimento > 0 ? d.comissao / d.investimento : 0))}
         />
       </div>
 
       {/* ================================================================ */}
-      {/* FAIXA 2 — IMPORTANTE: Lucro, CPA, Comissão Real, Antecipadas, Recuperação */}
+      {/* MÉTRICAS — 12 cartões do mesmo tamanho (divide por 2, 3, 4 e 6)  */}
       {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 stagger">
-        <KpiCard
-          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0" }}
-          icon={Zap}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0" }}
-          icon={ShoppingCart}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0" }}
-          icon={DollarSign}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0" }}
-          icon={Clock}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00", color: "success" }}
-          icon={RefreshCw}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-      </div>
-
-      {/* ================================================================ */}
-      {/* FAIXA 3 — SECUNDÁRIO: Comissão Projetada, A Receber, Ticket Médio, */}
-      {/*            Taxa Conversão, Taxa Frustração, Frustradas             */}
-      {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 stagger">
-        <KpiCard
-          data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0" }}
-          icon={TrendingUp}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0" }}
-          icon={Target}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0" }}
-          icon={BarChart3}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0%" }}
-          icon={Target}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0%" }}
-          icon={XCircle}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-        <KpiCard
-          data={kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0" }}
-          icon={XCircle}
-          loading={isLoading}
-          className="min-h-[5rem]"
-          textSize="text-lg"
-          compact
-          mini
-        />
-      </div>
-
-      {/* ================================================================ */}
-      {/* FAIXA 4 — RESUMO: Caixa Esperado + Margem */}
-      {/* ================================================================ */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 stagger">
-        <KpiCard
-          data={
-            kpis?.caixaEsperado || {
-              label: "Caixa Esperado",
-              value: 0,
-              formatted: "R$ 0",
-              color: "brand",
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="live-dot" />
+          <h2 className="text-sm font-medium text-muted-foreground">Métricas do período</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <KpiCard data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0,00" }} icon={ShoppingCart} loading={isLoading} compact />
+          <KpiCard data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0,00" }} icon={DollarSign} loading={isLoading} compact />
+          <KpiCard data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0,00" }} icon={Clock} loading={isLoading} compact />
+          <KpiCard data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00" }} icon={RefreshCw} loading={isLoading} compact />
+          <KpiCard data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0,00" }} icon={TrendingUp} loading={isLoading} compact />
+          <KpiCard data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0,00" }} icon={Target} loading={isLoading} compact />
+          <KpiCard data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0,00" }} icon={BarChart3} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0,0%" }), color: "info" as const }} icon={Target} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.taxaFrustracao || { label: "Taxa Frustração", value: 0, formatted: "0,0%" }), color: "warning" as const }} icon={AlertTriangle} loading={isLoading} compact />
+          <KpiCard data={{ ...(kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0,00" }), color: "danger" as const }} icon={XCircle} loading={isLoading} compact />
+          <KpiCard data={kpis?.caixaEsperado || { label: "Caixa Esperado", value: 0, formatted: "R$ 0,00", color: "brand" }} icon={Wallet} loading={isLoading} compact />
+          <KpiCard
+            data={
+              kpis?.lucro
+                ? {
+                    ...kpis.lucro,
+                    label: "Margem de Lucro",
+                    formatted: kpis.investimento?.value
+                      ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1).replace(".", ",")}%`
+                      : "0,0%",
+                    value: kpis.investimento?.value ? (kpis.lucro.value / kpis.investimento.value) * 100 : 0,
+                  }
+                : { label: "Margem de Lucro", value: 0, formatted: "0,0%" }
             }
-          }
-          icon={Wallet}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
-        <KpiCard
-          data={kpis?.lucro
-            ? {
-                ...kpis.lucro,
-                label: "Margem de Lucro",
-                formatted: kpis.investimento?.value
-                  ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1).replace(".", ",")}%`
-                  : "0%",
-                value: kpis.investimento?.value
-                  ? (kpis.lucro.value / kpis.investimento.value) * 100
-                  : 0,
-              }
-            : { label: "Margem de Lucro", value: 0, formatted: "0%" }
-          }
-          icon={Percent}
-          loading={isLoading}
-          className="min-h-[5.5rem]"
-          textSize="text-xl"
-          compact
-        />
+            icon={Percent}
+            loading={isLoading}
+            compact
+          />
+        </div>
       </div>
 
       {/* ================================================================ */}
@@ -550,25 +461,28 @@ export default function DashboardPage() {
                       <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                     </linearGradient>
+                    <filter id="lineGlow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="3000" height="1000">
+                      <feGaussianBlur stdDeviation="4" result="b" />
+                      <feMerge>
+                        <feMergeNode in="b" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.06)" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    axisLine={false} tickLine={false}
                   />
                   <YAxis
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    axisLine={false} tickLine={false}
                     width={72}
                     tickFormatter={formatAxisBRL}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #262626",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={GLASS_TOOLTIP}
                     labelStyle={{ color: "#fafafa" }}
                     formatter={(value: number) => formatCurrency(value)}
                   />
@@ -579,7 +493,9 @@ export default function DashboardPage() {
                     stroke="#10b981"
                     fillOpacity={1}
                     fill="url(#colorComissao)"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
+                    filter="url(#lineGlow)"
+                    activeDot={{ r: 5, stroke: "#10b981", strokeWidth: 2, fill: "#0b0c0f" }}
                   />
                   <Area
                     type="monotone"
@@ -588,7 +504,9 @@ export default function DashboardPage() {
                     stroke="#f59e0b"
                     fillOpacity={1}
                     fill="url(#colorInvestimento)"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
+                    filter="url(#lineGlow)"
+                    activeDot={{ r: 5, stroke: "#f59e0b", strokeWidth: 2, fill: "#0b0c0f" }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -616,25 +534,21 @@ export default function DashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={dailyData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" horizontal={false} />
+                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.06)" horizontal={false} />
                   <XAxis
                     type="number"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    axisLine={false} tickLine={false}
                   />
                   <YAxis
                     type="category"
                     dataKey="label"
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                    axisLine={{ stroke: "#262626" }}
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    axisLine={false} tickLine={false}
                     width={50}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #262626",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={GLASS_TOOLTIP}
                     labelStyle={{ color: "#fafafa" }}
                   />
                   <Bar dataKey="pagas" name="Pagas" fill="#22c55e" radius={[0, 4, 4, 0]} />
@@ -693,11 +607,7 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#141414",
-                        border: "1px solid #262626",
-                        borderRadius: "8px",
-                      }}
+                      contentStyle={GLASS_TOOLTIP}
                       formatter={(value: number) => formatCurrency(value)}
                     />
                     <Legend

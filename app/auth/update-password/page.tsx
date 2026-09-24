@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle } from "lucide-react";
+import { AuthShell } from "@/components/layout/auth-shell";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -51,18 +52,10 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-logo tracking-tight">
-            <span className="text-brand">Alpha</span>
-            <span className="text-foreground">Nexus</span>
-          </h1>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-8 shadow-xl">
+    <AuthShell>
+        <div>
           <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-2xl font-semibold tracking-tight text-metal">
               Nova senha
             </h2>
             <p className="text-muted-foreground text-sm mt-1">
@@ -124,7 +117,6 @@ export default function UpdatePasswordPage() {
             </Button>
           </form>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

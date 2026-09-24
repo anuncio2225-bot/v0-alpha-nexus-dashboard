@@ -39,7 +39,7 @@ export default function CollectionsReportsPage() {
             <SummaryCard
               icon={TrendingUp}
               label="Taxa de recuperação"
-              value={`${m.recovery_rate.toFixed(1)}%`}
+              value={`${m.recovery_rate.toFixed(1).replace(".", ",")}%`}
             />
             <SummaryCard
               icon={DollarSign}

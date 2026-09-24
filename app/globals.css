@@ -7,66 +7,76 @@
 
 /* Dark-only: no light mode. Brand: emerald green #10b981 */
 :root {
-  /* Background layers (darkest to lightest) */
-  --background: #0a0a0a;
-  --card: #141414;
-  --card-elevated: #1c1c1c;
-  
+  /* Camadas — preto grafite levemente frio, como as referências (Quantix). */
+  --background: #07080a;
+  --card: #0d0e11;
+  --card-elevated: #15171b;
+
   /* Foreground */
-  --foreground: #fafafa;
-  --foreground-muted: #a1a1aa;
-  
-  /* Brand - Emerald */
+  --foreground: #f5f6f7;
+  --foreground-muted: #8b909a;
+
+  /* Marca — esmeralda */
   --brand: #10b981;
-  --brand-foreground: #022c22;
-  --brand-muted: rgba(16, 185, 129, 0.15);
-  
+  --brand-foreground: #02140d;
+  --brand-muted: rgba(16, 185, 129, 0.14);
+  --brand-glow: rgba(16, 185, 129, 0.45);
+
   /* Semantic colors */
   --success: #22c55e;
   --success-foreground: #052e16;
   --warning: #f59e0b;
   --warning-foreground: #451a03;
-  --danger: #ef4444;
-  --danger-foreground: #450a0a;
-  
-  /* UI elements */
-  --border: #262626;
-  --border-muted: #1f1f1f;
-  --input: #1c1c1c;
+  --danger: #f43f5e;
+  --danger-foreground: #4c0519;
+  --info: #60a5fa;
+
+  /* Bordas finas iluminadas */
+  --border: #1c1e23;
+  --border-muted: #15171b;
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --border-glass-strong: rgba(255, 255, 255, 0.12);
+  --input: #111317;
   --ring: #10b981;
-  
+
   /* Shadcn compatibility */
   --primary: #10b981;
-  --primary-foreground: #022c22;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #262626;
-  --muted-foreground: #a1a1aa;
-  --accent: #1c1c1c;
-  --accent-foreground: #fafafa;
-  --destructive: #ef4444;
+  --primary-foreground: #02140d;
+  --secondary: #16181c;
+  --secondary-foreground: #f5f6f7;
+  --muted: #16181c;
+  --muted-foreground: #8b909a;
+  --accent: #16181c;
+  --accent-foreground: #f5f6f7;
+  --destructive: #f43f5e;
   --destructive-foreground: #fafafa;
-  --popover: #141414;
-  --popover-foreground: #fafafa;
-  
+  --popover: #0f1013;
+  --popover-foreground: #f5f6f7;
+
   /* Charts */
   --chart-1: #10b981;
-  --chart-2: #3b82f6;
-  --chart-3: #8b5cf6;
+  --chart-2: #60a5fa;
+  --chart-3: #a1a1aa;
   --chart-4: #f59e0b;
-  --chart-5: #ef4444;
-  
+  --chart-5: #f43f5e;
+
   /* Sidebar */
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #fafafa;
+  --sidebar: #0a0b0d;
+  --sidebar-foreground: #f5f6f7;
   --sidebar-primary: #10b981;
-  --sidebar-primary-foreground: #022c22;
-  --sidebar-accent: #1c1c1c;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #1f1f1f;
+  --sidebar-primary-foreground: #02140d;
+  --sidebar-accent: rgba(255, 255, 255, 0.04);
+  --sidebar-accent-foreground: #f5f6f7;
+  --sidebar-border: #16181c;
   --sidebar-ring: #10b981;
-  
-  --radius: 0.625rem;
+
+  --radius: 0.875rem;
+
+  /* Superfície de vidro escuro: degradê de cima pra baixo + reflexo + sombra funda */
+  --surface-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 38%, rgba(255, 255, 255, 0) 100%);
+  --surface-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 0 0 rgba(0, 0, 0, 0.6), 0 24px 48px -28px rgba(0, 0, 0, 0.95);
+  --metal: linear-gradient(180deg, #ffffff 0%, #e4e6ea 45%, #8d939d 100%);
+  --metal-fade: linear-gradient(90deg, #ffffff 0%, #f1f2f4 52%, #6b7280 100%);
 }
 
 .dark {
@@ -130,6 +140,15 @@
   --sidebar-accent-foreground: #18181b;
   --sidebar-border: #e4e4e7;
   --sidebar-ring: #10b981;
+
+  /* Versões claras do vidro e do metal (senão o texto metálico some no branco). */
+  --brand-glow: rgba(16, 185, 129, 0.3);
+  --border-glass: rgba(0, 0, 0, 0.08);
+  --border-glass-strong: rgba(0, 0, 0, 0.14);
+  --surface-bg: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+  --surface-shadow: inset 0 1px 0 0 #ffffff, 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 32px -22px rgba(0, 0, 0, 0.28);
+  --metal: linear-gradient(180deg, #111114 0%, #3f3f46 100%);
+  --metal-fade: linear-gradient(90deg, #111114 0%, #27272a 52%, #8a8a93 100%);
 }
 
 @theme inline {
@@ -204,6 +223,13 @@
   body {
     @apply bg-background text-foreground antialiased;
     caret-color: var(--brand);
+    /* Luz ambiente (verde da marca no canto, grafite do outro lado) + grão fino
+       para o preto não ficar "chapado". */
+    background-image:
+      radial-gradient(1100px 620px at 8% -12%, rgba(16, 185, 129, 0.085), transparent 62%),
+      radial-gradient(900px 520px at 100% -8%, rgba(148, 163, 184, 0.07), transparent 60%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -237,23 +263,169 @@
 }
 
 @layer components {
-  /* Metric display - large numbers */
+  /* ------------------------------------------------------------------
+     ALPHANEXUS GLASS — linguagem visual (referência: Quantix / fintech escuro)
+     ------------------------------------------------------------------ */
+
+  /* Número grande metálico: branco que esmaece para o cinza à direita. */
   .metric {
     font-family: var(--font-heading);
     font-variant-numeric: tabular-nums;
-    @apply text-3xl font-semibold tracking-tight;
+    @apply text-3xl font-semibold;
+    letter-spacing: -0.035em;
   }
 
   .metric-sm {
     font-family: var(--font-heading);
     font-variant-numeric: tabular-nums;
-    @apply text-xl font-semibold tracking-tight;
+    @apply text-xl font-semibold;
+    letter-spacing: -0.03em;
   }
 
-  /* Card de dado não "levanta" nem brilha: só a borda responde ao mouse. */
+  /* Texto metálico (títulos): branco em cima, aço embaixo. */
+  .text-metal {
+    background: var(--metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Texto metálico horizontal (números): os últimos dígitos esmaecem. */
+  .text-metal-fade {
+    background: var(--metal-fade);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Vidro escuro: degradê + reflexo interno + sombra funda. Vai por cima da
+     cor de fundo, então `bg-card` nas páginas continua valendo. */
+  .surface {
+    background-image: var(--surface-bg);
+    box-shadow: var(--surface-shadow);
+    border-color: var(--border-glass);
+  }
+
+  /* Linha de luz no topo da peça (reflexo na borda). */
+  .shine-top {
+    position: relative;
+  }
+  .shine-top::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    pointer-events: none;
+  }
+
+  /* Brilho colorido saindo do fundo da peça. Cor via --tone. */
+  .ambient {
+    position: relative;
+    isolation: isolate;
+  }
+  .ambient::after {
+    content: "";
+    position: absolute;
+    inset: auto -20% -45% -20%;
+    height: 85%;
+    background: radial-gradient(closest-side, var(--tone, rgba(16, 185, 129, 0.22)), transparent);
+    filter: blur(28px);
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Cartão que acende sob o mouse (posição via --mx/--my). */
   .card-hover {
-    transition: border-color 150ms var(--ease-out);
-    @apply hover:border-foreground/15;
+    transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+  .card-hover:hover {
+    border-color: var(--border-glass-strong);
+    box-shadow: var(--surface-shadow), 0 0 0 1px rgba(16, 185, 129, 0.08), 0 18px 50px -24px rgba(16, 185, 129, 0.35);
+  }
+
+  /* Ponto "ao vivo" pulsando. */
+  .live-dot {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--brand);
+    box-shadow: 0 0 10px var(--brand-glow);
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 1px solid var(--brand);
+    animation: livePing 1.8s var(--ease-out) infinite;
+  }
+  @keyframes livePing {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+
+  /* Faixa que corre (ticker de vendas). */
+  .marquee {
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee var(--marquee-duration, 60s) linear infinite;
+  }
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* Grade geométrica de fundo (login). */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  }
+
+  /* Botão primário: esmeralda com volume e brilho. */
+  .btn-glow {
+    background-image: linear-gradient(180deg, #34d399 0%, #10b981 45%, #059669 100%);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(16, 185, 129, 0.55), 0 10px 28px -10px rgba(16, 185, 129, 0.7);
+    color: #02140d;
+  }
+  .btn-glow:hover {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.45), 0 0 0 1px rgba(52, 211, 153, 0.7), 0 14px 36px -10px rgba(16, 185, 129, 0.85);
+  }
+
+  /* Botão de vidro (secundário). */
+  .btn-glass {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-glass);
+  }
+  .btn-glass:hover {
+    border-color: var(--border-glass-strong);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  }
+
+  /* Ícone em azulejo: quadrado arredondado com a cor do tom. */
+  .icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--tile, #10b981) 22%, transparent), color-mix(in srgb, var(--tile, #10b981) 8%, transparent));
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 0 0 1px color-mix(in srgb, var(--tile, #10b981) 30%, transparent), 0 6px 18px -8px color-mix(in srgb, var(--tile, #10b981) 60%, transparent);
+    color: var(--tile, #10b981);
   }
   
   /* Card hover background */
@@ -350,4 +522,34 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/* ============================================================================
+   Texto metálico — fora das camadas de propósito: precisa vencer classes de cor
+   (`text-foreground`) que as páginas colocam nos títulos.
+   ============================================================================ */
+.text-metal,
+main h1 {
+  background: var(--metal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.03em;
+}
+
+.text-metal-fade {
+  background: var(--metal-fade);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Linha do mini-gráfico sendo desenhada ao aparecer. */
+.sparkline-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sparklineDraw 1.4s cubic-bezier(0.23, 1, 0.32, 1) 0.15s forwards;
+}
+@keyframes sparklineDraw {
+  to { stroke-dashoffset: 0; }
 }
