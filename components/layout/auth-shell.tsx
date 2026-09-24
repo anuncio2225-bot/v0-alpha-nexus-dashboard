@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Activity, BadgeDollarSign, Users } from "lucide-react";
-import { BrandMark } from "@/components/layout/brand-mark";
+import { Logo } from "@/components/layout/logo";
 import { Sparkline } from "@/components/dashboard/sparkline";
 
 // Curva ilustrativa do cartão decorativo (sem números: é só a forma do gráfico).
@@ -28,10 +28,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-12 px-5 py-10 lg:grid-cols-[1.1fr_1fr]">
         {/* Vitrine (só no computador) */}
         <section className="hidden lg:block">
-          <div className="flex items-center gap-3">
-            <BrandMark className="h-11 w-11" />
-            <span className="text-2xl font-bold font-logo tracking-tight text-metal">AlphaNexus</span>
-          </div>
+          <Logo className="text-3xl" />
           <h2 className="mt-10 text-[52px] font-semibold leading-[1.02] tracking-tight text-metal">
             Sua operação
             <br />
@@ -69,9 +66,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
         {/* Formulário */}
         <section className="mx-auto w-full max-w-md">
-          <div className="mb-8 flex flex-col items-center gap-3 lg:hidden">
-            <BrandMark className="h-12 w-12" />
-            <span className="text-2xl font-bold font-logo tracking-tight text-metal">AlphaNexus</span>
+          <div className="mb-8 flex justify-center lg:hidden">
+            <Logo className="text-3xl" />
           </div>
           <div className="surface shine-top rounded-3xl border border-[var(--border-glass)] bg-card/80 p-7 backdrop-blur-xl sm:p-9">
             {children}

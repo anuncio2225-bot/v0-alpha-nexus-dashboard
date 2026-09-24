@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
-import { SalesTicker } from "@/components/dashboard/sales-ticker";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
@@ -232,11 +231,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Faixa de vendas recentes, correndo (pausa ao passar o mouse) */}
-      <SalesTicker />
-
       {/* Cabeçalho: título metálico grande + filtros de vidro */}
-      <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
+      <div className="flex flex-col gap-5">
         <div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="live-dot" />

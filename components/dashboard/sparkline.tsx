@@ -47,7 +47,8 @@ export function Sparkline({ data, color, className, endDot = true }: SparklinePr
   const last = pts[pts.length - 1];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={cn("h-full w-full overflow-visible", className)} aria-hidden="true">
+    <div className={cn("relative h-full w-full", className)} aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full overflow-visible">
       <defs>
         <linearGradient id={`fill-${id}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.32" />
@@ -77,12 +78,14 @@ export function Sparkline({ data, color, className, endDot = true }: SparklinePr
         pathLength={1}
         className="sparkline-draw"
       />
-      {endDot && (
-        <g>
-          <circle cx={last.x} cy={last.y} r="7" fill={color} opacity="0.18" className="animate-pulse" />
-          <circle cx={last.x} cy={last.y} r="3.2" fill="#0b0c0f" stroke={color} strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
-        </g>
-      )}
     </svg>
+      {/* O ponto fica fora do SVG esticado para continuar redondo em qualquer largura. */}
+      {endDot && (
+        <span
+          className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] bg-[#0b0c0f]"
+          style={{ left: `${(last.x / W) * 100}%`, top: `${(last.y / H) * 100}%`, borderColor: color, boxShadow: `0 0 0 4px ${color}2e, 0 0 12px ${color}` }}
+        />
+      )}
+    </div>
   );
 }

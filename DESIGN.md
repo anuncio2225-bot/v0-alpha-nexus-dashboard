@@ -13,13 +13,14 @@ bem definida e bordas arredondadas, na paleta da marca (preto, grafite, branco e
 |---|---|---|
 | Fundo | preto grafite `#07080a` + luz verde no canto + grão fino | `body` em `app/globals.css` |
 | Superfície | vidro escuro: degradê de cima pra baixo, borda `rgba(255,255,255,.07)`, reflexo interno, sombra funda, raio 16–20 px | `.surface` (já no `Card`) |
+| Logotipo | **oficial, não redesenhar**: "Alpha" verde + "Nexus" branco, fonte Syne | `components/layout/logo.tsx` |
 | Título | metálico (branco → aço), tracking −0,03em, grande e em duas linhas nas telas principais | `.text-metal`, todo `main h1` |
 | Número | metálico que esmaece à direita; negativo em degradê vermelho | `.text-metal-fade` |
 | Brilho | cada cartão tem um tom (verde, azul, âmbar, vermelho) que acende no fundo e no azulejo do ícone | `.ambient` + `--tone`, `.icon-tile` + `--tile` |
 | Botão primário | verde com volume (degradê + reflexo + brilho) | `.btn-glow` (variante `default`) |
 | Botão secundário | vidro | `.btn-glass` (variantes `outline` e `secondary`) |
 | Menu ativo | pílula de vidro com reflexo no topo + barrinha verde brilhando | `components/layout/sidebar.tsx` |
-| Movimento | faixa de vendas correndo, ponto "ao vivo" pulsando, mini-gráficos que se desenham, cartão que acende sob o mouse | `.marquee`, `.live-dot`, `.sparkline-draw`, `GlowCard` |
+| Movimento | ponto "ao vivo" pulsando, mini-gráficos que se desenham, cartão que acende sob o mouse (a faixa de vendas correndo foi recusada pelo dono) | `.live-dot`, `.sparkline-draw`, `GlowCard` |
 
 ## Regras que continuam valendo
 

@@ -44,7 +44,7 @@ import type { Profile, TeamPermissionKey } from "@/types";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useHideValues } from "@/contexts/hide-values-context";
 import { useTeamPermissions } from "@/hooks/use-team-permissions";
-import { BrandMark } from "@/components/layout/brand-mark";
+import { Logo } from "@/components/layout/logo";
 
 interface SidebarProps {
   profile: Profile | null;
@@ -145,9 +145,8 @@ export function Sidebar({ profile }: SidebarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold font-logo tracking-tight">
-          <BrandMark className="h-7 w-7" />
-          <span className="text-metal">AlphaNexus</span>
+        <Link href="/dashboard">
+          <Logo className="text-lg" />
         </Link>
       </header>
 
@@ -170,15 +169,12 @@ export function Sidebar({ profile }: SidebarProps) {
       >
         {/* Logo + Toggle */}
         <div className={cn("flex h-[72px] items-center justify-between gap-2 px-4", isCollapsed && "h-auto flex-col justify-center gap-3 py-4")}>
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <BrandMark className="h-9 w-9 shrink-0" />
-            {!isCollapsed && (
-              <span className="min-w-0 leading-tight">
-                <span className="block truncate text-[17px] font-bold font-logo tracking-tight text-metal">AlphaNexus</span>
-                <span className="block truncate text-[11px] text-sidebar-foreground/45">Gestão inteligente de operações</span>
-              </span>
-            )}
-          </Link>
+          {!isCollapsed && (
+            <Link href="/dashboard" className="min-w-0 leading-tight">
+              <Logo className="block text-xl" />
+              <span className="mt-0.5 block truncate text-[11px] text-sidebar-foreground/45">Gestão inteligente de operações</span>
+            </Link>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
