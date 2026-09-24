@@ -12,26 +12,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import {
+  CommissionInvestmentChart,
+  FinancialDonut,
+  OperationalFunnel,
+  SalesStatusChart,
+} from "@/components/dashboard/charts";
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
 import { getDateRange, formatCurrency, cn } from "@/lib/utils";
 import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode, Profile } from "@/types";
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
 import {
   Calendar,
   Clock,
@@ -54,30 +45,6 @@ import {
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-// Caixa de detalhe dos gráficos em vidro escuro.
-const GLASS_TOOLTIP = {
-  backgroundColor: "rgba(15, 16, 19, 0.92)",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  borderRadius: "12px",
-  boxShadow: "0 20px 40px -16px rgba(0, 0, 0, 0.9)",
-  backdropFilter: "blur(12px)",
-};
-
-// Sem roxo/índigo: é a paleta "de IA" e não significa nada aqui.
-const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444", "#71717a", "#38bdf8"];
-
-// Eixo em reais legível em qualquer escala: "R$ 340", "R$ 1,2 mil", "R$ 3,4 mi".
-// O formato antigo (`R$${v/1000}k`) mostrava "R$0k" em todas as marcas abaixo de mil.
-const axisBRL = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-function formatAxisBRL(value: number): string {
-  return axisBRL.format(value);
-}
 
 export default function DashboardPage() {
   const [preset, setPreset] = useState<FilterPreset>("7d");
@@ -240,10 +207,11 @@ export default function DashboardPage() {
               Ao vivo{formattedDate ? ` · ${formattedDate}` : ""}
             </span>
           </div>
+          {/* Saudação pelo horário + primeiro nome da conta logada */}
           <h1 className="mt-3 text-[34px] font-semibold leading-[1.05] sm:text-[40px]">
-            Visão geral
+            {greeting || "Olá"},
             <br />
-            da operação
+            {firstName || "bem-vindo"}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -428,257 +396,15 @@ export default function DashboardPage() {
       </div>
 
       {/* ================================================================ */}
-      {/* GRAFICOS: Comissao vs Investimento + Vendas por Status */}
+      {/* GRÁFICOS — componentes em components/dashboard/charts.tsx          */}
       {/* ================================================================ */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Comissao vs Investimento */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground">
-              Comissão vs Investimento
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : dailyData.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados no período
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={dailyData}>
-                  <defs>
-                    <linearGradient id="colorComissao" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorInvestimento" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                    <filter id="lineGlow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="3000" height="1000">
-                      <feGaussianBlur stdDeviation="4" result="b" />
-                      <feMerge>
-                        <feMergeNode in="b" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                    width={72}
-                    tickFormatter={formatAxisBRL}
-                  />
-                  <Tooltip
-                    contentStyle={GLASS_TOOLTIP}
-                    labelStyle={{ color: "#fafafa" }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="comissao"
-                    name="Comissão"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorComissao)"
-                    strokeWidth={2.5}
-                    filter="url(#lineGlow)"
-                    activeDot={{ r: 5, stroke: "#10b981", strokeWidth: 2, fill: "#0b0c0f" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="investimento"
-                    name="Investimento"
-                    stroke="#f59e0b"
-                    fillOpacity={1}
-                    fill="url(#colorInvestimento)"
-                    strokeWidth={2.5}
-                    filter="url(#lineGlow)"
-                    activeDot={{ r: 5, stroke: "#f59e0b", strokeWidth: 2, fill: "#0b0c0f" }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Vendas por Status */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground">
-              Vendas por Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : dailyData.every((d) => !d.pagas && !d.agendadas && !d.frustradas) ? (
-              <div className="flex h-[300px] flex-col items-center justify-center gap-1 text-center">
-                <p className="text-sm text-foreground">Nenhuma venda neste período</p>
-                <p className="text-xs text-muted-foreground">
-                  Pagas, agendadas e frustradas aparecem aqui dia a dia.
-                </p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dailyData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.06)" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                    width={50}
-                  />
-                  <Tooltip
-                    contentStyle={GLASS_TOOLTIP}
-                    labelStyle={{ color: "#fafafa" }}
-                  />
-                  <Bar dataKey="pagas" name="Pagas" fill="#22c55e" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="agendadas" name="Agendadas" fill="#a1a1aa" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="frustradas" name="Frustradas" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <CommissionInvestmentChart data={dailyData} loading={isLoading} />
+        <SalesStatusChart data={dailyData} loading={isLoading} />
       </div>
-
-      {/* ================================================================ */}
-      {/* GRAFICOS NOVOS: Pizza Financeiro + Funil Operacional */}
-      {/* ================================================================ */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Pizza Financeiro */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              Distribuição Financeira
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : financialBreakdown.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados financeiros no período
-              </div>
-            ) : financialBreakdown.length === 1 ? (
-              // Rosca de uma fatia só não compara nada: diz em texto.
-              <div className="flex h-[300px] flex-col items-center justify-center gap-1 text-center">
-                <p className="text-xs text-muted-foreground">Todo o valor do período é</p>
-                <p className="text-sm text-foreground">{financialBreakdown[0].label}</p>
-                <p className="metric-sm text-foreground">
-                  <SensitiveValue>{formatCurrency(financialBreakdown[0].value)}</SensitiveValue>
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={financialBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="value"
-                      nameKey="label"
-                    >
-                      {financialBreakdown.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={GLASS_TOOLTIP}
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      formatter={(value: string) => (
-                        <span className="text-sm text-muted-foreground">{value}</span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Funil Operacional */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
-              Funil Operacional
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : operationalFunnel.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Sem dados operacionais no período
-              </div>
-            ) : (
-              <div className="space-y-4 py-4">
-                {operationalFunnel.map((step, idx) => {
-                  const maxVal = Math.max(...operationalFunnel.map((s) => s.value));
-                  const pct = maxVal > 0 ? (step.value / maxVal) * 100 : 0;
-                  const totalAll = operationalFunnel.reduce((s, f) => s + f.value, 0);
-                  const share = totalAll > 0 ? ((step.value / totalAll) * 100).toFixed(1) : "0";
-
-                  return (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">
-                          {step.label}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-foreground">
-                            {step.value}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ({share}%)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor:
-                              step.label === "Pagas"
-                                ? "#22c55e"
-                                : step.label === "Frustradas"
-                                  ? "#ef4444"
-                                  : step.label === "Antecipadas"
-                                    ? "#6366f1"
-                                    : "#a1a1aa",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <FinancialDonut data={financialBreakdown} loading={isLoading} />
+        <OperationalFunnel steps={operationalFunnel} loading={isLoading} />
       </div>
 
       {/* ================================================================ */}

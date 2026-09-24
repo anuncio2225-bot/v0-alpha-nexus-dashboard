@@ -82,7 +82,7 @@ export function Sparkline({ data, color, className, endDot = true }: SparklinePr
       {/* O ponto fica fora do SVG esticado para continuar redondo em qualquer largura. */}
       {endDot && (
         <span
-          className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] bg-[#0b0c0f]"
+          className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] bg-card"
           style={{ left: `${(last.x / W) * 100}%`, top: `${(last.y / H) * 100}%`, borderColor: color, boxShadow: `0 0 0 4px ${color}2e, 0 0 12px ${color}` }}
         />
       )}

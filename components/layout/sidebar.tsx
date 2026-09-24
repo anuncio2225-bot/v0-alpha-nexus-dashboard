@@ -115,13 +115,6 @@ export function Sidebar({ profile }: SidebarProps) {
     router.push("/auth/login");
   }
 
-  const firstName = (profile?.full_name || profile?.name || "").trim().split(/\s+/)[0] || "";
-  const [todayLabel, setTodayLabel] = useState("");
-  useEffect(() => {
-    const s = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
-    setTodayLabel(s.charAt(0).toUpperCase() + s.slice(1));
-  }, []);
-
   const initials = profile?.full_name
     ?.split(" ")
     .map((n) => n[0])
@@ -201,28 +194,17 @@ export function Sidebar({ profile }: SidebarProps) {
 
         <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        {/* Saudação grande, como nas referências */}
-        {!isCollapsed && (
-          <div className="px-5 pb-3 pt-4">
-            <p className="text-[20px] font-semibold leading-[1.15] tracking-tight text-metal">
-              Bem-vindo de volta,
-              <br />
-              {firstName || "tudo pronto"}
-            </p>
-            {todayLabel && (
-              <p className="mt-2 text-xs text-sidebar-foreground/45">{todayLabel}</p>
-            )}
-            {isMember && (
-              <div className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1">
-                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand" />
-                <span className="truncate text-[11px] text-brand">
-                  {ownerName ? `Equipe · ${ownerName}` : "Acesso de equipe"}
-                </span>
-              </div>
-            )}
+        {/* Selo de acesso de equipe (a saudação agora fica no título do painel) */}
+        {isMember && !isCollapsed && (
+          <div className="px-5 pt-3">
+            <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand" />
+              <span className="truncate text-[11px] text-brand">
+                {ownerName ? `Equipe · ${ownerName}` : "Acesso de equipe"}
+              </span>
+            </div>
           </div>
         )}
-        <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-3">
@@ -240,7 +222,7 @@ export function Sidebar({ profile }: SidebarProps) {
                   </p>
                 )}
                 {showGroup && isCollapsed && index > 0 && (
-                  <div className="mx-3 my-3 h-px bg-white/[0.06]" />
+                  <div className="mx-3 my-3 h-px bg-[var(--hairline)]" />
                 )}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -249,8 +231,8 @@ export function Sidebar({ profile }: SidebarProps) {
                     className={cn(
                       "group relative mb-0.5 flex items-center gap-3 rounded-xl border px-3 py-2 text-[13.5px] font-medium transition-[color,background-color,border-color] duration-200",
                       isActive
-                        ? "shine-top border-white/10 bg-[linear-gradient(90deg,rgba(255,255,255,0.09),rgba(255,255,255,0.02))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_24px_-12px_rgba(0,0,0,0.9)]"
-                        : "border-transparent text-sidebar-foreground/60 hover:bg-white/[0.035] hover:text-sidebar-foreground",
+                        ? "nav-active shine-top"
+                        : "border-transparent text-sidebar-foreground/60 hover:bg-[var(--glass-2)] hover:text-sidebar-foreground",
                       isCollapsed && "justify-center px-2"
                     )}
                   >
@@ -286,7 +268,7 @@ export function Sidebar({ profile }: SidebarProps) {
         </nav>
 
         {/* User section */}
-        <div className="m-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="m-3 rounded-2xl border border-[var(--hairline)] bg-[var(--glass-1)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           {/* Nome e e-mail ganham a linha inteira; as ações vão para a linha de
               baixo. Na mesma linha, o nome sumia em "Cl…". */}
           <div
