@@ -198,9 +198,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho: título metálico grande + filtros de vidro */}
-      <div className="flex flex-col gap-5">
-        <div>
+      {/* Cabeçalho compacto: saudação numa linha e filtros ao lado quando cabem
+          (flex-wrap joga os filtros para baixo sozinho em telas estreitas) */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="live-dot" />
             <span>
@@ -208,10 +209,8 @@ export default function DashboardPage() {
             </span>
           </div>
           {/* Saudação pelo horário + primeiro nome da conta logada */}
-          <h1 className="mt-3 text-[34px] font-semibold leading-[1.05] sm:text-[40px]">
-            {greeting || "Olá"},
-            <br />
-            {firstName || "bem-vindo"}
+          <h1 className="mt-1.5 text-[28px] font-semibold leading-tight sm:text-[32px]">
+            {greeting || "Olá"}{firstName ? `, ${firstName}` : ""}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
