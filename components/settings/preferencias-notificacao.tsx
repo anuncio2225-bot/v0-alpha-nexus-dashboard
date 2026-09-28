@@ -30,7 +30,7 @@ interface Membro {
   aparelhos: number;
 }
 
-const GRUPOS = ["Pagamento", "Entrega", "Problemas"] as const;
+const GRUPOS = ["Pagamento", "Entrega", "Problemas", "Estoque"] as const;
 const HORAS = Array.from({ length: 24 }, (_, h) => h);
 
 /**

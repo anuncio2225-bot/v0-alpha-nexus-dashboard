@@ -1,4 +1,5 @@
 import { resolveKitUnits, type KitRow } from "./kit";
+import { avisarSeEstoqueBaixo } from "./alerta";
 
 /**
  * Sincronização de estoque a partir de vendas (SOMENTE gravação em
@@ -106,6 +107,7 @@ export async function syncStockForTransaction(
     });
     // 23505 = violação do índice único parcial (corrida) -> ignora silenciosamente
     if (error && error.code !== "23505") throw error;
+    if (!error) await avisarSeEstoqueBaixo(userId, units);
     return error ? "noop" : "exit_created";
   }
 

@@ -15,11 +15,12 @@ export type EventoPush =
   | "cobranca_aberta"
   | "falha_entrega"
   | "venda_frustrada"
-  | "reembolso";
+  | "reembolso"
+  | "estoque_baixo";
 
 export interface EventoInfo {
   id: EventoPush;
-  grupo: "Pagamento" | "Entrega" | "Problemas";
+  grupo: "Pagamento" | "Entrega" | "Problemas" | "Estoque";
   emoji: string;
   titulo: string;
   descricao: string;
@@ -39,6 +40,7 @@ export const EVENTOS_PUSH: EventoInfo[] = [
   { id: "falha_entrega", grupo: "Problemas", emoji: "⚠️", titulo: "Falha na entrega", descricao: "A transportadora não conseguiu entregar", padrao: true },
   { id: "venda_frustrada", grupo: "Problemas", emoji: "❌", titulo: "Venda frustrada ou cancelada", descricao: "Pagamento falhou, pedido cancelado ou devolvido", padrao: true },
   { id: "reembolso", grupo: "Problemas", emoji: "💸", titulo: "Reembolso", descricao: "Venda estornada ou reembolsada", padrao: true },
+  { id: "estoque_baixo", grupo: "Estoque", emoji: "📦", titulo: "Estoque baixo", descricao: "Saldo abaixo do nível de alerta ou zerado (hora de parar de agendar ou repor)", padrao: true },
 ];
 
 export type PreferenciasPush = Partial<Record<EventoPush, boolean>>;
