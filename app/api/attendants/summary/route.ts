@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
   afterpayPendente,
@@ -32,7 +32,11 @@ export async function GET(request: Request) {
     .eq("user_id", userId)
     .eq("status", "active");
 
-  const list = (attendants || []) as Attendant[];
+  // Membro limitado a um atendente: o resumo é só dele.
+  const src = await scopedSrc(supabase, user.id, "atendentes");
+  const list = ((attendants || []) as Attendant[]).filter(
+    (a) => !src || (a.src || "").trim().toLowerCase() === src.trim().toLowerCase()
+  );
 
   if (list.length === 0) {
     return NextResponse.json({

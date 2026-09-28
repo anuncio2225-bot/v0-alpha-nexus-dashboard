@@ -40,9 +40,15 @@ export type TeamMemberStatus = "pending" | "active" | "revoked";
 export type TeamScopeMode = "all" | "attendant";
 
 // Areas onde o filtro por SRC (atendente) se aplica
+/** Onde o filtro "só as vendas do atendente (SRC)" vale para o membro. */
 export interface TeamSrcAreas {
   cobranca: boolean;
-  financeiro: boolean;
+  /** Tela Atendentes: vê só o próprio cartão, comissão e pagamentos. */
+  atendentes: boolean;
+  /** Dashboard: só as vendas dele, sem o investimento da operação. */
+  dashboard: boolean;
+  /** Legado (nunca foi aplicado em nenhuma tela). */
+  financeiro?: boolean;
 }
 
 export interface TeamMember {

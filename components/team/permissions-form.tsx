@@ -214,14 +214,22 @@ export function PermissionsForm({
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
-                    checked={value.src_areas.financeiro}
-                    onCheckedChange={(c) => setArea("financeiro", c === true)}
+                    checked={value.src_areas.atendentes}
+                    onCheckedChange={(c) => setArea("atendentes", c === true)}
                   />
-                  <span className="text-foreground">Financeiro</span>
+                  <span className="text-foreground">Atendentes (só o resultado e a comissão dele)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={value.src_areas.dashboard}
+                    onCheckedChange={(c) => setArea("dashboard", c === true)}
+                  />
+                  <span className="text-foreground">Dashboard (só as vendas dele, sem o investimento da operação)</span>
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Nas demais áreas permitidas, o membro vê tudo da conta.
+                Nas demais áreas permitidas, o membro vê tudo da conta. Para um atendente, libere só
+                Cobrança e Atendentes nas permissões acima.
               </p>
             </div>
           </div>

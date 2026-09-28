@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { calcularMetricas } from "@/lib/dashboard/metrics";
 
@@ -41,7 +41,15 @@ export async function GET(request: Request) {
     const metrics = await calcularMetricas(
       supabase,
       await getEffectiveUserId(supabase, user.id),
-      { fromRaw, toRaw, attendantId, productFilters, modes }
+      {
+        fromRaw,
+        toRaw,
+        attendantId,
+        productFilters,
+        modes,
+        // Membro vinculado a um atendente vê só as vendas dele.
+        srcFilter: await scopedSrc(supabase, user.id, "dashboard"),
+      }
     );
     return NextResponse.json(metrics);
   } catch (error) {

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTeamContext } from "@/lib/team/server";
 import { resolveRolePreset } from "@/lib/team/roles";
 import type { TeamRole, TeamScopeMode, TeamSrcAreas } from "@/types";
+import { normalizeSrcAreas } from "@/lib/team/scope";
 
 // GET /api/team — lista os membros da equipe do dono logado
 export async function GET() {
@@ -64,10 +65,7 @@ export async function POST(request: NextRequest) {
     typeof body.attendant_src === "string" && body.attendant_src.trim()
       ? body.attendant_src.trim()
       : null;
-  const srcAreas: TeamSrcAreas = {
-    cobranca: body.src_areas?.cobranca !== false,
-    financeiro: body.src_areas?.financeiro !== false,
-  };
+  const srcAreas: TeamSrcAreas = normalizeSrcAreas(body.src_areas);
 
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "Email inválido" }, { status: 400 });

@@ -77,7 +77,7 @@ function defaultFormValue(): PermissionsFormValue {
     scope_mode: "all",
     attendant_id: null,
     attendant_src: null,
-    src_areas: { cobranca: true, financeiro: true },
+    src_areas: { cobranca: true, atendentes: true, dashboard: true },
   };
 }
 
@@ -205,7 +205,11 @@ export function TeamClient() {
       scope_mode: member.scope_mode || "all",
       attendant_id: member.attendant_id ?? null,
       attendant_src: member.attendant_src ?? null,
-      src_areas: member.src_areas || { cobranca: true, financeiro: true },
+      src_areas: {
+        cobranca: member.src_areas?.cobranca !== false,
+        atendentes: member.src_areas?.atendentes !== false,
+        dashboard: member.src_areas?.dashboard !== false,
+      },
     });
   }
 

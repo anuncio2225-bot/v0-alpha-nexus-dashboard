@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTeamContext } from "@/lib/team/server";
 import { resolveRolePreset } from "@/lib/team/roles";
 import type { TeamRole, TeamScopeMode, TeamSrcAreas } from "@/types";
+import { normalizeSrcAreas } from "@/lib/team/scope";
 
 // PATCH /api/team/[id] — edita papel/permissoes/vinculo/senha de um membro (dono)
 export async function PATCH(
@@ -72,10 +73,7 @@ export async function PATCH(
         ? body.attendant_src.trim()
         : null;
   if (body.src_areas) {
-    update.src_areas = {
-      cobranca: body.src_areas.cobranca !== false,
-      financeiro: body.src_areas.financeiro !== false,
-    } as TeamSrcAreas;
+    update.src_areas = normalizeSrcAreas(body.src_areas);
   }
 
   // Redefinir senha (opcional)

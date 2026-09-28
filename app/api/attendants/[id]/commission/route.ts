@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, podeVerAtendente } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
   afterpayPendente,
@@ -36,6 +36,10 @@ export async function GET(
 
   if (attErr || !attendant) {
     return NextResponse.json({ error: "Attendant not found" }, { status: 404 });
+  }
+
+  if (!(await podeVerAtendente(supabase, user.id, userId, id))) {
+    return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
   }
 
   const att = attendant as Attendant;
