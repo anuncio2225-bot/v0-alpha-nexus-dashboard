@@ -330,7 +330,7 @@ export default function DashboardPage() {
           trend={dailyData.map((d) => d.investimento)}
         />
         <KpiCard
-          data={kpis?.lucro || { label: "Lucro", value: 0, formatted: "R$ 0,00" }}
+          data={kpis?.lucro || { label: "Lucro Estimado", value: 0, formatted: "R$ 0,00" }}
           icon={Zap}
           loading={isLoading}
           itemClassName="lg:col-span-2 xl:col-span-1"
@@ -375,18 +375,7 @@ export default function DashboardPage() {
           <KpiCard data={{ ...(kpis?.frustradas || { label: "Frustradas", value: 0, formatted: "R$ 0,00" }), color: "danger" as const }} icon={XCircle} loading={isLoading} compact />
           <KpiCard data={kpis?.caixaEsperado || { label: "Caixa Esperado", value: 0, formatted: "R$ 0,00", color: "brand" }} icon={Wallet} loading={isLoading} compact />
           <KpiCard
-            data={
-              kpis?.lucro
-                ? {
-                    ...kpis.lucro,
-                    label: "Margem de Lucro",
-                    formatted: kpis.investimento?.value
-                      ? `${((kpis.lucro.value / kpis.investimento.value) * 100).toFixed(1).replace(".", ",")}%`
-                      : "0,0%",
-                    value: kpis.investimento?.value ? (kpis.lucro.value / kpis.investimento.value) * 100 : 0,
-                  }
-                : { label: "Margem de Lucro", value: 0, formatted: "0,0%" }
-            }
+            data={kpis?.lucroRealizado || { label: "Lucro Realizado", value: 0, formatted: "R$ 0,00" }}
             icon={Percent}
             loading={isLoading}
             compact

@@ -511,6 +511,7 @@ export interface DashboardMetrics {
     roi: KpiData;
     cac: KpiData;
     lucro: KpiData;
+    lucroRealizado: KpiData;
     taxaFrustracao: KpiData;
     cpa: KpiData;
     caixaEsperado: KpiData;

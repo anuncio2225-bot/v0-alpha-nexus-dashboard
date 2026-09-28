@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  STAGE_COLUMN,
+  TRACKING_COLUMNS,
+  trackingStage,
+} from "@/lib/tracking/stages";
 
 /**
  * Sincronizacao de transacoes -> modulo de Cobranca (collection_clients).
@@ -14,6 +19,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *   o status automatico (ex.: "Negociacao", "Prometeu Pagar").
  * - O valor (total_value) usa a comissao do afiliado (affiliate_commission ||
  *   commission); se ambos forem 0/nulos, cai para total_value/amount da venda.
+ * - Entrega (AfterPay): enquanto a venda nao esta paga, o card anda pelas
+ *   colunas de rastreio (Postado → Em Trânsito → Saiu para Entrega → Entregue)
+ *   conforme o status que a transportadora manda. Depois da entrega, o gateway
+ *   abre a cobranca e o card vai para "Aguardando Pagamento".
  */
 
 // Transacao -> nome do status de cobranca (alinhado ao Braip)
@@ -38,6 +47,34 @@ export function mapTransactionStatusToCollection(txStatus: string | null): strin
   }
 }
 
+/**
+ * Coluna do CRM considerando pagamento E entrega. Retorna a coluna preferida
+ * e, em seguida, as alternativas (caso o usuario nao tenha a coluna).
+ */
+export function collectionColumnFor(t: {
+  status?: string | null;
+  shipping_status?: string | null;
+  original_status?: string | null;
+}): string[] {
+  const base = mapTransactionStatusToCollection(t.status ?? null);
+  // Pago, cancelado, devolvido e frustrado encerram o fluxo: o rastreio nao muda nada.
+  if (base !== "Agendado" && base !== "Aguardando Pagamento") return [base];
+
+  const stage = trackingStage(t.shipping_status);
+  const vencido = /vencid|atrasad|overdue/i.test(t.original_status || "");
+
+  if (base === "Aguardando Pagamento") {
+    // Cobranca aberta. Problema na entrega tem prioridade sobre a cobranca.
+    if (stage === "falha_entrega") return ["Falha na Entrega", base];
+    if (vencido) return ["Pagamento Pendente", base];
+    return [base];
+  }
+
+  // Agendado: o card acompanha a entrega.
+  const col = stage ? STAGE_COLUMN[stage] : null;
+  return col ? [col, "Agendado"] : ["Agendado"];
+}
+
 // Status automaticos que o webhook tem autoridade para sobrescrever
 const WEBHOOK_AUTHORITATIVE = new Set(["Pago", "Cancelado", "Devolucao"]);
 
@@ -50,6 +87,7 @@ const SYSTEM_STATUS = new Set([
   "Agendado",
   "Aguardando Pagamento",
   "Frustrado",
+  ...TRACKING_COLUMNS,
 ]);
 
 interface TxRow {
@@ -208,9 +246,14 @@ export async function syncTransactionToCollection(
   statusMap: Map<string, { id: string; name: string }>,
   attByName: Map<string, string>
 ): Promise<"inserted" | "updated" | "skipped"> {
-  const targetStatusName = mapTransactionStatusToCollection(t.status ?? null);
+  // Primeira coluna da lista que o usuario tem (ex.: "Em Trânsito" → "Agendado").
+  const candidates = collectionColumnFor(t);
+  const matched = candidates
+    .map((n) => statusMap.get(n.toLowerCase()))
+    .find(Boolean);
+  const targetStatusName = matched?.name || candidates[0];
   const targetStatus =
-    statusMap.get(targetStatusName.toLowerCase()) ||
+    matched ||
     statusMap.get("pagamento pendente") ||
     statusMap.get("devendo") ||
     null;
@@ -227,7 +270,9 @@ export async function syncTransactionToCollection(
   // Ja existe um collection_client para essa transacao?
   const { data: existing } = await supabase
     .from("collection_clients")
-    .select("id, status_id, status_name, paid_value, braip_status, payment_date")
+    .select(
+      "id, status_id, status_name, paid_value, braip_status, payment_date, delivery_status"
+    )
     .eq("user_id", userId)
     .eq("transaction_id", t.id)
     .maybeSingle();
@@ -313,7 +358,7 @@ export async function syncTransactionToCollection(
         }
       } else if (
         targetStatusName === "Cancelado" ||
-        targetStatusName === "Devolvido" ||
+        targetStatusName === "Devolucao" ||
         targetStatusName === "Frustrado"
       ) {
         // Cancelados/devolvidos não têm data de pagamento — limpar se havia
@@ -340,6 +385,22 @@ export async function syncTransactionToCollection(
       description: `Status atualizado automaticamente: ${prevBraip || "—"} → ${braipStatus}`,
       old_status: prevBraip,
       new_status: braipStatus,
+    });
+  }
+
+  // Historico da entrega (rastreio mudou de etapa)
+  const prevDelivery = (existing.delivery_status as string | null) || null;
+  const newDelivery = t.shipping_status || null;
+  if (!error && newDelivery && newDelivery !== prevDelivery) {
+    await supabase.from("collection_history").insert({
+      user_id: userId,
+      client_id: existing.id,
+      type: "status_change",
+      description: `Rastreio atualizado: ${prevDelivery || "—"} → ${newDelivery}${
+        t.tracking_code ? ` (${t.tracking_code})` : ""
+      }`,
+      old_status: prevDelivery,
+      new_status: newDelivery,
     });
   }
 

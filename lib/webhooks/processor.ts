@@ -18,6 +18,11 @@ export interface ProcessOptions {
   webhookId?: string;
 }
 
+/** Nome do evento que alguns gateways mandam só no cabeçalho (Pag2Pay: X-Webhook-Event). */
+function headerEvent(headers?: Record<string, string>): string | null {
+  return headers?.["x-webhook-event"] || null;
+}
+
 export interface ResolvedWebhook {
   webhook_id: string;
   user_id: string;
@@ -145,7 +150,10 @@ function isAfterpayAwaiting(payload: Record<string, unknown>): boolean {
  * IMPORTANT: never falls back to "braip" as a generic catch-all, otherwise
  * Payt/Pag2Pay payloads would be mislabeled as Braip.
  */
-export function detectGateway(payload: Record<string, unknown>): WebhookGateway {
+export function detectGateway(
+  payload: Record<string, unknown>,
+  headers?: Record<string, string>
+): WebhookGateway {
   // Check explicit gateway field first
   const explicit = payload.gateway || payload.platform || payload.source;
   if (typeof explicit === "string") {
@@ -160,7 +168,7 @@ export function detectGateway(payload: Record<string, unknown>): WebhookGateway 
 
   // Check by payload shape (specific platforms first)
   if (isPaytPayload(payload)) return "payt";
-  if (isPag2PayPayload(payload)) return "pag2pay";
+  if (isPag2PayPayload(payload, headers)) return "pag2pay";
   if (isKiwifyPayload(payload)) return "kiwify";
   if (isBraipPayload(payload)) return "braip";
 
@@ -175,7 +183,8 @@ export function detectGateway(payload: Record<string, unknown>): WebhookGateway 
  */
 export function normalize(
   payload: Record<string, unknown>,
-  gateway: WebhookGateway
+  gateway: WebhookGateway,
+  eventName?: string | null
 ): NormalizedEvent {
   let event: NormalizedEvent | null = null;
 
@@ -191,7 +200,7 @@ export function normalize(
         event = normalizePayt(payload);
         break;
       case "pag2pay":
-        event = normalizePag2Pay(payload);
+        event = normalizePag2Pay(payload, eventName);
         break;
       default:
         // Unknown gateway: use the generic normalizer (tries common fields)
@@ -234,7 +243,9 @@ export async function processWebhook(
   let logRowId: string | null = null;
 
   try {
-    const gateway = options.forceGateway ?? detectGateway(payload);
+    const gateway =
+      options.forceGateway ?? detectGateway(payload, options.headers);
+    const eventHeader = headerEvent(options.headers);
     const webhookId = options.webhookId || null;
 
     // Fetch the webhook's configured operational_type (afterpay | antecipado |
@@ -257,7 +268,8 @@ export async function processWebhook(
 
     // Extract event type for logging
     const eventType = String(
-      payload.event ||
+      eventHeader ||
+        payload.event ||
         payload.event_type ||
         payload.type ||
         payload.webhook_event_type ||
@@ -314,7 +326,7 @@ export async function processWebhook(
     }
 
     // 2. Normalize the payload (never returns null now)
-    const event = normalize(payload, gateway);
+    const event = normalize(payload, gateway, eventHeader);
 
     console.log("[v0] Normalized event:", {
       gateway: event.gateway,
@@ -391,8 +403,15 @@ export async function processWebhook(
       // user set up that integration. We only fall back to the payload-derived
       // sale_type when the webhook has no operational_type configured (e.g.
       // legacy "universal" token without a webhook row).
+      // Exceção: no Pag2Pay o próprio pedido diz se é AfterPay
+      // (payment_type), e um mesmo webhook recebe Pix/cartão e AfterPay — o
+      // payload manda, salvo quando o webhook é de recuperação.
       sale_type:
-        webhookOperationalType || event.sale_type || "antecipado",
+        event.gateway === "pag2pay" &&
+        event.sale_type &&
+        webhookOperationalType !== "recuperacao"
+          ? event.sale_type
+          : webhookOperationalType || event.sale_type || "antecipado",
       pay_on_delivery: event.pay_on_delivery ?? false,
 
       tracking_code: event.tracking_code || null,
@@ -408,6 +427,56 @@ export async function processWebhook(
       raw_payload: payload,
       updated_at: new Date().toISOString(),
     };
+
+    // 4b. Estado anterior da mesma venda. Os eventos de um pedido chegam em
+    // sequência (agendado → rastreio → entregue → cobrança → pago) e podem
+    // chegar repetidos ou fora de ordem (reenvio do gateway):
+    //  - dado de entrega/pagamento já salvo não é apagado por um evento que não
+    //    o traz (ex.: "Atualização" no rastreio, evento só de status);
+    //  - uma venda já PAGA não volta para agendado/aguardando por causa de um
+    //    evento antigo reenviado.
+    try {
+      const { data: prev } = await supabase
+        .from("transactions")
+        .select(
+          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full"
+        )
+        .eq("user_id", userId)
+        .eq("gateway", event.gateway)
+        .eq("external_id", event.external_id)
+        .maybeSingle();
+
+      if (prev) {
+        for (const k of [
+          "tracking_code",
+          "tracking_url",
+          "shipping_status",
+          "shipping_company",
+          "payment_link",
+          "address_full",
+        ] as const) {
+          if (!tx[k] && prev[k]) tx[k] = prev[k];
+        }
+        if (
+          prev.status === "pago" &&
+          (event.status === "agendado" || event.status === "aguardando")
+        ) {
+          tx.status = "pago";
+          tx.payment_date = prev.payment_date;
+          tx.paid_value = prev.paid_value;
+          event.status = "pago";
+          event.payment_date = prev.payment_date || undefined;
+        }
+      }
+      // Repassa ao CRM o que foi preservado.
+      event.tracking_code = (tx.tracking_code as string) || undefined;
+      event.shipping_status = (tx.shipping_status as string) || undefined;
+      event.shipping_company = (tx.shipping_company as string) || undefined;
+      event.payment_link = (tx.payment_link as string) || undefined;
+      event.address_full = (tx.address_full as string) || undefined;
+    } catch {
+      // Não bloqueia: sem o estado anterior, grava o evento como veio.
+    }
 
     // 5. Upsert - use conflict on unique index (user_id, gateway, external_id)
     const { data: upserted, error: upsertError } = await supabase
@@ -489,6 +558,8 @@ export async function processWebhook(
         shipping_status: event.shipping_status || null,
         shipping_company: event.shipping_company || null,
         address_full: event.address_full || null,
+        transaction_code: event.external_id,
+        original_status: event.original_status || null,
       };
 
       await supabase.rpc("seed_collection_defaults", { p_user_id: userId });

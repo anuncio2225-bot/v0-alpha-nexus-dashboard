@@ -88,6 +88,7 @@ async function handle(req: NextRequest, token: string) {
     [
       "user-agent",
       "x-webhook-source",
+      "x-webhook-event", // Pag2Pay: nome do evento vem só aqui
       "x-forwarded-for",
       "content-type",
       "x-real-ip",
