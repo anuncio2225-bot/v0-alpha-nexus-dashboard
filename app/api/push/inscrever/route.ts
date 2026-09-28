@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
   }
 
   const ownerId = await getEffectiveUserId(supabase, user.id);
-  // O endpoint é único por aparelho/instalação. Reinstalar gera outro, e o
-  // antigo morre sozinho no primeiro envio (404/410). As preferências já
-  // escolhidas neste aparelho são mantidas no upsert.
+  // Uma linha por (conta, aparelho): o mesmo celular pode receber de várias
+  // contas — basta entrar em cada uma e ativar. Reinstalar o app gera outro
+  // endpoint, e o antigo morre sozinho no primeiro envio (404/410).
   const { error } = await createAdminClient()
     .from("push_subscriptions")
     .upsert(
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         auth: inscricao.keys.auth,
         user_agent: request.headers.get("user-agent"),
       },
-      { onConflict: "endpoint" }
+      { onConflict: "owner_id,endpoint" }
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -55,6 +55,7 @@ export async function DELETE(request: NextRequest) {
     .from("push_subscriptions")
     .delete()
     .eq("endpoint", endpoint)
-    .eq("member_id", user.id);
+    .eq("member_id", user.id)
+    .eq("owner_id", await getEffectiveUserId(supabase, user.id));
   return NextResponse.json({ ok: true });
 }

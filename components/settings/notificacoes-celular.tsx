@@ -82,11 +82,13 @@ export function NotificacoesCelular() {
   const [diagnostico, setDiagnostico] = useState("");
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [recebidoEm, setRecebidoEm] = useState<string | null>(null);
+  const [conta, setConta] = useState<string | null>(null);
 
   const carregarAparelho = useCallback(async (ep: string) => {
     const r = await fetch(`/api/push/preferencias?endpoint=${encodeURIComponent(ep)}`);
     if (!r.ok) return false;
     const d = await r.json();
+    setConta(d.conta || null);
     if (!d.registrado) return false;
     setRecebidoEm(d.ultimo_recebido_em || null);
     return true;
@@ -178,12 +180,10 @@ export function NotificacoesCelular() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint }),
       });
-      const registro = await navigator.serviceWorker.getRegistration("/");
-      const inscricao = await registro?.pushManager.getSubscription();
-      await inscricao?.unsubscribe();
-      setEndpoint(null);
+      // Não cancela a inscrição do navegador: o mesmo aparelho pode estar
+      // ativo em outra conta. Só esta conta para de mandar para ele.
       setSituacao("desligado");
-      setRecado("Este aparelho não recebe mais notificações.");
+      setRecado("Este aparelho não recebe mais notificações desta conta.");
     } finally {
       setOcupado(false);
     }
@@ -270,7 +270,7 @@ export function NotificacoesCelular() {
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-success/12 px-3 py-1 text-sm text-success">
                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                Este aparelho está recebendo
+                Recebendo as vendas {conta ? `de ${conta}` : "desta conta"}
               </span>
               <Button variant="outline" size="sm" onClick={testar} disabled={ocupado}>
                 {ocupado ? "Enviando…" : "Mandar teste"}
@@ -287,6 +287,11 @@ export function NotificacoesCelular() {
         </div>
 
         {recado && <p className="text-sm text-muted-foreground">{recado}</p>}
+
+        <p className="text-xs text-muted-foreground">
+          Cada conta avisa só das vendas dela. Tem mais de uma conta? Entre em cada uma neste celular e
+          ative aqui — o mesmo aparelho passa a receber de todas.
+        </p>
 
         {servicoDePush && (
           <div className="rounded-xl border border-warning/35 bg-warning/8 p-4">

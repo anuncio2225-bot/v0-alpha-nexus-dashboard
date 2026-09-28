@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (23):
+-- Migrações registradas no banco (24):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -31,6 +31,7 @@
 --   20260928134205  push_celular
 --   20260928135424  push_preferencias_relatorio
 --   20260928135800  cron_relatorio_diario
+--   20260928144640  push_aparelho_varias_contas
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -472,7 +473,7 @@ create table public.push_subscriptions (
   ultimo_sucesso_em timestamp with time zone,
   ultimo_recebido_em timestamp with time zone,
   constraint push_subscriptions_pkey PRIMARY KEY (id),
-  constraint push_subscriptions_endpoint_key UNIQUE (endpoint)
+  constraint push_subscriptions_owner_endpoint_key UNIQUE (owner_id, endpoint)
 );
 
 create table public.sales (
@@ -762,6 +763,7 @@ CREATE INDEX idx_monthly_tax_config_user_year ON public.monthly_tax_config USING
 CREATE INDEX idx_product_costs_user ON public.product_costs USING btree (user_id);
 CREATE UNIQUE INDEX idx_profiles_webhook_token ON public.profiles USING btree (webhook_token);
 CREATE INDEX idx_profit_partners_user ON public.profit_partners USING btree (user_id);
+CREATE INDEX push_subscriptions_endpoint_idx ON public.push_subscriptions USING btree (endpoint);
 CREATE INDEX push_subscriptions_owner_idx ON public.push_subscriptions USING btree (owner_id);
 CREATE INDEX idx_sales_sale_date ON public.sales USING btree (sale_date DESC);
 CREATE INDEX idx_sales_user_id ON public.sales USING btree (user_id);
