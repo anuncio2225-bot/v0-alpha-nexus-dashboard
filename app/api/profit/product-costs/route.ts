@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { gravarVersao } from "@/lib/profit/versoes";
 
 export async function GET() {
   const supabase = await createClient();
@@ -78,6 +79,9 @@ export async function POST(request: Request) {
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Kit novo vale a partir de hoje; o passado segue com os kits da época.
+  await gravarVersao(supabase, userId).catch((e) => console.error("[lucro] versão:", e));
 
   return NextResponse.json({ productCost: data });
 }

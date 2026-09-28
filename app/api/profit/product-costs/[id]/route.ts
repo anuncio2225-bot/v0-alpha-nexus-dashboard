@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { gravarVersao } from "@/lib/profit/versoes";
 
 export async function PATCH(
   request: Request,
@@ -41,6 +42,9 @@ export async function PATCH(
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // A mudança do kit vale a partir de hoje; o passado segue como estava.
+  await gravarVersao(supabase, userId).catch((e) => console.error("[lucro] versão:", e));
+
   return NextResponse.json({ productCost: data });
 }
 
@@ -66,6 +70,8 @@ export async function DELETE(
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await gravarVersao(supabase, userId).catch((e) => console.error("[lucro] versão:", e));
 
   return NextResponse.json({ success: true });
 }

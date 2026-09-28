@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -10,11 +10,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("attendants")
     .select("*")
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
     .order("name");
+  // Membro limitado a um atendente vê só o próprio cartão.
+  const src = await scopedSrc(supabase, user.id, "atendentes");
+  if (src) query = query.ilike("src", src);
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -29,6 +33,9 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (await scopedSrc(supabase, user.id, "atendentes")) {
+    return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
   }
 
   const body = await request.json();

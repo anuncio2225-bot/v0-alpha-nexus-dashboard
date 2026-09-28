@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, podeVerAtendente, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 
 async function auth() {
@@ -7,8 +7,8 @@ async function auth() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { supabase, userId: null as string | null };
-  return { supabase, userId: await getEffectiveUserId(supabase, user.id) };
+  if (!user) return { supabase, userId: null as string | null, authId: "" };
+  return { supabase, userId: await getEffectiveUserId(supabase, user.id), authId: user.id };
 }
 
 // Listar regras da atendente
@@ -17,8 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { supabase, userId } = await auth();
+  const { supabase, userId, authId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await podeVerAtendente(supabase, authId, userId, id))) return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
 
   const { data, error } = await supabase
     .from("attendant_rules")
@@ -37,8 +38,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { supabase, userId } = await auth();
+  const { supabase, userId, authId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Atendente não registra pagamento nem muda as próprias regras.
+  if (await scopedSrc(supabase, authId, "atendentes")) return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
 
   const body = await request.json();
   const ruleType: "commission" | "bonus" = body.rule_type;

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { carregarVersoes, diaSP, versaoDoDia, type VersaoCustos } from "@/lib/profit/versoes";
 
 /**
  * ANÁLISE DE LUCRO (somente leitura).
@@ -91,9 +92,32 @@ export async function GET(request: Request) {
     .eq("user_id", userId);
   const productCosts = (productCostsRaw || []) as ProductCost[];
 
+  // Custos por PERÍODO: cada venda usa os custos vigentes no dia em que foi
+  // paga (mudar o envio hoje não altera o lucro de meses já fechados). Sem
+  // versões gravadas, vale a configuração atual para tudo.
+  const versoes = await carregarVersoes(supabase, userId);
+  const atual: VersaoCustos = {
+    vigente_desde: "2000-01-01",
+    config: {
+      cost_per_unit: config.cost_per_unit,
+      shipping_cost: config.shipping_cost,
+      affiliate_percent: config.affiliate_percent,
+      affiliate_platform_fee: config.affiliate_platform_fee,
+      affiliate_platform_fixed: config.affiliate_platform_fixed,
+    },
+    kits: productCosts,
+  };
+  const custosDa = (tx: Tx): VersaoCustos => {
+    const ref = tx.payment_date || tx.sale_date || tx.created_at;
+    return (ref && versaoDoDia(versoes, diaSP(ref))) || atual;
+  };
+
   const kitCostFor = (tx: Tx): number => {
+    const v = custosDa(tx);
+    const unit = num(v.config.cost_per_unit);
+    const envio = num(v.config.shipping_cost);
     const hay = `${tx.plan_name || ""} ${tx.product_name || ""}`.toLowerCase();
-    const match = productCosts.find(
+    const match = v.kits.find(
       (pc) =>
         pc.product_keyword &&
         hay.includes(pc.product_keyword.trim().toLowerCase())
@@ -101,12 +125,12 @@ export async function GET(request: Request) {
     if (match) {
       const shipping =
         match.custom_shipping === null || match.custom_shipping === undefined
-          ? config.shipping_cost
+          ? envio
           : num(match.custom_shipping);
-      return num(match.units_per_kit) * config.cost_per_unit + shipping;
+      return num(match.units_per_kit) * unit + shipping;
     }
     // Fallback: 1 unidade + envio padrão
-    return config.cost_per_unit + config.shipping_cost;
+    return unit + envio;
   };
 
   // 3. Sócios
@@ -244,10 +268,11 @@ export async function GET(request: Request) {
   let ownKitCosts = 0;
   for (const t of ownTxs) {
     const price = num(t.product_price) || num(t.total_value) || num(t.amount);
-    const gross = price * (config.affiliate_percent / 100);
+    const c = custosDa(t).config;
+    const gross = price * (num(c.affiliate_percent) / 100);
     const net =
-      gross * (1 - config.affiliate_platform_fee / 100) -
-      config.affiliate_platform_fixed;
+      gross * (1 - num(c.affiliate_platform_fee) / 100) -
+      num(c.affiliate_platform_fixed);
     simRevenue += Math.max(0, net);
     ownKitCosts += kitCostFor(t); // reutilizado na operação interna (2.4)
   }

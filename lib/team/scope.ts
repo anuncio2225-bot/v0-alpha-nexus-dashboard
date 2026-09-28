@@ -1,7 +1,29 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamDataScope, TeamSrcAreas } from "@/types";
 
-const DEFAULT_SRC_AREAS: TeamSrcAreas = { cobranca: true, financeiro: true };
+const DEFAULT_SRC_AREAS: TeamSrcAreas = { cobranca: true, atendentes: true, dashboard: true };
+
+/** Normaliza o que vem do banco/cliente (registros antigos não têm as chaves novas). */
+export function normalizeSrcAreas(raw: Partial<TeamSrcAreas> | null | undefined): TeamSrcAreas {
+  return {
+    cobranca: raw?.cobranca !== false,
+    atendentes: raw?.atendentes !== false,
+    dashboard: raw?.dashboard !== false,
+  };
+}
+
+/**
+ * SRC do atendente ao qual o usuário logado está limitado NAQUELA área, ou
+ * null quando ele vê tudo (dono, ou membro sem vínculo / área liberada).
+ */
+export async function scopedSrc(
+  supabase: SupabaseClient,
+  userId: string,
+  area: keyof Omit<TeamSrcAreas, "financeiro">
+): Promise<string | null> {
+  const scope = await getTeamDataScope(supabase, userId);
+  return scope.srcFilter && scope.srcAreas[area] ? scope.srcFilter : null;
+}
 
 /**
  * Resolve o escopo de DADOS completo do usuario logado:
@@ -34,10 +56,7 @@ export async function getTeamDataScope(
       return {
         ownerId,
         srcFilter: membership.attendant_src as string,
-        srcAreas: {
-          ...DEFAULT_SRC_AREAS,
-          ...((membership.src_areas as Partial<TeamSrcAreas>) || {}),
-        },
+        srcAreas: normalizeSrcAreas(membership.src_areas as Partial<TeamSrcAreas>),
       };
     }
   } catch {
@@ -84,4 +103,25 @@ export async function getCanDelete(supabase: SupabaseClient): Promise<boolean> {
   const { data, error } = await supabase.rpc("team_can_delete");
   if (error || data === null || data === undefined) return true;
   return data as boolean;
+}
+
+/**
+ * Membro limitado a um atendente só enxerga o PRÓPRIO atendente na tela
+ * Atendentes. Devolve true quando o usuário pode ver o atendente `attendantId`.
+ */
+export async function podeVerAtendente(
+  supabase: SupabaseClient,
+  userId: string,
+  ownerId: string,
+  attendantId: string
+): Promise<boolean> {
+  const src = await scopedSrc(supabase, userId, "atendentes");
+  if (!src) return true;
+  const { data } = await supabase
+    .from("attendants")
+    .select("src")
+    .eq("id", attendantId)
+    .eq("user_id", ownerId)
+    .maybeSingle();
+  return (data?.src || "").trim().toLowerCase() === src.trim().toLowerCase();
 }

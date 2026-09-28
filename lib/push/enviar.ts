@@ -257,6 +257,7 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     falha_entrega: `${info.emoji} Falha na entrega`,
     venda_frustrada: `${info.emoji} Venda ${v.status === "cancelado" ? "cancelada" : "frustrada"} · ${valor}`,
     reembolso: `${info.emoji} Reembolso · ${valor}`,
+    estoque_baixo: `${info.emoji} Estoque baixo`, // montado em lib/stock/alerta.ts
   };
 
   const partes = [cliente, produto].filter(Boolean).join(" — ");

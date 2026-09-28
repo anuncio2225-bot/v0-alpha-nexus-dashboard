@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (24):
+-- Migrações registradas no banco (25):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -32,6 +32,7 @@
 --   20260928135424  push_preferencias_relatorio
 --   20260928135800  cron_relatorio_diario
 --   20260928144640  push_aparelho_varias_contas
+--   20260928195032  custos_por_periodo
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -437,6 +438,18 @@ create table public.profit_config (
   updated_at timestamp with time zone default now(),
   constraint profit_config_pkey PRIMARY KEY (id),
   constraint profit_config_user_id_key UNIQUE (user_id)
+);
+
+create table public.profit_config_versoes (
+  id uuid default gen_random_uuid() not null,
+  user_id uuid not null,
+  vigente_desde date not null,
+  config jsonb not null,
+  kits jsonb default '[]'::jsonb not null,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint profit_config_versoes_pkey PRIMARY KEY (id),
+  constraint profit_config_versoes_user_id_vigente_desde_key UNIQUE (user_id, vigente_desde)
 );
 
 create table public.profit_partners (
@@ -1071,6 +1084,7 @@ alter table public.monthly_tax_config enable row level security;
 alter table public.product_costs enable row level security;
 alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
+alter table public.profit_config_versoes enable row level security;
 alter table public.profit_partners enable row level security;
 alter table public.push_preferencias enable row level security;
 alter table public.push_subscriptions enable row level security;
@@ -1372,6 +1386,8 @@ create policy "team_select_owner_profile" on public.profiles as permissive for s
 create policy "profit_config_user" on public.profit_config as permissive for all to public
   using ((auth.uid() = user_id))
   with check ((auth.uid() = user_id));
+create policy "profit_config_versoes_select" on public.profit_config_versoes as permissive for select to authenticated
+  using ((user_id = effective_user_id()));
 create policy "profit_partners_user" on public.profit_partners as permissive for all to public
   using ((auth.uid() = user_id))
   with check ((auth.uid() = user_id));

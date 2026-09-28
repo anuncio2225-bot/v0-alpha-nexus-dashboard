@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { cleanSrc } from "../auto-detect/route";
 
@@ -22,6 +22,9 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (await scopedSrc(supabase, user.id, "atendentes")) {
+    return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
   }
 
   const userId = await getEffectiveUserId(supabase, user.id);

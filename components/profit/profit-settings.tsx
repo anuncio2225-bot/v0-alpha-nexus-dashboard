@@ -19,7 +19,11 @@ import {
 import { toast } from "sonner";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Plus, Trash2, Save } from "lucide-react";
-import type { ProfitConfig, Partner, ProductCost } from "./types";
+import type { ProfitConfig, Partner, ProductCost, VersaoCustos } from "./types";
+
+/** Hoje em Brasília (YYYY-MM-DD). */
+const hojeSP = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+const dataBR = (d: string) => d.split("-").reverse().join("/");
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -35,6 +39,7 @@ const CASHFLOW_EXCLUSION_OPTIONS = [
 export function ProfitSettings() {
   const { data: configData, isLoading: loadingConfig } = useSWR<{
     config: ProfitConfig;
+    versoes?: VersaoCustos[];
   }>("/api/profit/config", fetcher);
   const { data: partnersData } = useSWR<{ partners: Partner[] }>(
     "/api/profit/partners",
@@ -62,6 +67,7 @@ export function ProfitSettings() {
         productCosts={costsData?.productCosts || []}
         suggestions={costsData?.suggestions || []}
       />
+      <HistoricoCustos versoes={configData.versoes || []} />
       <SimulationSection config={configData.config} />
       <DistributionSection
         config={configData.config}
@@ -85,6 +91,7 @@ function CostsSection({
 }) {
   const [costPerUnit, setCostPerUnit] = useState(String(config.cost_per_unit));
   const [shipping, setShipping] = useState(String(config.shipping_cost));
+  const [vigenteDesde, setVigenteDesde] = useState(hojeSP());
   const [saving, setSaving] = useState(false);
 
   async function saveBaseCosts() {
@@ -97,11 +104,12 @@ function CostsSection({
           ...config,
           cost_per_unit: Number(costPerUnit) || 0,
           shipping_cost: Number(shipping) || 0,
+          vigente_desde: vigenteDesde,
         }),
       });
       if (!res.ok) throw new Error();
       await mutate("/api/profit/config");
-      toast.success("Custos de fabricação salvos");
+      toast.success(`Custos salvos — valem a partir de ${dataBR(vigenteDesde)}`);
     } catch {
       toast.error("Erro ao salvar custos");
     } finally {
@@ -138,10 +146,24 @@ function CostsSection({
             />
           </div>
         </div>
-        <Button onClick={saveBaseCosts} disabled={saving} size="sm">
-          <Save className="mr-2 h-4 w-4" />
-          Salvar custos base
-        </Button>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label>Valem a partir de</Label>
+            <Input
+              type="date"
+              value={vigenteDesde}
+              onChange={(e) => setVigenteDesde(e.target.value || hojeSP())}
+              className="w-44"
+            />
+          </div>
+          <Button onClick={saveBaseCosts} disabled={saving} size="sm">
+            <Save className="mr-2 h-4 w-4" />
+            Salvar custos base
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Os meses anteriores continuam com os custos da época. Mudança de kit vale a partir de hoje.
+        </p>
 
         <KitsTable
           productCosts={productCosts}
@@ -196,6 +218,7 @@ function KitsTable({
       });
       if (!res.ok) throw new Error();
       await mutate("/api/profit/product-costs");
+      await mutate("/api/profit/config"); // atualiza o histórico de custos
       setForm({
         product_name: "",
         product_keyword: "",
@@ -217,6 +240,7 @@ function KitsTable({
       });
       if (!res.ok) throw new Error();
       await mutate("/api/profit/product-costs");
+      await mutate("/api/profit/config"); // atualiza o histórico de custos
       toast.success("Kit removido");
     } catch {
       toast.error("Erro ao remover kit");
@@ -693,6 +717,47 @@ function ExclusionsSection({ config }: { config: ProfitConfig }) {
           <Save className="mr-2 h-4 w-4" />
           Salvar exclusões
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------------- Histórico de custos por período ---------------- */
+
+function HistoricoCustos({ versoes }: { versoes: VersaoCustos[] }) {
+  if (versoes.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Histórico de custos</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Cada venda usa os custos vigentes no dia em que foi paga.
+        </p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vale a partir de</TableHead>
+              <TableHead className="text-right">Custo/pote</TableHead>
+              <TableHead className="text-right">Envio</TableHead>
+              <TableHead className="text-right">Kits</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {versoes.map((v, i) => (
+              <TableRow key={v.vigente_desde}>
+                <TableCell>
+                  {v.vigente_desde <= "2000-01-01" ? "Início" : dataBR(v.vigente_desde)}
+                  {i === 0 && <span className="ml-2 text-xs text-success">atual</span>}
+                </TableCell>
+                <TableCell className="text-right">{formatCurrency(Number(v.config.cost_per_unit) || 0)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(Number(v.config.shipping_cost) || 0)}</TableCell>
+                <TableCell className="text-right">{v.kits.length}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

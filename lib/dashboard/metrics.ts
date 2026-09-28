@@ -42,6 +42,11 @@ export interface ParametrosMetricas {
   fromRaw: string;
   toRaw: string;
   attendantId?: string | null;
+  /**
+   * Membro da equipe limitado a um atendente: só as vendas com este SRC, e sem
+   * o investimento em anúncios (é custo da operação inteira, não dele).
+   */
+  srcFilter?: string | null;
   productFilters?: string[];
   modes?: Array<"afterpay" | "antecipado" | "recuperacao">;
 }
@@ -58,6 +63,7 @@ export async function calcularMetricas(
 ): Promise<DashboardMetrics> {
   const { fromRaw, toRaw } = params;
   const attendantId = params.attendantId || null;
+  const srcFilter = params.srcFilter || null;
   const productFilters = params.productFilters || [];
   const modes = params.modes || [];
 
@@ -134,6 +140,9 @@ export async function calcularMetricas(
     }
   }
 
+  if (srcFilter) {
+    txQuery = txQuery.ilike("src", srcFilter);
+  }
   if (attendantId) {
     txQuery = txQuery.eq("attendant_id", attendantId);
   }
@@ -161,10 +170,12 @@ export async function calcularMetricas(
 
   // 2. Fetch product list (for filter dropdown) - ALWAYS the full list,
   // independent of current product filter, so the user can change selection.
-  const { data: allProductsRaw } = await fetchAll(supabase
+  let productsQuery = supabase
     .from("transactions")
     .select("product_id, product_name, webhook_id, sale_date, created_at")
-    .eq("user_id", ownerId)
+    .eq("user_id", ownerId);
+  if (srcFilter) productsQuery = productsQuery.ilike("src", srcFilter);
+  const { data: allProductsRaw } = await fetchAll(productsQuery
     .or("origin_type.eq.own,origin_type.is.null")
     .not("product_name", "is", null)
     .or(
@@ -251,6 +262,7 @@ export async function calcularMetricas(
     .gte("payment_date", from)
     .lte("payment_date", to);
 
+  if (srcFilter) paymentsQuery = paymentsQuery.ilike("src", srcFilter);
   // Respeita o filtro de modalidade, igual ao resto do painel.
   if (modes.length > 0) {
     paymentsQuery = paymentsQuery.in("sale_type", modes);
@@ -267,12 +279,14 @@ export async function calcularMetricas(
   // 3. Fetch Ad Investments (manual entries from ad_investments table)
   const dateFrom = from.split("T")[0];
   const dateTo = to.split("T")[0];
-  const { data: adInvestments } = await fetchAll(supabase
-    .from("ad_investments")
-    .select("investment_value, date, platform, campaign_name")
-    .eq("user_id", ownerId)
-    .gte("date", dateFrom)
-    .lte("date", dateTo));
+  const { data: adInvestments } = srcFilter
+    ? { data: [] as { investment_value: number; date: string; platform: string; campaign_name: string | null }[] }
+    : await fetchAll(supabase
+        .from("ad_investments")
+        .select("investment_value, date, platform, campaign_name")
+        .eq("user_id", ownerId)
+        .gte("date", dateFrom)
+        .lte("date", dateTo));
 
   // 3b. Fetch Meta Ads spend (automatic) from meta_ads_performance.
   // Mesma logica/fonte usada em /api/meta/insights para que os numeros
@@ -285,7 +299,7 @@ export async function calcularMetricas(
     .eq("user_id", ownerId)
     .eq("is_active", true);
 
-  const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
+  const activeMetaIds = srcFilter ? [] : (activeMetaAccounts || []).map((a) => a.account_id);
   // Contas ISENTAS do imposto da Meta (apply_meta_tax = false): o gasto delas
   // entra só convertido/IOF, mas NÃO recebe o ads_tax_percentage.
   const exemptMetaIds = new Set(
@@ -771,6 +785,10 @@ export async function calcularMetricas(
     .eq("status", "active");
 
   const attendants: AttendantRanking[] = (attendantsRaw || [])
+    // Membro vinculado a um atendente não vê o ranking das colegas.
+    .filter(
+      (att) => !srcFilter || (att.src || "").trim().toLowerCase() === srcFilter.trim().toLowerCase()
+    )
     .map((att) => {
       // Vendas são vinculadas ao atendente pelo SRC (nome), não por
       // attendant_id (que fica vazio nas transações). Casamento
