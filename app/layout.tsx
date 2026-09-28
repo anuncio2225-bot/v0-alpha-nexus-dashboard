@@ -26,6 +26,12 @@ export const metadata: Metadata = {
     icon: "/icon.png",
     apple: "/apple-icon.png",
   },
+  // iPhone: abre como app (sem barra do Safari) quando instalado na tela inicial.
+  appleWebApp: {
+    capable: true,
+    title: "AlphaNexus",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {

@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { User, Settings as SettingsIcon } from "lucide-react";
 import type { Profile, Settings } from "@/types";
+import { NotificacoesCelular } from "@/components/settings/notificacoes-celular";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -109,6 +110,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <NotificacoesCelular />
 
       {/* Settings Card */}
       <Card className="bg-card border-border">

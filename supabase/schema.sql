@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (20):
+-- Migrações registradas no banco (21):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -28,6 +28,7 @@
 --   20260811021013  recalc_meta_account_spend_fn
 --   20260923182425  lixeira
 --   20260928132808  colunas_rastreio_crm
+--   20260928134205  push_celular
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -444,6 +445,22 @@ create table public.profit_partners (
   constraint profit_partners_pkey PRIMARY KEY (id)
 );
 
+create table public.push_subscriptions (
+  id uuid default gen_random_uuid() not null,
+  owner_id uuid not null,
+  member_id uuid not null,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  preferencias jsonb default '{}'::jsonb not null,
+  created_at timestamp with time zone default now() not null,
+  ultimo_sucesso_em timestamp with time zone,
+  ultimo_recebido_em timestamp with time zone,
+  constraint push_subscriptions_pkey PRIMARY KEY (id),
+  constraint push_subscriptions_endpoint_key UNIQUE (endpoint)
+);
+
 create table public.sales (
   id uuid default gen_random_uuid() not null,
   user_id uuid not null,
@@ -731,6 +748,7 @@ CREATE INDEX idx_monthly_tax_config_user_year ON public.monthly_tax_config USING
 CREATE INDEX idx_product_costs_user ON public.product_costs USING btree (user_id);
 CREATE UNIQUE INDEX idx_profiles_webhook_token ON public.profiles USING btree (webhook_token);
 CREATE INDEX idx_profit_partners_user ON public.profit_partners USING btree (user_id);
+CREATE INDEX push_subscriptions_owner_idx ON public.push_subscriptions USING btree (owner_id);
 CREATE INDEX idx_sales_sale_date ON public.sales USING btree (sale_date DESC);
 CREATE INDEX idx_sales_user_id ON public.sales USING btree (user_id);
 CREATE INDEX idx_stock_movements_transaction ON public.stock_movements USING btree (transaction_id);
@@ -1038,6 +1056,7 @@ alter table public.product_costs enable row level security;
 alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
 alter table public.profit_partners enable row level security;
+alter table public.push_subscriptions enable row level security;
 alter table public.sales enable row level security;
 alter table public.settings enable row level security;
 alter table public.stock_config enable row level security;
