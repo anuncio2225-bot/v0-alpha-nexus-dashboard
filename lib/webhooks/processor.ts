@@ -11,6 +11,13 @@ import {
 } from "@/lib/collections/sync";
 import { fetchKits, syncStockForTransaction } from "@/lib/stock/sync";
 import type { NormalizedEvent, ProcessResult, WebhookGateway } from "./types";
+import { after } from "next/server";
+import {
+  avisoDaVenda,
+  enviarAviso,
+  eventoDaMudanca,
+  type EstadoVenda,
+} from "@/lib/push/enviar";
 
 export interface ProcessOptions {
   forceGateway?: WebhookGateway;
@@ -435,6 +442,7 @@ export async function processWebhook(
     //    o traz (ex.: "Atualização" no rastreio, evento só de status);
     //  - uma venda já PAGA não volta para agendado/aguardando por causa de um
     //    evento antigo reenviado.
+    let estadoAnterior: EstadoVenda | null = null;
     try {
       const { data: prev } = await supabase
         .from("transactions")
@@ -447,6 +455,10 @@ export async function processWebhook(
         .maybeSingle();
 
       if (prev) {
+        estadoAnterior = {
+          status: prev.status ?? null,
+          shipping_status: prev.shipping_status ?? null,
+        };
         for (const k of [
           "tracking_code",
           "tracking_url",
@@ -600,6 +612,45 @@ export async function processWebhook(
       );
     } catch (stockErr) {
       console.error("[v0] stock sync error (non-blocking):", stockErr);
+    }
+
+    // 6d. Notificação no celular — só quando a venda MUDA de estado (retry do
+    // gateway não repete aviso). Roda depois da resposta ao gateway (`after`),
+    // para o webhook não esperar o serviço de push.
+    try {
+      const vendaAviso = {
+        id: upserted?.id as string | undefined,
+        status: tx.status as string,
+        sale_type: tx.sale_type as string,
+        payment_method: event.payment_method || null,
+        shipping_status: (tx.shipping_status as string) || null,
+        tracking_code: (tx.tracking_code as string) || null,
+        customer_name: event.customer_name || null,
+        product_name: event.product_name || null,
+        plan_name: event.plan_name || null,
+        total_value: (tx.total_value as number) || event.amount || 0,
+        src: event.src || null,
+        origin_type: event.origin_type || "own",
+        affiliate_name: event.affiliate_name || null,
+      };
+      const ev = eventoDaMudanca(estadoAnterior, vendaAviso);
+      // Venda de afiliado externo: só o pagamento interessa ao dono.
+      const avisar =
+        ev && (vendaAviso.origin_type !== "affiliate_incoming" || ev === "pagamento_aprovado");
+      if (ev && avisar) {
+        const aviso = avisoDaVenda(ev, vendaAviso);
+        const disparar = () =>
+          enviarAviso(userId, aviso).catch((e) =>
+            console.error("[push] falha no envio (não bloqueia):", e)
+          );
+        try {
+          after(disparar);
+        } catch {
+          await disparar(); // fora de uma requisição (ex.: reprocessamento)
+        }
+      }
+    } catch (pushErr) {
+      console.error("[push] erro ao montar aviso (não bloqueia):", pushErr);
     }
 
     // 7. Mark log as processed
