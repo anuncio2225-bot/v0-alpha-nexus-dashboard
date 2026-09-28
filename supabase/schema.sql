@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (21):
+-- Migrações registradas no banco (23):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -29,11 +29,13 @@
 --   20260923182425  lixeira
 --   20260928132808  colunas_rastreio_crm
 --   20260928134205  push_celular
+--   20260928135424  push_preferencias_relatorio
+--   20260928135800  cron_relatorio_diario
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
 
--- Extensões instaladas: pg_graphql 1.5.11, pg_stat_statements 1.11, pgcrypto 1.3, plpgsql 1.0, supabase_vault 0.3.1, uuid-ossp 1.1
+-- Extensões instaladas: pg_cron 1.6.4, pg_graphql 1.5.11, pg_net 0.20.0, pg_stat_statements 1.11, pgcrypto 1.3, plpgsql 1.0, supabase_vault 0.3.1, uuid-ossp 1.1
 
 -- ---------------------------------------------------------------- TABELAS
 create table public.account_balance_logs (
@@ -445,6 +447,19 @@ create table public.profit_partners (
   constraint profit_partners_pkey PRIMARY KEY (id)
 );
 
+create table public.push_preferencias (
+  owner_id uuid not null,
+  member_id uuid not null,
+  preferencias jsonb default '{}'::jsonb not null,
+  permitido boolean default true not null,
+  relatorio_ativo boolean default true not null,
+  relatorio_hora smallint default 21 not null,
+  relatorio_enviado_em date,
+  updated_at timestamp with time zone default now() not null,
+  constraint push_preferencias_relatorio_hora_check CHECK (((relatorio_hora >= 0) AND (relatorio_hora <= 23))),
+  constraint push_preferencias_pkey PRIMARY KEY (owner_id, member_id)
+);
+
 create table public.push_subscriptions (
   id uuid default gen_random_uuid() not null,
   owner_id uuid not null,
@@ -453,7 +468,6 @@ create table public.push_subscriptions (
   p256dh text not null,
   auth text not null,
   user_agent text,
-  preferencias jsonb default '{}'::jsonb not null,
   created_at timestamp with time zone default now() not null,
   ultimo_sucesso_em timestamp with time zone,
   ultimo_recebido_em timestamp with time zone,
@@ -1056,6 +1070,7 @@ alter table public.product_costs enable row level security;
 alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
 alter table public.profit_partners enable row level security;
+alter table public.push_preferencias enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.sales enable row level security;
 alter table public.settings enable row level security;
