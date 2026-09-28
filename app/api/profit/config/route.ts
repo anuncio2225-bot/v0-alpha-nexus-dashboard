@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { carregarVersoes, gravarVersao } from "@/lib/profit/versoes";
 
 const DEFAULT_CONFIG = {
   cost_per_unit: 0,
@@ -31,7 +32,12 @@ export async function GET() {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ config: data || { ...DEFAULT_CONFIG, user_id: userId } });
+  // Histórico: a partir de quando cada conjunto de custos vale.
+  const versoes = await carregarVersoes(supabase, userId);
+  return NextResponse.json({
+    config: data || { ...DEFAULT_CONFIG, user_id: userId },
+    versoes: versoes.reverse(),
+  });
 }
 
 export async function POST(request: Request) {
@@ -67,6 +73,17 @@ export async function POST(request: Request) {
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Grava o retrato dos custos valendo a partir da data escolhida (padrão:
+  // hoje). Períodos anteriores continuam com os custos da época.
+  try {
+    await gravarVersao(supabase, userId, body.vigente_desde);
+  } catch (e) {
+    return NextResponse.json(
+      { error: `Custos salvos, mas o histórico falhou: ${(e as Error).message}` },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ config: data });
 }

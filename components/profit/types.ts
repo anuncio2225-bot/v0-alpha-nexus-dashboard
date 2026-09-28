@@ -48,6 +48,19 @@ export interface ProfitConfig {
   excluded_cashflow_categories: string[];
 }
 
+/** Custos valendo a partir de uma data (Análise de Lucro por período). */
+export interface VersaoCustos {
+  vigente_desde: string;
+  config: {
+    cost_per_unit: number;
+    shipping_cost: number;
+    affiliate_percent: number;
+    affiliate_platform_fee: number;
+    affiliate_platform_fixed: number;
+  };
+  kits: { product_keyword: string; units_per_kit: number; custom_shipping: number | null }[];
+}
+
 export interface Partner {
   id: string;
   name: string;
