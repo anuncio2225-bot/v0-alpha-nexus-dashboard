@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
+  afterpayPendente,
   calculateCommission,
   getCurrentPeriod,
   type CommissionTx,
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
       total_attendants: 0,
       total_to_pay: 0,
       total_paid_sales: 0,
+      total_pendente: 0,
       top_seller: null,
     });
   }
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
 
   let totalToPay = 0;
   let totalPaidSales = 0;
+  let totalPendente = 0;
   let topSeller: { name: string; sales: number } | null = null;
 
   for (const att of list) {
@@ -85,6 +88,22 @@ export async function GET(request: Request) {
     );
 
     totalToPay += result.total_to_pay;
+
+    const { data: abertos } = await fetchAll(supabase
+      .from("transactions")
+      .select(
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date"
+      )
+      .eq("user_id", userId)
+      .ilike("src", att.src)
+      .or("origin_type.eq.own,origin_type.is.null")
+      .eq("sale_type", "afterpay")
+      .in("status", ["agendado", "aguardando"]));
+    const pendentes = ((abertos || []) as CommissionTx[]).filter((tx) => {
+      const ref = (tx.sale_date || "").slice(0, 10);
+      return ref >= period.start && ref <= period.end;
+    });
+    totalPendente += afterpayPendente(att, pendentes, result.commission_tier.percent).comissao;
     totalPaidSales += result.total_sales;
 
     if (!topSeller || result.total_sales > topSeller.sales) {
@@ -96,6 +115,7 @@ export async function GET(request: Request) {
     total_attendants: list.length,
     total_to_pay: totalToPay,
     total_paid_sales: totalPaidSales,
+    total_pendente: totalPendente,
     top_seller: topSeller && topSeller.sales > 0 ? topSeller : null,
   });
 }

@@ -311,6 +311,12 @@ export interface CommissionResult {
   bonus_total: number;
   platform_deductions: number;
   total_to_pay: number;
+  /**
+   * AfterPay vendido pela atendente e ainda não pago pelo cliente (a caminho
+   * ou entregue em cobrança). NÃO entra no total a pagar: vira comissão quando
+   * o cliente paga. Estimado com a faixa atual.
+   */
+  afterpay_pendente?: { vendas: number; base: number; comissao: number };
 }
 
 // ============================================================================

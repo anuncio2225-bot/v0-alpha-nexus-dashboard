@@ -602,6 +602,7 @@ export async function processWebhook(
         {
           id: upserted?.id as string,
           status: event.status || null,
+          sale_type: (tx.sale_type as string) || null,
           plan_name: event.plan_name || null,
           product_name: event.product_name || null,
           customer_name: event.customer_name || null,

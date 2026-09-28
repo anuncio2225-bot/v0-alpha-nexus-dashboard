@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge, CalendarRange } from "lucide-react";
+import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge, CalendarRange, Clock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
@@ -82,6 +82,7 @@ interface Summary {
   total_attendants: number;
   total_to_pay: number;
   total_paid_sales: number;
+  total_pendente?: number;
   top_seller: { name: string; sales: number } | null;
 }
 
@@ -222,6 +223,12 @@ export default function AttendantsPage() {
       sensitive: true,
     },
     {
+      label: "AfterPay a liberar",
+      value: summary ? formatCurrency(summary.total_pendente || 0) : "—",
+      icon: Clock,
+      sensitive: true,
+    },
+    {
       label: "Vendas pagas",
       value: summary ? String(summary.total_paid_sales) : "—",
       icon: ShoppingCart,
@@ -359,7 +366,7 @@ export default function AttendantsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
         {kpis.map((k) => (
           <Card key={k.label} className="bg-card border-border">
             <CardContent className="flex items-center gap-3 p-4">

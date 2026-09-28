@@ -3,10 +3,12 @@ import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { resolveKitUnits, type KitRow } from "@/lib/stock/kit";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { consomeEstoque } from "@/lib/stock/sync";
 
 /**
  * POST /api/stock/sync — cria saídas de estoque para TODAS as vendas pagas
- * (own + affiliate_incoming) que ainda não possuem uma saída correspondente.
+ * e AfterPay agendadas/entregues (own + affiliate_incoming) que ainda não
+ * possuem uma saída correspondente.
  * Idempotente: pula transações que já têm saída. Retorna quantas foram criadas.
  */
 export async function POST() {
@@ -26,16 +28,16 @@ export async function POST() {
     .eq("user_id", userId);
   const kits = (kitsRaw || []) as KitRow[];
 
-  // Transações pagas
+  // Transações que já tiraram produto do estoque
   const { data: txsRaw, error: txErr } = await fetchAll(supabase
     .from("transactions")
-    .select("id, status, plan_name, product_name, customer_name, payment_date, sale_date, created_at")
+    .select("id, status, sale_type, plan_name, product_name, customer_name, payment_date, sale_date, created_at")
     .eq("user_id", userId)
-    .eq("status", "pago")
+    .in("status", ["pago", "agendado", "aguardando"])
     .in("origin_type", ["own", "affiliate_incoming"]));
   if (txErr)
     return NextResponse.json({ error: txErr.message }, { status: 500 });
-  const txs = txsRaw || [];
+  const txs = (txsRaw || []).filter((t) => consomeEstoque(t.status, t.sale_type));
 
   // Saídas já existentes (para não duplicar)
   const { data: existingRaw } = await fetchAll(supabase
@@ -61,7 +63,11 @@ export async function POST() {
         product_name: t.plan_name || t.product_name || null,
         description: `Venda: ${label}`,
         kit_matched: matched,
-        date: t.payment_date || t.sale_date || t.created_at || new Date().toISOString(),
+        date:
+          (t.sale_type === "afterpay" ? t.sale_date : t.payment_date) ||
+          t.sale_date ||
+          t.created_at ||
+          new Date().toISOString(),
       };
     });
 

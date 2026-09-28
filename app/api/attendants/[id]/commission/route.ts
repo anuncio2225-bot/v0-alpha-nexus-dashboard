@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import {
+  afterpayPendente,
   calculateCommission,
   getCurrentPeriod,
   saleBaseValue,
@@ -59,6 +60,8 @@ export async function GET(
     customer_name: string | null;
     product_name: string | null;
   })[] = [];
+  // AfterPay vendido no período e ainda não pago (a caminho / em cobrança).
+  let pendentes: CommissionTx[] = [];
 
   if (att.src) {
     const { data: txs, error: txErr } = await fetchAll(supabase
@@ -80,6 +83,21 @@ export async function GET(
     // Filtra pelo período usando payment_date (fallback sale_date)
     paidSales = (txs || []).filter((tx) => {
       const ref = (tx.payment_date || tx.sale_date || "").slice(0, 10);
+      return ref >= period.start && ref <= period.end;
+    });
+
+    const { data: abertos } = await fetchAll(supabase
+      .from("transactions")
+      .select(
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date"
+      )
+      .eq("user_id", userId)
+      .ilike("src", att.src)
+      .or("origin_type.eq.own,origin_type.is.null")
+      .eq("sale_type", "afterpay")
+      .in("status", ["agendado", "aguardando"]));
+    pendentes = ((abertos || []) as CommissionTx[]).filter((tx) => {
+      const ref = (tx.sale_date || "").slice(0, 10);
       return ref >= period.start && ref <= period.end;
     });
   }
@@ -156,5 +174,10 @@ export async function GET(
     (r) => r.rule_type === "commission"
   );
 
-  return NextResponse.json({ ...result, sales, has_commission_rule: hasCommissionRule });
+  return NextResponse.json({
+    ...result,
+    afterpay_pendente: afterpayPendente(att, pendentes, result.commission_tier.percent),
+    sales,
+    has_commission_rule: hasCommissionRule,
+  });
 }

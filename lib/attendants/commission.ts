@@ -87,6 +87,22 @@ export function saleBaseValue(tx: CommissionTx, attendant: Attendant): number {
   );
 }
 
+/**
+ * AfterPay em aberto (vendido, ainda não pago): quanto a atendente vai
+ * receber quando o cliente pagar, na faixa atual. Só informativo — não entra
+ * no total a pagar, porque venda AfterPay ainda pode frustrar.
+ */
+export function afterpayPendente(
+  attendant: Attendant,
+  pendentes: CommissionTx[],
+  tierPercent: number
+): { vendas: number; base: number; comissao: number } {
+  const base = pendentes.reduce((s, tx) => s + saleBaseValue(tx, attendant), 0);
+  const comissao =
+    base * (tierPercent / 100) + pendentes.length * (attendant.fixed_per_sale || 0);
+  return { vendas: pendentes.length, base, comissao };
+}
+
 /** Dedução da plataforma por venda (apenas para relatório, modo produtor). */
 function platformDeduction(tx: CommissionTx, attendant: Attendant): number {
   if (attendant.calc_mode !== "producer") return 0;
