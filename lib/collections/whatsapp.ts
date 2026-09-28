@@ -1,3 +1,4 @@
+import { trackingStage } from "@/lib/tracking/stages";
 import type { CollectionClient } from "@/types";
 
 // Formata BRL simples (sem depender de Intl no client em massa)
@@ -33,12 +34,6 @@ export function formatDocument(doc: string | null | undefined): string | null {
   if (d.length === 14)
     return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
   return doc;
-}
-
-// Link de rastreio dos Correios
-export function correiosTrackingUrl(code: string | null | undefined): string | null {
-  if (!code) return null;
-  return `https://www.linkcorreios.com.br/?id=${encodeURIComponent(code.trim())}`;
 }
 
 // Categoriza o status (manual ou Braip) em um "tom" de mensagem
@@ -156,14 +151,26 @@ export function buildWhatsappUrl(client: CollectionClient): string | null {
 export function deliveryStatusLabel(status: string | null | undefined): string | null {
   if (!status) return null;
   const s = status.toLowerCase();
-  if (s.includes("entregue") || s.includes("delivered")) return "✅ Entregue";
-  if (s.includes("saiu") || s.includes("out for delivery")) return "🏠 Saiu para entrega";
-  if (s.includes("caminho") || s.includes("transito") || s.includes("transit"))
-    return "🚚 A caminho";
-  if (s.includes("postado") || s.includes("posted")) return "📬 Postado";
-  if (s.includes("retirada") || s.includes("collection")) return "⏳ Aguardando retirada";
+  switch (trackingStage(status)) {
+    case "entregue":
+      return "✅ Entregue";
+    case "saiu_para_entrega":
+      return "🏠 Saiu para entrega";
+    case "em_transito":
+      return "🚚 A caminho";
+    case "postado":
+      return "📬 Postado";
+    case "aguardando_retirada":
+      return "⏳ Aguardando retirada";
+    case "falha_entrega":
+      return "⚠️ Falha na entrega";
+    case "devolvido":
+      return "↩️ Devolvido";
+    case "frustrado":
+      return "⚠️ Entrega frustrada";
+    case "preparando":
+      return `📤 ${status}`;
+  }
   if (s.includes("atraso") || s.includes("arrears")) return "⚠️ Em atraso";
-  if (s.includes("frustrad") || s.includes("incorret")) return "⚠️ Entrega frustrada";
-  if (s.includes("enviar") || s.includes("a enviar")) return "📤 A enviar";
   return status;
 }

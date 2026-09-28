@@ -51,11 +51,11 @@ import {
 } from "lucide-react";
 import {
   buildWhatsappUrl,
-  correiosTrackingUrl,
   deliveryStatusLabel,
   formatDocument,
   formatPhoneDisplay,
 } from "@/lib/collections/whatsapp";
+import { trackingUrlFor } from "@/lib/tracking/stages";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -475,7 +475,7 @@ export function ClientDrawer({
                         </dt>
                         <dd className="text-right">
                           <a
-                            href={correiosTrackingUrl(client.tracking_code) ?? "#"}
+                            href={trackingUrlFor(client.tracking_code, client.platform_name) ?? "#"}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 font-medium text-primary hover:underline"

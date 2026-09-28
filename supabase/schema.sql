@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-09-23 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-09-28 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (19):
+-- Migrações registradas no banco (20):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -27,6 +27,7 @@
 --   20260811012222  meta_account_apply_meta_tax
 --   20260811021013  recalc_meta_account_spend_fn
 --   20260923182425  lixeira
+--   20260928132808  colunas_rastreio_crm
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -893,21 +894,27 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
-  -- Status padrao alinhados ao Braip (automaticos do webhook + manuais).
+  -- Status padrao: automaticos do webhook (pagamento + entrega) e manuais.
   for s in select * from (values
     ('Agendado', '#0ea5e9', 'calendar-check', 0, false, true),
-    ('Aguardando Pagamento', '#3b82f6', 'clock', 1, false, true),
-    ('Pagamento Pendente', '#ef4444', 'alert-triangle', 2, true, true),
-    ('Negociacao', '#eab308', 'handshake', 3, false, false),
-    ('Prometeu Pagar', '#a855f7', 'calendar-clock', 4, false, false),
-    ('Pagamento Parcial', '#f97316', 'circle-dollar-sign', 5, false, false),
-    ('Aguardando Confirmacao', '#06b6d4', 'clock', 6, false, false),
-    ('Nao Responde', '#1f2937', 'phone-off', 7, false, false),
-    ('Base Correios', '#a16207', 'truck', 8, false, false),
-    ('Frustrado', '#374151', 'x-circle', 9, false, true),
-    ('Cancelado', '#ea580c', 'ban', 10, false, true),
-    ('Pago', '#22c55e', 'check', 11, false, true),
-    ('Devolucao', '#f59e0b', 'undo-2', 12, false, true)
+    ('Postado', '#6366f1', 'package', 1, false, true),
+    ('Em Trânsito', '#8b5cf6', 'truck', 2, false, true),
+    ('Saiu para Entrega', '#d946ef', 'map-pin', 3, false, true),
+    ('Aguardando Retirada', '#f59e0b', 'store', 4, false, true),
+    ('Entregue', '#14b8a6', 'package-check', 5, false, true),
+    ('Falha na Entrega', '#dc2626', 'package-x', 6, false, true),
+    ('Aguardando Pagamento', '#3b82f6', 'clock', 7, false, true),
+    ('Pagamento Pendente', '#ef4444', 'alert-triangle', 8, true, true),
+    ('Negociacao', '#eab308', 'handshake', 9, false, false),
+    ('Prometeu Pagar', '#a855f7', 'calendar-clock', 10, false, false),
+    ('Pagamento Parcial', '#f97316', 'circle-dollar-sign', 11, false, false),
+    ('Aguardando Confirmacao', '#06b6d4', 'clock', 12, false, false),
+    ('Nao Responde', '#1f2937', 'phone-off', 13, false, false),
+    ('Base Correios', '#a16207', 'truck', 14, false, false),
+    ('Frustrado', '#374151', 'x-circle', 15, false, true),
+    ('Cancelado', '#ea580c', 'ban', 16, false, true),
+    ('Pago', '#22c55e', 'check', 17, false, true),
+    ('Devolucao', '#f59e0b', 'undo-2', 18, false, true)
   ) as v(name, color, icon, position, is_default, is_system)
   loop
     if not exists (

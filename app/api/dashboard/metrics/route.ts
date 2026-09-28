@@ -84,6 +84,16 @@ export async function GET(request: Request) {
     /[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? v : `${v}-03:00`;
   const from = withSpOffset(fromRaw);
   const to = withSpOffset(toRaw);
+  const fromMs = new Date(from).getTime();
+  const toMs = new Date(to).getTime();
+  const inRange = (iso: string | null | undefined) => {
+    if (!iso) return false;
+    const ms = new Date(iso).getTime();
+    return ms >= fromMs && ms <= toMs;
+  };
+  // Dia-calendário de Brasília (UTC-3, sem horário de verão) de um ISO em UTC.
+  const spDay = (iso: string | null | undefined) =>
+    iso ? new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10) : "";
 
   try {
     // 1. Fetch ALL transactions in period
@@ -259,6 +269,10 @@ export async function GET(request: Request) {
       .gte("payment_date", from)
       .lte("payment_date", to);
 
+    // Respeita o filtro de modalidade, igual ao resto do painel.
+    if (modes.length > 0) {
+      paymentsQuery = paymentsQuery.in("sale_type", modes);
+    }
     if (productFilters.length > 0) {
       const orClauses = productFilters
         .flatMap((p) => [`product_id.eq.${p}`, `product_name.eq.${p}`])
@@ -354,28 +368,46 @@ export async function GET(request: Request) {
     const sumCommission = (arr: Tx[]) =>
       arr.reduce((s, t) => s + txCommission(t), 0);
 
+    // Quando cada venda "conta" no período:
+    //  - AfterPay: na DATA DO PEDIDO. A venda é tratada como realizada desde o
+    //    agendamento (o produto já saiu) e segue contando enquanto está a caminho,
+    //    entregue aguardando pagamento e depois de paga. Só sai se frustrar ou
+    //    for cancelada/devolvida.
+    //  - Antecipado / Recuperação: na DATA DO PAGAMENTO (o dinheiro já entrou).
+    // A consulta traz a união (pedido OU pagamento no período); aqui cada venda
+    // é filtrada pela data que vale para ela, para não contar em dois dias.
+    const soldInPeriod = (t: Tx) => inRange(t.sale_date || t.created_at);
+    const paidInPeriod = (t: Tx) =>
+      inRange(t.payment_date || t.sale_date || t.created_at);
+
+    const AFTERPAY_VIVA = new Set(["agendado", "aguardando", "pago"]);
+    const isAfterpayViva = (t: Tx) =>
+      t.sale_type === "afterpay" && AFTERPAY_VIVA.has(t.status || "");
+
     const pagas = workingList.filter((t) => t.status === "pago");
-    const agendadas = workingList.filter((t) => t.status === "agendado");
-    const aguardando = workingList.filter((t) => t.status === "aguardando");
+    // "Agendadas" = todas as vendas AfterPay do período que seguem valendo.
+    const agendadas = workingList.filter(
+      (t) => isAfterpayViva(t) && soldInPeriod(t)
+    );
+    // Em aberto = ainda não pagas (a caminho / entregues aguardando pagamento).
+    const afterpayEmAberto = agendadas.filter((t) => t.status !== "pago");
+    const afterpayACaminho = agendadas.filter((t) => t.status === "agendado");
+    const afterpayCobranca = agendadas.filter((t) => t.status === "aguardando");
+    const afterpayPagas = agendadas.filter((t) => t.status === "pago");
     const canceladas = workingList.filter((t) => t.status === "cancelado");
     const devolvidas = workingList.filter((t) => t.status === "devolvido");
     const frustradasOnly = workingList.filter((t) => t.status === "frustrado");
 
-    // Separar pagas por sale_type para cálculo correto por modo.
     // Antecipado e Recuperação = pagas no ato (dinheiro já entrou).
     const pagasAntecipadas = workingList.filter(
-      (t) => t.sale_type === "antecipado" && t.status === "pago"
+      (t) => t.sale_type === "antecipado" && t.status === "pago" && paidInPeriod(t)
     );
     const pagasRecuperacao = workingList.filter(
-      (t) => t.sale_type === "recuperacao" && t.status === "pago"
+      (t) => t.sale_type === "recuperacao" && t.status === "pago" && paidInPeriod(t)
     );
 
     // "Antecipadas" card = pagas antecipadas + pagas recuperação (tudo pago no ato)
-    const antecipadas = workingList.filter(
-      (t) =>
-        (t.sale_type === "antecipado" || t.sale_type === "recuperacao") &&
-        t.status === "pago"
-    );
+    const antecipadas = [...pagasAntecipadas, ...pagasRecuperacao];
 
     const valorPagasAntecipadas = sumValue(pagasAntecipadas);
     const valorPagasRecuperacao = sumValue(pagasRecuperacao);
@@ -397,8 +429,10 @@ export async function GET(request: Request) {
     );
 
     const comissaoReal = sumCommission(pagas);
-    const comissaoProjetada = sumCommission([...agendadas, ...aguardando]);
-    const valorReceber = valorAgendadas + sumValue(aguardando);
+    // A receber = AfterPay vendido e ainda não pago (a caminho + em cobrança).
+    // Pix/boleto antecipado só gerado não entra: não é venda feita.
+    const comissaoProjetada = sumCommission(afterpayEmAberto);
+    const valorReceber = sumValue(afterpayEmAberto);
 
     // INVESTMENT: manual (ad_investments) + automatico (Meta) no periodo.
     // DEDUPLICACAO: manuais de plataforma "meta_ads" em datas que ja possuem
@@ -428,7 +462,8 @@ export async function GET(request: Request) {
     // MODE-BASED CALCULATIONS
     // ============================================================
     // Cada modalidade contribui com sua parte na receita base:
-    //   Afterpay    → AGENDADAS (projeção futura — NÃO muda com Recuperação)
+    //   Afterpay    → vendas AfterPay do período (agendadas, entregues e pagas),
+    //                 contadas como se já recebidas — base do lucro estimado
     //   Antecipado  → PAGAS antecipadas (receita real)
     //   Recuperação → PAGAS recuperação (receita real, ADICIONA ao que já está)
     //
@@ -443,7 +478,7 @@ export async function GET(request: Request) {
     let quantidadeBase = 0;
 
     if (hasAfterPay) {
-      // Afterpay contribui com AGENDADAS (projeção)
+      // Afterpay contribui com todas as vendas AfterPay que seguem valendo
       receitaBase += valorAgendadas;
       quantidadeBase += agendadas.length;
     }
@@ -466,6 +501,8 @@ export async function GET(request: Request) {
     );
 
     const lucro = safeNumber(receitaBase - investimentoComImposto);
+    // Lucro realizado = o que de fato entrou (pagamentos no período) - investimento.
+    const lucroRealizado = safeNumber(valorEntradasCommission - investimentoComImposto);
 
     const cpa = safeNumber(
       quantidadeBase > 0 ? investimentoComImposto / quantidadeBase : 0
@@ -492,7 +529,7 @@ export async function GET(request: Request) {
         label: "Agendadas",
         value: valorAgendadas,
         formatted: formatCurrency(valorAgendadas),
-        tooltip: `${agendadas.length} vendas agendadas`,
+        tooltip: `${agendadas.length} venda${agendadas.length !== 1 ? "s" : ""} AfterPay: ${afterpayACaminho.length} a caminho, ${afterpayCobranca.length} entregue${afterpayCobranca.length !== 1 ? "s" : ""} aguardando pagamento, ${afterpayPagas.length} paga${afterpayPagas.length !== 1 ? "s" : ""}`,
         color: "neutral",
       },
       antecipadas: {
@@ -542,14 +579,14 @@ export async function GET(request: Request) {
         label: "Comissão Projetada",
         value: comissaoProjetada,
         formatted: formatCurrency(comissaoProjetada),
-        tooltip: "Comissão esperada (agendadas + aguardando)",
+        tooltip: "Comissão das vendas AfterPay ainda não pagas",
         color: "brand",
       },
       valorReceber: {
         label: "A Receber",
         value: valorReceber,
         formatted: formatCurrency(valorReceber),
-        tooltip: "Valor total a receber",
+        tooltip: `AfterPay em aberto: ${formatCurrency(sumValue(afterpayACaminho))} a caminho + ${formatCurrency(sumValue(afterpayCobranca))} entregue aguardando pagamento`,
         color: "brand",
       },
       investimento: {
@@ -574,11 +611,18 @@ export async function GET(request: Request) {
         color: "neutral",
       },
       lucro: {
-        label: "Lucro",
+        label: "Lucro Estimado",
         value: lucro,
         formatted: formatCurrency(lucro),
-        tooltip: `${formatCurrency(receitaBase)} - ${formatCurrency(investimentoComImposto)}`,
+        tooltip: `${formatCurrency(receitaBase)} - ${formatCurrency(investimentoComImposto)} (AfterPay conta como recebido)`,
         color: lucro >= 0 ? "success" : "danger",
+      },
+      lucroRealizado: {
+        label: "Lucro Realizado",
+        value: lucroRealizado,
+        formatted: formatCurrency(lucroRealizado),
+        tooltip: `${formatCurrency(valorEntradasCommission)} pagos no período - ${formatCurrency(investimentoComImposto)}`,
+        color: lucroRealizado >= 0 ? "success" : "danger",
       },
       taxaFrustracao: {
         label: "Taxa Frustração",
@@ -636,11 +680,16 @@ export async function GET(request: Request) {
 
     const dailyData: DailyData[] = days.map((day) => {
       const dayStr = format(day, "yyyy-MM-dd");
-      // Use sale_date if available, otherwise created_at
-      const dayTx = workingList.filter((t) => {
-        const dateToUse = t.sale_date || t.created_at;
-        return dateToUse && dateToUse.startsWith(dayStr);
-      });
+      // Dia do pedido e dia do pagamento no fuso de Brasília.
+      const dayTx = workingList.filter(
+        (t) => spDay(t.sale_date || t.created_at) === dayStr
+      );
+      const dayAgendadas = agendadas.filter(
+        (t) => spDay(t.sale_date || t.created_at) === dayStr
+      );
+      const dayAntecipadas = antecipadas.filter(
+        (t) => spDay(t.payment_date || t.sale_date || t.created_at) === dayStr
+      );
       const dayAds = adsList.filter((a) => a.date === dayStr);
       const dayMetaSpend = safeNumber(metaSpendByDay.get(dayStr) || 0);
       // Deduplicacao: manuais de meta_ads nao entram se ja ha automatico no dia
@@ -649,16 +698,20 @@ export async function GET(request: Request) {
         return s + safeNumber(a.investment_value);
       }, 0);
       const dayAdSpend = dayManualSpend + dayMetaSpend;
+      // Receita do dia pela mesma regra do Lucro Estimado.
+      const dayReceita =
+        (hasAfterPay ? sumValue(dayAgendadas) : 0) +
+        sumValue(
+          dayAntecipadas.filter((t) =>
+            t.sale_type === "antecipado" ? hasAntecipado : hasRecuperacao
+          )
+        );
 
       return {
         date: dayStr,
         label: format(day, "dd/MM"),
-        agendadas: dayTx.filter((t) => t.status === "agendado").length,
-        antecipadas: dayTx.filter(
-          (t) =>
-            (t.sale_type === "antecipado" || t.sale_type === "recuperacao") &&
-            (t.status === "agendado" || t.status === "pago")
-        ).length,
+        agendadas: dayAgendadas.length,
+        antecipadas: dayAntecipadas.length,
         pagas: dayTx.filter((t) => t.status === "pago").length,
         frustradas: dayTx.filter(
           (t) =>
@@ -666,7 +719,7 @@ export async function GET(request: Request) {
             t.status === "devolvido" ||
             t.status === "frustrado"
         ).length,
-        comissao: safeNumber(sumCommission(dayTx.filter((t) => t.status === "pago"))),
+        comissao: safeNumber(dayReceita),
         investimento: safeNumber(dayAdSpend + dayAdSpend * (safeTaxPercent / 100)),
       };
     });
