@@ -5,8 +5,11 @@ import { resolveKitUnits, type KitRow } from "./kit";
  * stock_movements — nunca altera transactions).
  *
  * - Venda paga  -> cria uma SAÍDA ('exit') com a quantidade de potes do kit.
+ * - AfterPay (paga na entrega) -> a SAÍDA acontece no AGENDAMENTO, porque o
+ *   produto sai do estoque para ser enviado antes de o cliente pagar.
  * - Devolução/cancelamento de uma venda que já teve saída -> cria uma ENTRADA
- *   ('entry') de devolução, restaurando o saldo.
+ *   ('entry') de devolução, restaurando o saldo. No AfterPay, venda frustrada
+ *   também devolve (a encomenda volta pela transportadora).
  *
  * Idempotente: no máximo 1 saída por transação (garantido também por índice
  * único parcial no banco) e no máximo 1 devolução por transação.
@@ -26,6 +29,7 @@ export interface StockTx {
   payment_date: string | null;
   sale_date: string | null;
   created_at?: string | null;
+  sale_type?: string | null;
 }
 
 const REVERSAL_STATUSES = new Set([
@@ -36,6 +40,21 @@ const REVERSAL_STATUSES = new Set([
   "chargeback",
   "reembolso",
 ]);
+
+/** A venda já tirou produto do estoque? */
+export function consomeEstoque(status: string | null, saleType?: string | null): boolean {
+  const s = (status || "").toLowerCase().trim();
+  if (s === "pago") return true;
+  // AfterPay: agendado (a caminho) e aguardando (entregue, em cobrança).
+  return saleType === "afterpay" && (s === "agendado" || s === "aguardando");
+}
+
+/** A venda devolve o produto ao estoque (se ele tinha saído)? */
+export function devolveEstoque(status: string | null, saleType?: string | null): boolean {
+  const s = (status || "").toLowerCase().trim();
+  if (REVERSAL_STATUSES.has(s)) return true;
+  return saleType === "afterpay" && s === "frustrado";
+}
 
 export async function fetchKits(supabase: SB, userId: string): Promise<KitRow[]> {
   const { data } = await supabase
@@ -55,11 +74,16 @@ export async function syncStockForTransaction(
   kits: KitRow[]
 ): Promise<"exit_created" | "return_created" | "noop"> {
   const status = (tx.status || "").toLowerCase().trim();
-  const when = tx.payment_date || tx.sale_date || tx.created_at || new Date().toISOString();
+  // AfterPay sai do estoque no dia do pedido; as demais, no dia do pagamento.
+  const when =
+    (tx.sale_type === "afterpay" ? tx.sale_date : tx.payment_date) ||
+    tx.sale_date ||
+    tx.created_at ||
+    new Date().toISOString();
   const label = `${tx.customer_name || "Cliente"} - ${tx.plan_name || tx.product_name || "Produto"}`;
 
-  // Caso 1: venda paga -> garantir SAÍDA
-  if (status === "pago") {
+  // Caso 1: venda paga (ou AfterPay agendado/entregue) -> garantir SAÍDA
+  if (consomeEstoque(status, tx.sale_type)) {
     const { data: existingExit } = await supabase
       .from("stock_movements")
       .select("id")
@@ -87,7 +111,7 @@ export async function syncStockForTransaction(
 
   // Caso 2: devolução/cancelamento -> se houve saída e ainda não há devolução,
   // cria ENTRADA de devolução restaurando o saldo.
-  if (REVERSAL_STATUSES.has(status)) {
+  if (devolveEstoque(status, tx.sale_type)) {
     const { data: exit } = await supabase
       .from("stock_movements")
       .select("id, quantity")
@@ -143,7 +167,7 @@ export async function syncStockForTransactionId(
     const { data: tx } = await supabase
       .from("transactions")
       .select(
-        "id, status, plan_name, product_name, customer_name, payment_date, sale_date, created_at"
+        "id, status, sale_type, plan_name, product_name, customer_name, payment_date, sale_date, created_at"
       )
       .eq("id", transactionId)
       .eq("user_id", userId)

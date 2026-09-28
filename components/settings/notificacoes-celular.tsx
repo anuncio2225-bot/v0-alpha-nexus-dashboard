@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
 import { BellRing, Smartphone } from "lucide-react";
-import { EVENTOS_PUSH, querReceber, type EventoPush, type PreferenciasPush } from "@/lib/push/eventos";
+import { PreferenciasNotificacao } from "./preferencias-notificacao";
 
 type Situacao =
   | "verificando"
@@ -74,8 +72,6 @@ async function assinar(registro: ServiceWorkerRegistration, chave: Uint8Array) {
   }
 }
 
-const GRUPOS = ["Pagamento", "Entrega", "Problemas"] as const;
-
 export function NotificacoesCelular() {
   const [situacao, setSituacao] = useState<Situacao>("verificando");
   const [aparelho, setAparelho] = useState<Aparelho>("computador");
@@ -85,7 +81,6 @@ export function NotificacoesCelular() {
   const [servicoDePush, setServicoDePush] = useState(false);
   const [diagnostico, setDiagnostico] = useState("");
   const [endpoint, setEndpoint] = useState<string | null>(null);
-  const [prefs, setPrefs] = useState<PreferenciasPush>({});
   const [recebidoEm, setRecebidoEm] = useState<string | null>(null);
 
   const carregarAparelho = useCallback(async (ep: string) => {
@@ -93,7 +88,6 @@ export function NotificacoesCelular() {
     if (!r.ok) return false;
     const d = await r.json();
     if (!d.registrado) return false;
-    setPrefs(d.preferencias || {});
     setRecebidoEm(d.ultimo_recebido_em || null);
     return true;
   }, []);
@@ -217,21 +211,6 @@ export function NotificacoesCelular() {
     }
   }
 
-  async function alternar(ev: EventoPush, valor: boolean) {
-    if (!endpoint) return;
-    const antes = prefs;
-    setPrefs({ ...prefs, [ev]: valor });
-    const r = await fetch("/api/push/preferencias", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint, preferencias: { [ev]: valor } }),
-    });
-    if (!r.ok) {
-      setPrefs(antes);
-      toast.error("Não deu para salvar. Tente de novo.");
-    }
-  }
-
   const rodape = diagnostico && (
     <p className="mt-3 break-all font-mono text-[11px] text-muted-foreground/70">{diagnostico}</p>
   );
@@ -323,35 +302,10 @@ export function NotificacoesCelular() {
           </div>
         )}
 
-        {situacao === "ligado" && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Escolha o que este aparelho recebe. Cada celular tem a sua escolha.
-            </p>
-            {GRUPOS.map((g) => (
-              <div key={g}>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{g}</p>
-                <div className="divide-y divide-border rounded-xl border border-border">
-                  {EVENTOS_PUSH.filter((e) => e.grupo === g).map((e) => (
-                    <label key={e.id} className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3">
-                      <span className="min-w-0">
-                        <span className="block text-sm text-foreground">
-                          {e.emoji} {e.titulo}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">{e.descricao}</span>
-                      </span>
-                      <Switch checked={querReceber(prefs, e.id)} onCheckedChange={(v) => alternar(e.id, v)} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {recebidoEm && (
-              <p className="text-xs text-muted-foreground">
-                Última notificação confirmada neste aparelho: {new Date(recebidoEm).toLocaleString("pt-BR")}
-              </p>
-            )}
-          </div>
+        {situacao === "ligado" && recebidoEm && (
+          <p className="text-xs text-muted-foreground">
+            Última notificação confirmada neste aparelho: {new Date(recebidoEm).toLocaleString("pt-BR")}
+          </p>
         )}
 
         {aparelho !== "computador" && !instalado && (
@@ -379,7 +333,13 @@ export function NotificacoesCelular() {
           Venda aprovada, Pix e boleto gerados, entrega e cobrança — direto na tela do celular
         </CardDescription>
       </CardHeader>
-      <CardContent>{conteudo}</CardContent>
+      <CardContent className="space-y-6">
+        <section>
+          <p className="mb-3 text-sm font-medium text-foreground">Este aparelho</p>
+          {conteudo}
+        </section>
+        <PreferenciasNotificacao />
+      </CardContent>
     </Card>
   );
 }

@@ -337,6 +337,22 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               ))}
             </div>
 
+            {data.afterpay_pendente && data.afterpay_pendente.vendas > 0 && (
+              <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">
+                  AfterPay a liberar
+                  <span className="block text-xs">
+                    {data.afterpay_pendente.vendas} venda
+                    {data.afterpay_pendente.vendas !== 1 ? "s" : ""} a caminho ou em cobrança — entra
+                    no total quando o cliente pagar
+                  </span>
+                </span>
+                <span className="shrink-0 font-medium text-foreground">
+                  <SensitiveValue>{formatCurrency(data.afterpay_pendente.comissao)}</SensitiveValue>
+                </span>
+              </div>
+            )}
+
             <Separator />
 
             {/* Total */}

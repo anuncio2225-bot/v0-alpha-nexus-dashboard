@@ -36,7 +36,7 @@ function prepararVapid(): boolean {
 }
 
 export interface Aviso {
-  evento: EventoPush | "teste";
+  evento: EventoPush | "teste" | "relatorio";
   titulo: string;
   corpo: string;
   url?: string;
@@ -54,12 +54,14 @@ export interface ResultadoEnvio {
 
 /**
  * Manda o aviso para todos os aparelhos da conta que querem esse evento.
- * `somenteEndpoint` restringe a um aparelho (botão de teste).
+ * `somenteEndpoint` restringe a um aparelho (botão de teste);
+ * `somenteMembros` restringe a algumas pessoas (relatório diário).
  */
 export async function enviarAviso(
   ownerId: string,
   aviso: Aviso,
-  somenteEndpoint?: string
+  somenteEndpoint?: string,
+  somenteMembros?: string[]
 ): Promise<ResultadoEnvio> {
   if (!prepararVapid()) {
     return { enviados: 0, removidos: 0, tentados: 0, ignorado: "servidor sem chaves de push" };
@@ -68,9 +70,10 @@ export async function enviarAviso(
 
   let q = admin
     .from("push_subscriptions")
-    .select("id, member_id, endpoint, p256dh, auth, preferencias")
+    .select("id, member_id, endpoint, p256dh, auth")
     .eq("owner_id", ownerId);
   if (somenteEndpoint) q = q.eq("endpoint", somenteEndpoint);
+  if (somenteMembros) q = q.in("member_id", somenteMembros);
   const { data: inscricoes } = await q;
   if (!inscricoes?.length) return { enviados: 0, removidos: 0, tentados: 0, ignorado: "nenhum aparelho" };
 
@@ -89,10 +92,22 @@ export async function enviarAviso(
     }
   }
 
+  // Escolhas de cada pessoa + se o dono libera notificações para ela.
+  const { data: prefsRaw } = await admin
+    .from("push_preferencias")
+    .select("member_id, preferencias, permitido")
+    .eq("owner_id", ownerId);
+  const prefsDe = new Map((prefsRaw || []).map((p) => [p.member_id as string, p]));
+
+  const ehEvento = aviso.evento !== "teste" && aviso.evento !== "relatorio";
   const alvos = inscricoes.filter((i) => {
-    if (aviso.evento !== "teste" && !querReceber(i.preferencias, aviso.evento)) return false;
+    const p = prefsDe.get(i.member_id);
+    // O dono sempre recebe; membro só se o dono permitir.
+    if (i.member_id !== ownerId && p && p.permitido === false && aviso.evento !== "teste")
+      return false;
+    if (ehEvento && !querReceber(p?.preferencias, aviso.evento as EventoPush)) return false;
     const src = srcDoMembro.get(i.member_id);
-    if (src && aviso.evento !== "teste") {
+    if (src && ehEvento) {
       return (aviso.src || "").trim().toLowerCase() === src;
     }
     return true;
