@@ -4,7 +4,9 @@ import type { MetadataRoute } from "next";
 // para receber notificação, e o que faz o aviso chegar melhor no Android.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AlphaNexus Dashboard",
+    // Mesmo nome curto nos dois campos: o iPhone mostra os dois na notificação
+    // ("AlphaNexus" + "de AlphaNexus Dashboard"), e repetido fica comprido.
+    name: "AlphaNexus",
     short_name: "AlphaNexus",
     description: "Vendas, entregas e cobrança da sua operação",
     lang: "pt-BR",

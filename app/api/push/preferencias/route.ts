@@ -36,14 +36,21 @@ export async function GET(request: NextRequest) {
           .from("push_subscriptions")
           .select("ultimo_recebido_em")
           .eq("endpoint", endpoint)
+          .eq("owner_id", s.ownerId)
           .eq("member_id", s.userId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
   const souDono = s.ownerId === s.userId;
+  const { data: conta } = await admin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", s.ownerId)
+    .maybeSingle();
   return NextResponse.json({
     souDono,
+    conta: conta?.email || null,
     registrado: !!aparelho,
     ultimo_recebido_em: aparelho?.ultimo_recebido_em ?? null,
     preferencias: pref?.preferencias || {},
