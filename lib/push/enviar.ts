@@ -43,6 +43,10 @@ export interface Aviso {
   tag?: string;
   /** Membro da equipe limitado a um atendente só recebe as vendas dele. */
   src?: string | null;
+  /** Mesmo texto sem o nome do produto (para quem escolheu esconder). */
+  corpoSemProduto?: string;
+  /** Identificador para o registro de envios (ex.: código da venda). */
+  referencia?: string;
 }
 
 export interface ResultadoEnvio {
@@ -75,7 +79,8 @@ export async function enviarAviso(
   if (somenteEndpoint) q = q.eq("endpoint", somenteEndpoint);
   if (somenteMembros) q = q.in("member_id", somenteMembros);
   const { data: inscricoes } = await q;
-  if (!inscricoes?.length) return { enviados: 0, removidos: 0, tentados: 0, ignorado: "nenhum aparelho" };
+  if (!inscricoes?.length)
+    return registrar(ownerId, aviso, { enviados: 0, removidos: 0, tentados: 0, ignorado: "nenhum aparelho" });
 
   // Membros limitados a um atendente (SRC) só recebem o que é deles.
   const membros = [...new Set(inscricoes.map((i) => i.member_id).filter((m) => m !== ownerId))];
@@ -95,7 +100,7 @@ export async function enviarAviso(
   // Escolhas de cada pessoa + se o dono libera notificações para ela.
   const { data: prefsRaw } = await admin
     .from("push_preferencias")
-    .select("member_id, preferencias, permitido")
+    .select("member_id, preferencias, permitido, mostrar_produto")
     .eq("owner_id", ownerId);
   const prefsDe = new Map((prefsRaw || []).map((p) => [p.member_id as string, p]));
 
@@ -112,16 +117,19 @@ export async function enviarAviso(
     }
     return true;
   });
-  if (!alvos.length) return { enviados: 0, removidos: 0, tentados: 0, ignorado: "ninguém quer este aviso" };
+  if (!alvos.length)
+    return registrar(ownerId, aviso, { enviados: 0, removidos: 0, tentados: 0, ignorado: "ninguém quer este aviso" });
 
-  const carga = JSON.stringify({
-    tipo: aviso.evento,
-    titulo: aviso.titulo,
-    corpo: aviso.corpo,
-    url: aviso.url || "/dashboard",
-    tag: aviso.tag,
-    hora: new Date().toISOString(),
-  });
+  const hora = new Date().toISOString();
+  const cargaDe = (semProduto: boolean) =>
+    JSON.stringify({
+      tipo: aviso.evento,
+      titulo: aviso.titulo,
+      corpo: semProduto && aviso.corpoSemProduto !== undefined ? aviso.corpoSemProduto : aviso.corpo,
+      url: aviso.url || "/dashboard",
+      tag: aviso.tag,
+      hora,
+    });
 
   let enviados = 0;
   const mortas: string[] = [];
@@ -129,9 +137,10 @@ export async function enviarAviso(
   await Promise.all(
     alvos.map(async (i) => {
       try {
+        const semProduto = prefsDe.get(i.member_id)?.mostrar_produto === false;
         await webpush.sendNotification(
           { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } },
-          carga,
+          cargaDe(semProduto),
           { TTL: 3600, urgency: aviso.evento === "pagamento_aprovado" ? "high" : "normal" }
         );
         enviados++;
@@ -152,7 +161,30 @@ export async function enviarAviso(
       .update({ ultimo_sucesso_em: new Date().toISOString() })
       .in("id", aceitas);
 
-  return { enviados, removidos: mortas.length, tentados: alvos.length };
+  return registrar(ownerId, aviso, {
+    enviados,
+    removidos: mortas.length,
+    tentados: alvos.length,
+    ignorado: enviados === 0 ? "serviço de push recusou" : undefined,
+  });
+}
+
+/** Guarda o resultado do envio (push_envios). Nunca atrapalha o envio. */
+async function registrar(ownerId: string, aviso: Aviso, r: ResultadoEnvio): Promise<ResultadoEnvio> {
+  try {
+    await createAdminClient().from("push_envios").insert({
+      owner_id: ownerId,
+      evento: aviso.evento,
+      titulo: aviso.titulo,
+      referencia: aviso.referencia || null,
+      enviados: r.enviados,
+      tentados: r.tentados,
+      ignorado: r.ignorado || null,
+    });
+  } catch {
+    // registro é só diagnóstico
+  }
+  return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,10 +194,12 @@ export async function enviarAviso(
 export interface EstadoVenda {
   status: string | null;
   shipping_status: string | null;
+  tracking_code?: string | null;
 }
 
 export interface VendaParaAviso {
   id?: string;
+  external_id?: string | null;
   status: string;
   sale_type?: string | null;
   payment_method?: string | null;
@@ -214,6 +248,9 @@ export function eventoDaMudanca(
   if (s1 === "agendado" || s1 === "aguardando") {
     const e0 = trackingStage(antes?.shipping_status);
     const e1 = trackingStage(depois.shipping_status);
+    // Código de rastreio novo. O Pag2Pay manda o evento "codigoRastreio" com
+    // o código e SEM status de entrega — antes disso não virava aviso.
+    if (!e1 && depois.tracking_code && !antes?.tracking_code) return "pedido_enviado";
     if (e1 && e1 !== e0) {
       switch (e1) {
         case "postado":
@@ -250,7 +287,9 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     boleto_gerado: `${info.emoji} Boleto gerado · ${valor}`,
     venda_agendada: `${info.emoji} Venda agendada · ${valor}`,
     cobranca_aberta: `${info.emoji} Entregue — cobrar ${valor}`,
-    pedido_enviado: `${info.emoji} Pedido a caminho`,
+    pedido_enviado: trackingStage(v.shipping_status)
+      ? `${info.emoji} Pedido a caminho`
+      : `${info.emoji} Código de rastreio gerado`,
     saiu_para_entrega: `${info.emoji} Saiu para entrega`,
     aguardando_retirada: `${info.emoji} Aguardando retirada`,
     pedido_entregue: `${info.emoji} Pedido entregue`,
@@ -263,15 +302,19 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
   const partes = [cliente, produto].filter(Boolean).join(" — ");
   const rastreio = v.tracking_code ? ` · ${v.tracking_code}` : "";
   const entrega = ["pedido_enviado", "saiu_para_entrega", "aguardando_retirada", "pedido_entregue", "falha_entrega"].includes(ev);
+  const final = entrega ? rastreio : afiliado;
 
   return {
     evento: ev,
     titulo: titulos[ev],
-    corpo: `${partes}${entrega ? rastreio : afiliado}`,
+    corpo: `${partes}${final}`,
+    corpoSemProduto: `${cliente}${final}`,
+    referencia: v.external_id || v.id,
     url: ev === "cobranca_aberta" || entrega || ev === "falha_entrega" ? "/dashboard/collections" : "/dashboard",
-    // Cada venda tem a sua tag: o aviso novo da MESMA venda substitui o
-    // anterior (a caminho → saiu → entregue), sem empilhar na tela.
-    tag: v.id ? `venda-${v.id}` : undefined,
+    // Uma tag por venda E por tipo de aviso: cada etapa fica na tela. Com a
+    // tag só da venda, o "código de rastreio" apagava o "venda agendada" do
+    // mesmo pedido e parecia que o aviso nunca tinha chegado.
+    tag: v.id ? `venda-${v.id}-${ev}` : undefined,
     src: v.src,
   };
 }
