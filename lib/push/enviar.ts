@@ -311,9 +311,10 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     corpoSemProduto: `${cliente}${final}`,
     referencia: v.external_id || v.id,
     url: ev === "cobranca_aberta" || entrega || ev === "falha_entrega" ? "/dashboard/collections" : "/dashboard",
-    // Cada venda tem a sua tag: o aviso novo da MESMA venda substitui o
-    // anterior (a caminho → saiu → entregue), sem empilhar na tela.
-    tag: v.id ? `venda-${v.id}` : undefined,
+    // Uma tag por venda E por tipo de aviso: cada etapa fica na tela. Com a
+    // tag só da venda, o "código de rastreio" apagava o "venda agendada" do
+    // mesmo pedido e parecia que o aviso nunca tinha chegado.
+    tag: v.id ? `venda-${v.id}-${ev}` : undefined,
     src: v.src,
   };
 }
