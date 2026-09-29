@@ -458,6 +458,7 @@ export async function processWebhook(
         estadoAnterior = {
           status: prev.status ?? null,
           shipping_status: prev.shipping_status ?? null,
+          tracking_code: prev.tracking_code ?? null,
         };
         for (const k of [
           "tracking_code",
@@ -621,6 +622,7 @@ export async function processWebhook(
     try {
       const vendaAviso = {
         id: upserted?.id as string | undefined,
+        external_id: event.external_id,
         status: tx.status as string,
         sale_type: tx.sale_type as string,
         payment_method: event.payment_method || null,

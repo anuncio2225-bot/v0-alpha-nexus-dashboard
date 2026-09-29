@@ -18,6 +18,7 @@ interface Preferencias {
   souDono: boolean;
   permitido: boolean;
   preferencias: PreferenciasPush;
+  mostrar_produto: boolean;
   relatorio: { ativo: boolean; hora: number };
 }
 
@@ -44,10 +45,17 @@ export function PreferenciasNotificacao() {
     fetcher
   );
 
-  async function salvar(corpo: Partial<{ preferencias: PreferenciasPush; relatorio: Partial<Preferencias["relatorio"]> }>) {
+  async function salvar(
+    corpo: Partial<{
+      preferencias: PreferenciasPush;
+      relatorio: Partial<Preferencias["relatorio"]>;
+      mostrar_produto: boolean;
+    }>
+  ) {
     if (!data) return;
     const otimista: Preferencias = {
       ...data,
+      mostrar_produto: corpo.mostrar_produto ?? data.mostrar_produto,
       preferencias: { ...data.preferencias, ...(corpo.preferencias || {}) },
       relatorio: { ...data.relatorio, ...(corpo.relatorio || {}) },
     };
@@ -99,6 +107,18 @@ export function PreferenciasNotificacao() {
             O dono da conta desligou as notificações para você. Suas escolhas ficam guardadas para quando ele liberar.
           </p>
         )}
+        <label className="mb-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+          <span className="min-w-0">
+            <span className="block text-sm text-foreground">Mostrar o nome do produto</span>
+            <span className="block text-xs text-muted-foreground">
+              Desligado, a notificação mostra só o cliente e o valor — bom para a tela de bloqueio.
+            </span>
+          </span>
+          <Switch
+            checked={data.mostrar_produto !== false}
+            onCheckedChange={(v) => salvar({ mostrar_produto: v })}
+          />
+        </label>
         <div className="space-y-4">
           {GRUPOS.map((g) => (
             <div key={g}>

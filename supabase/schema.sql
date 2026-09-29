@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-09-28 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-09-29 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (25):
+-- Migrações registradas no banco (26):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -33,6 +33,7 @@
 --   20260928135800  cron_relatorio_diario
 --   20260928144640  push_aparelho_varias_contas
 --   20260928195032  custos_por_periodo
+--   20260929022010  push_produto_e_registro
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -461,6 +462,19 @@ create table public.profit_partners (
   constraint profit_partners_pkey PRIMARY KEY (id)
 );
 
+create table public.push_envios (
+  id uuid default gen_random_uuid() not null,
+  owner_id uuid not null,
+  evento text not null,
+  titulo text,
+  referencia text,
+  enviados integer default 0 not null,
+  tentados integer default 0 not null,
+  ignorado text,
+  created_at timestamp with time zone default now() not null,
+  constraint push_envios_pkey PRIMARY KEY (id)
+);
+
 create table public.push_preferencias (
   owner_id uuid not null,
   member_id uuid not null,
@@ -470,6 +484,7 @@ create table public.push_preferencias (
   relatorio_hora smallint default 21 not null,
   relatorio_enviado_em date,
   updated_at timestamp with time zone default now() not null,
+  mostrar_produto boolean default true not null,
   constraint push_preferencias_relatorio_hora_check CHECK (((relatorio_hora >= 0) AND (relatorio_hora <= 23))),
   constraint push_preferencias_pkey PRIMARY KEY (owner_id, member_id)
 );
@@ -776,6 +791,7 @@ CREATE INDEX idx_monthly_tax_config_user_year ON public.monthly_tax_config USING
 CREATE INDEX idx_product_costs_user ON public.product_costs USING btree (user_id);
 CREATE UNIQUE INDEX idx_profiles_webhook_token ON public.profiles USING btree (webhook_token);
 CREATE INDEX idx_profit_partners_user ON public.profit_partners USING btree (user_id);
+CREATE INDEX push_envios_owner_idx ON public.push_envios USING btree (owner_id, created_at DESC);
 CREATE INDEX push_subscriptions_endpoint_idx ON public.push_subscriptions USING btree (endpoint);
 CREATE INDEX push_subscriptions_owner_idx ON public.push_subscriptions USING btree (owner_id);
 CREATE INDEX idx_sales_sale_date ON public.sales USING btree (sale_date DESC);
@@ -1086,6 +1102,7 @@ alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
 alter table public.profit_config_versoes enable row level security;
 alter table public.profit_partners enable row level security;
+alter table public.push_envios enable row level security;
 alter table public.push_preferencias enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.sales enable row level security;

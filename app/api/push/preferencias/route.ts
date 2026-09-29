@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const [{ data: pref }, { data: aparelho }] = await Promise.all([
     admin
       .from("push_preferencias")
-      .select("preferencias, permitido, relatorio_ativo, relatorio_hora")
+      .select("preferencias, permitido, relatorio_ativo, relatorio_hora, mostrar_produto")
       .eq("owner_id", s.ownerId)
       .eq("member_id", s.userId)
       .maybeSingle(),
@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     preferencias: pref?.preferencias || {},
     // O dono sempre recebe; membro depende da liberação do dono.
     permitido: souDono ? true : pref?.permitido ?? true,
+    mostrar_produto: pref?.mostrar_produto ?? true,
     relatorio: {
       ativo: pref?.relatorio_ativo ?? true,
       hora: pref?.relatorio_hora ?? 21,
@@ -69,6 +70,7 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     preferencias?: PreferenciasPush;
     relatorio?: { ativo?: boolean; hora?: number };
+    mostrar_produto?: boolean;
   };
   const admin = createAdminClient();
 
@@ -93,6 +95,7 @@ export async function PATCH(request: NextRequest) {
     updated_at: new Date().toISOString(),
   };
   if (typeof body.relatorio?.ativo === "boolean") linha.relatorio_ativo = body.relatorio.ativo;
+  if (typeof body.mostrar_produto === "boolean") linha.mostrar_produto = body.mostrar_produto;
   if (Number.isInteger(body.relatorio?.hora) && body.relatorio!.hora! >= 0 && body.relatorio!.hora! <= 23)
     linha.relatorio_hora = body.relatorio!.hora;
 
