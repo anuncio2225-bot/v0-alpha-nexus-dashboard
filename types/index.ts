@@ -727,6 +727,11 @@ export interface CollectionCalendarEmail {
 }
 
 export interface CollectionMetrics {
+  /** Pedidos e valor por etapa da entrega (agendado → pago). */
+  funil?: Record<
+    "agendado" | "transito" | "agencia" | "cobranca" | "pago" | "frustrado",
+    { count: number; value: number }
+  >;
   total_due_today: number;
   received_today: number;
   scheduled_today: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -43,6 +43,29 @@ export function CollectionsKanban({
 
   const ordered = [...statuses].sort((a, b) => a.position - b.position);
 
+  // Barra de rolagem lateral também no TOPO (fixa ao descer a página): com
+  // muitos clientes, a barra nativa fica lá no fim da coluna mais comprida.
+  const quadroRef = useRef<HTMLDivElement>(null);
+  const barraRef = useRef<HTMLDivElement>(null);
+  const [larguraTotal, setLarguraTotal] = useState(0);
+  useEffect(() => {
+    const quadro = quadroRef.current;
+    if (!quadro) return;
+    const medir = () => setLarguraTotal(quadro.scrollWidth);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(quadro);
+    for (const filho of Array.from(quadro.children)) ro.observe(filho);
+    return () => ro.disconnect();
+  }, [statuses.length, clients.length]);
+  const sincronizando = useRef(false);
+  function espelhar(origem: HTMLDivElement | null, destino: HTMLDivElement | null) {
+    if (!origem || !destino || sincronizando.current) return;
+    sincronizando.current = true;
+    destino.scrollLeft = origem.scrollLeft;
+    requestAnimationFrame(() => (sincronizando.current = false));
+  }
+
   // Sensor da reordenacao de COLUNAS (dnd-kit). A alca tem um pequeno limiar
   // para nao conflitar com cliques.
   const sensors = useSensors(
@@ -69,7 +92,19 @@ export function CollectionsKanban({
         items={ordered.map((s) => s.id)}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div
+          ref={barraRef}
+          onScroll={() => espelhar(barraRef.current, quadroRef.current)}
+          className="sticky top-0 z-20 mb-2 overflow-x-auto rounded-md bg-background/90 backdrop-blur"
+          aria-hidden
+        >
+          <div style={{ width: larguraTotal, height: 12 }} />
+        </div>
+        <div
+          ref={quadroRef}
+          onScroll={() => espelhar(quadroRef.current, barraRef.current)}
+          className="flex gap-3 overflow-x-auto pb-4"
+        >
           {ordered.map((status) => {
             const colClients = clients.filter((c) => c.status_id === status.id);
             const colTotal = colClients.reduce(

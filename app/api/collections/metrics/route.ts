@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   let clientsQuery = supabase
     .from("collection_clients")
     .select(
-      "id, status_name, braip_status, attendant_name, product_name, total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
+      "id, status_name, braip_status, attendant_name, product_name, total_value, order_total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
     .eq("user_id", scope.ownerId);
 
@@ -139,6 +139,38 @@ export async function GET(request: Request) {
     0
   );
 
+  // Funil da entrega (igual ao quadro do Pag2Pay): quantos pedidos e quanto
+  // vale cada etapa, pelo valor cheio do pedido.
+  const ETAPA: Record<string, string> = {
+    agendado: "agendado",
+    postado: "transito",
+    "em trânsito": "transito",
+    "saiu para entrega": "transito",
+    "aguardando retirada": "agencia",
+    entregue: "cobranca",
+    "aguardando pagamento": "cobranca",
+    "pagamento pendente": "cobranca",
+    pago: "pago",
+    frustrado: "frustrado",
+    cancelado: "frustrado",
+    devolucao: "frustrado",
+    "falha na entrega": "frustrado",
+  };
+  const funil: Record<string, { count: number; value: number }> = {
+    agendado: { count: 0, value: 0 },
+    transito: { count: 0, value: 0 },
+    agencia: { count: 0, value: 0 },
+    cobranca: { count: 0, value: 0 },
+    pago: { count: 0, value: 0 },
+    frustrado: { count: 0, value: 0 },
+  };
+  for (const c of list) {
+    const etapa = ETAPA[(c.status_name || "").toLowerCase()];
+    if (!etapa) continue;
+    funil[etapa].count += 1;
+    funil[etapa].value += Number(c.order_total_value) || Number(c.total_value) || 0;
+  }
+
   // Agrupamentos
   const byStatus: Record<string, { count: number; value: number }> = {};
   const byAttendant: Record<string, { count: number; pending: number; received: number }> =
@@ -187,6 +219,7 @@ export async function GET(request: Request) {
       by_product: byProduct,
       attendant_status: attendantStatus,
       status_names: Array.from(statusNames),
+      funil,
     },
   });
 }

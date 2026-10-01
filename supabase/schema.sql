@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-09-29 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-01 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (26):
+-- Migrações registradas no banco (27):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -34,6 +34,7 @@
 --   20260928144640  push_aparelho_varias_contas
 --   20260928195032  custos_por_periodo
 --   20260929022010  push_produto_e_registro
+--   20261001141139  rastreio_consultado_em
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -652,6 +653,7 @@ create table public.transactions (
   product_price numeric,
   origin_type text default 'own'::text,
   affiliate_name text,
+  tracking_checked_at timestamp with time zone,
   constraint transactions_pkey PRIMARY KEY (id),
   constraint transactions_user_gateway_external_unique UNIQUE (user_id, gateway, external_id)
 );
@@ -815,6 +817,7 @@ CREATE INDEX idx_transactions_status ON public.transactions USING btree (status)
 CREATE INDEX idx_transactions_transaction_code ON public.transactions USING btree (transaction_code);
 CREATE INDEX idx_transactions_user_id ON public.transactions USING btree (user_id);
 CREATE INDEX idx_transactions_webhook ON public.transactions USING btree (webhook_id);
+CREATE INDEX transactions_rastreio_fila_idx ON public.transactions USING btree (tracking_checked_at NULLS FIRST) WHERE ((tracking_code IS NOT NULL) AND (status = ANY (ARRAY['agendado'::text, 'aguardando'::text])));
 CREATE INDEX idx_webhook_errors_created ON public.webhook_errors USING btree (created_at DESC);
 CREATE INDEX idx_webhook_errors_user ON public.webhook_errors USING btree (user_id);
 CREATE INDEX idx_webhook_errors_webhook ON public.webhook_errors USING btree (webhook_id);
