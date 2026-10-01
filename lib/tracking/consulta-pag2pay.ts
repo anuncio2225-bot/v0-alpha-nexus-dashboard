@@ -56,7 +56,13 @@ export async function atualizarRastreiosPag2Pay(limite = 35, prazoMs = 50_000): 
     .select("*")
     .eq("gateway", "pag2pay")
     .not("tracking_code", "is", null)
-    .in("status", ["agendado", "aguardando"])
+    // AfterPay em andamento e também vendas PAGAS recentes (antecipado:
+    // pagou antes, mas a entrega ainda precisa ser acompanhada).
+    .or(
+      `status.in.(agendado,aguardando),and(status.eq.pago,sale_date.gte.${new Date(
+        Date.now() - 30 * 86400_000
+      ).toISOString()})`
+    )
     .order("tracking_checked_at", { ascending: true, nullsFirst: true })
     .limit(limite);
 
@@ -95,8 +101,11 @@ export async function atualizarRastreiosPag2Pay(limite = 35, prazoMs = 50_000): 
 
     // Devolvido/frustrado/cancelado antes de pagar = venda perdida (mesma regra do webhook).
     let status = tx.status as string;
-    if (estagio === "devolvido" || estagio === "frustrado") status = "frustrado";
-    else if (estagio === "cancelado") status = "cancelado";
+    // (Venda já paga não é revertida pelo rastreio.)
+    if (status !== "pago") {
+      if (estagio === "devolvido" || estagio === "frustrado") status = "frustrado";
+      else if (estagio === "cancelado") status = "cancelado";
+    }
 
     const atualizado = {
       ...tx,

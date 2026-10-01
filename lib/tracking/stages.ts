@@ -58,6 +58,8 @@ function plain(s: string): string {
 // Casamento exato com o vocabulário do Pag2Pay (sem acento, minúsculo).
 const EXACT: Record<string, TrackingStage> = {
   "em analise": "preparando",
+  "aguardando codigo": "preparando",
+  "aguardando envio": "preparando",
   "em producao": "preparando",
   "pronto para envio": "preparando",
   "etiqueta emitida": "preparando",

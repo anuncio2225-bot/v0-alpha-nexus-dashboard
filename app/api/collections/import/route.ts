@@ -28,7 +28,7 @@ export async function POST() {
   const { data: txs, error: txErr } = await fetchAll(supabase
     .from("transactions")
     .select(
-      "id, transaction_code, customer_name, customer_phone, customer_email, customer_doc, product_name, product_id, plan_name, commission, affiliate_commission, total_value, amount, gateway, src, attendant_id, status, status_code, original_status, sale_date, payment_date, created_at, tracking_code, tracking_url, shipping_status, shipping_company, address_full, payment_method, payment_link"
+      "id, transaction_code, sale_type, customer_name, customer_phone, customer_email, customer_doc, product_name, product_id, plan_name, commission, affiliate_commission, total_value, amount, gateway, src, attendant_id, status, status_code, original_status, sale_date, payment_date, created_at, tracking_code, tracking_url, shipping_status, shipping_company, address_full, payment_method, payment_link"
     )
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
     // Vendas de afiliados externos não entram na Cobrança.

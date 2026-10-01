@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
+import { deliveryStatusLabel } from "@/lib/collections/whatsapp";
 import type { CollectionClient, CollectionStatus } from "@/types";
 import { CalendarClock, GripVertical } from "lucide-react";
 
@@ -145,6 +146,7 @@ export function CollectionsKanban({
                         {c.product_name}
                       </p>
                     )}
+                    <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-sm font-semibold text-brand">
                         <SensitiveValue>
@@ -264,6 +266,36 @@ function SortableColumn({
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * AfterPay e antecipado rodam no mesmo quadro: a etiqueta diz a modalidade, e
+ * a entrega aparece em todo card que tem rastreio — inclusive nos já pagos.
+ */
+const MODALIDADE: Record<string, { texto: string; classe: string }> = {
+  afterpay: { texto: "AfterPay", classe: "border-sky-500/40 bg-sky-500/10 text-sky-500" },
+  antecipado: { texto: "Antecipado", classe: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500" },
+  recuperacao: { texto: "Recuperação", classe: "border-amber-500/40 bg-amber-500/10 text-amber-500" },
+};
+
+function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entrega?: string | null }) {
+  const m = saleType ? MODALIDADE[saleType] : null;
+  const e = deliveryStatusLabel(entrega);
+  if (!m && !e) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {m && (
+        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", m.classe)}>
+          {m.texto}
+        </span>
+      )}
+      {e && (
+        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+          {e}
+        </span>
+      )}
     </div>
   );
 }

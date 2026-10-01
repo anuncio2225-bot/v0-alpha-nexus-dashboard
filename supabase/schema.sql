@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (27):
+-- Migrações registradas no banco (29):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -35,6 +35,8 @@
 --   20260928195032  custos_por_periodo
 --   20260929022010  push_produto_e_registro
 --   20261001141139  rastreio_consultado_em
+--   20261001141513  cron_rastreio_pag2pay
+--   20261001141633  crm_modalidade
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -230,6 +232,7 @@ create table public.collection_clients (
   order_total_value numeric,
   payment_date timestamp with time zone,
   transaction_code text,
+  sale_type text,
   constraint collection_clients_pkey PRIMARY KEY (id)
 );
 
