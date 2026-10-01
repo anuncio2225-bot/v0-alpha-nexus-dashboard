@@ -135,18 +135,18 @@ export function CollectionsKanban({
                     draggable
                     onDragStart={() => setDragId(c.id)}
                     onClick={() => onCardClick(c)}
-                    className="cursor-pointer gap-0 border-border bg-card px-3 py-2 transition-colors hover:border-brand/50"
+                    className="cursor-pointer gap-0 border-border bg-card px-3 py-2.5 transition-colors hover:border-brand/50"
                   >
                     <p className="truncate text-sm font-medium leading-tight text-foreground">
                       {c.name}
                     </p>
                     {c.product_name && (
-                      <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                      <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">
                         {c.product_name}
                       </p>
                     )}
                     {/* Etiquetas e valor na mesma linha: card mais baixo */}
-                    <div className="mt-1 flex items-center justify-between gap-2">
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
                       {(() => {
                         const v = valorDoCard(c);

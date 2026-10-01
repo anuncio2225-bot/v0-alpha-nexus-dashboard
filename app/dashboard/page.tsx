@@ -315,14 +315,14 @@ export default function DashboardPage() {
           }
           icon={CheckCircle}
           loading={isLoading}
-          itemClassName="lg:col-span-3 xl:col-span-1"
+          itemClassName="col-span-2 sm:col-span-1 lg:col-span-3 xl:col-span-1"
           trend={dailyData.map((d) => d.pagas)}
         />
         <KpiCard
           data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), subtitle: periodo, color: "info" as const }}
           icon={Calendar}
           loading={isLoading}
-          itemClassName="lg:col-span-3 xl:col-span-1"
+          itemClassName="col-span-2 sm:col-span-1 lg:col-span-3 xl:col-span-1"
           trend={dailyData.map((d) => d.agendadas)}
         />
         <KpiCard
