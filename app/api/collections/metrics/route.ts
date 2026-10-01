@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   let clientsQuery = supabase
     .from("collection_clients")
     .select(
-      "id, status_name, braip_status, attendant_name, product_name, total_value, order_total_value, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
+      "id, status_name, braip_status, attendant_name, product_name, total_value, order_total_value, sale_type, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
     )
     .eq("user_id", scope.ownerId);
 
@@ -161,12 +161,18 @@ export async function GET(request: Request) {
     transito: { count: 0, value: 0 },
     agencia: { count: 0, value: 0 },
     cobranca: { count: 0, value: 0 },
+    pix_boleto: { count: 0, value: 0 },
     pago: { count: 0, value: 0 },
     frustrado: { count: 0, value: 0 },
+    nao_pago: { count: 0, value: 0 },
   };
   for (const c of list) {
-    const etapa = ETAPA[(c.status_name || "").toLowerCase()];
+    let etapa = ETAPA[(c.status_name || "").toLowerCase()];
     if (!etapa) continue;
+    // AfterPay x antecipado: aguardando e perdido querem dizer coisas diferentes.
+    const afterpay = c.sale_type === "afterpay";
+    if (etapa === "cobranca" && !afterpay) etapa = "pix_boleto";
+    if (etapa === "frustrado" && !afterpay) etapa = "nao_pago";
     funil[etapa].count += 1;
     funil[etapa].value += Number(c.order_total_value) || Number(c.total_value) || 0;
   }

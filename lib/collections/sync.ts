@@ -55,8 +55,12 @@ export function collectionColumnFor(t: {
   status?: string | null;
   shipping_status?: string | null;
   original_status?: string | null;
+  sale_type?: string | null;
 }): string[] {
-  const base = mapTransactionStatusToCollection(t.status ?? null);
+  let base = mapTransactionStatusToCollection(t.status ?? null);
+  // "Frustrado" é só AfterPay. Pix/boleto antecipado que não foi pago vai
+  // para "Cancelado".
+  if (base === "Frustrado" && t.sale_type && t.sale_type !== "afterpay") base = "Cancelado";
   // Pago, cancelado, devolvido e frustrado encerram o fluxo: o rastreio nao muda nada.
   if (base !== "Agendado" && base !== "Aguardando Pagamento") return [base];
 

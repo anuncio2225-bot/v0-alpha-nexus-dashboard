@@ -518,6 +518,7 @@ export interface DashboardMetrics {
     entradasHoje: KpiData;
     comissaoReal: KpiData;
     comissaoProjetada: KpiData;
+    naoPagos: KpiData;
     valorReceber: KpiData;
     investimento: KpiData;
     roi: KpiData;
@@ -731,7 +732,7 @@ export interface CollectionCalendarEmail {
 export interface CollectionMetrics {
   /** Pedidos e valor por etapa da entrega (agendado → pago). */
   funil?: Record<
-    "agendado" | "transito" | "agencia" | "cobranca" | "pago" | "frustrado",
+    "agendado" | "transito" | "agencia" | "cobranca" | "pix_boleto" | "pago" | "frustrado" | "nao_pago",
     { count: number; value: number }
   >;
   total_due_today: number;

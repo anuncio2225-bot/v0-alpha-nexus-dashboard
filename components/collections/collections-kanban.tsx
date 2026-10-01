@@ -135,7 +135,7 @@ export function CollectionsKanban({
                     draggable
                     onDragStart={() => setDragId(c.id)}
                     onClick={() => onCardClick(c)}
-                    className="cursor-pointer border-border bg-card p-3 transition-colors hover:border-brand/50"
+                    className="cursor-pointer border-border bg-card p-2.5 transition-colors hover:border-brand/50"
                   >
                     <p className="truncate text-sm font-medium text-foreground">
                       {c.name}
@@ -226,7 +226,7 @@ function SortableColumn({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex w-72 shrink-0 flex-col rounded-lg border bg-card/50 transition-colors",
+        "flex w-64 shrink-0 flex-col rounded-lg border bg-card/50 transition-colors",
         isCardOver ? "border-brand" : "border-border",
         isDragging && "z-10 opacity-60"
       )}

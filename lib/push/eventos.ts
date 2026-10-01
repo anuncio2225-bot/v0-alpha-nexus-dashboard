@@ -38,7 +38,7 @@ export const EVENTOS_PUSH: EventoInfo[] = [
   { id: "aguardando_retirada", grupo: "Entrega", emoji: "🏪", titulo: "Aguardando retirada", descricao: "Encomenda esperando o cliente buscar", padrao: true },
   { id: "pedido_entregue", grupo: "Entrega", emoji: "✅", titulo: "Pedido entregue", descricao: "Transportadora confirmou a entrega", padrao: true },
   { id: "falha_entrega", grupo: "Problemas", emoji: "⚠️", titulo: "Falha na entrega", descricao: "A transportadora não conseguiu entregar", padrao: true },
-  { id: "venda_frustrada", grupo: "Problemas", emoji: "❌", titulo: "Venda frustrada ou cancelada", descricao: "Pagamento falhou, pedido cancelado ou devolvido", padrao: true },
+  { id: "venda_frustrada", grupo: "Problemas", emoji: "❌", titulo: "Frustrado (AfterPay) ou Pix/boleto não pago", descricao: "AfterPay enviado e não pago, ou Pix/boleto que venceu", padrao: true },
   { id: "reembolso", grupo: "Problemas", emoji: "💸", titulo: "Reembolso", descricao: "Venda estornada ou reembolsada", padrao: true },
   { id: "estoque_baixo", grupo: "Estoque", emoji: "📦", titulo: "Estoque baixo", descricao: "Saldo abaixo do nível de alerta ou zerado (hora de parar de agendar ou repor)", padrao: true },
 ];

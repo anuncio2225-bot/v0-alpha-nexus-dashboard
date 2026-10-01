@@ -408,13 +408,24 @@ export async function calcularMetricas(
   const valorPagasAntecipadas = sumValue(pagasAntecipadas);
   const valorPagasRecuperacao = sumValue(pagasRecuperacao);
 
-  // Frustradas = cancelado + devolvido + frustrado
-  const frustradas = [...canceladas, ...devolvidas, ...frustradasOnly];
+  // "Frustrada" é só AfterPay: o pedido foi enviado e o cliente não pagou.
+  // Pix/boleto antecipado que venceu sem pagar é "não pago" — outra coisa,
+  // não custou envio. Reembolso (devolvido) fica à parte.
+  const PERDIDO = new Set(["frustrado", "cancelado"]);
+  const frustradas = workingList.filter(
+    (t) => t.sale_type === "afterpay" && PERDIDO.has(t.status || "")
+  );
+  const naoPagos = workingList.filter(
+    (t) => t.sale_type !== "afterpay" && PERDIDO.has(t.status || "")
+  );
+  // Conversão continua contando toda venda perdida (frustrada, não paga e reembolso).
+  const perdidas = [...canceladas, ...devolvidas, ...frustradasOnly];
 
   const valorPagas = sumValue(pagas);
   const valorAgendadas = sumValue(agendadas);
   const valorAntecipadas = sumValue(antecipadas);
   const valorFrustradas = sumValue(frustradas);
+  const valorNaoPagos = sumValue(naoPagos);
 
   // Entradas no periodo (by payment_date) - independent from "Pagas" (by sale_date).
   // Uses commission-first priority just like every other metric.
@@ -508,12 +519,14 @@ export async function calcularMetricas(
     quantidadeBase > 0 ? receitaBase / quantidadeBase : 0
   );
 
-  const totalRelevant = quantidadeBase + frustradas.length;
+  const totalRelevant = quantidadeBase + perdidas.length;
   const taxaConversao = safeNumber(
     totalRelevant > 0 ? (quantidadeBase / totalRelevant) * 100 : 0
   );
 
-  const totalParaFrustracao = pagas.length + frustradas.length;
+  // Taxa de frustração: só AfterPay (frustradas ÷ AfterPay pagas + frustradas).
+  const totalParaFrustracao =
+    pagas.filter((t) => t.sale_type === "afterpay").length + frustradas.length;
   const taxaFrustracao = safeNumber(
     totalParaFrustracao > 0 ? (frustradas.length / totalParaFrustracao) * 100 : 0
   );
@@ -553,7 +566,7 @@ export async function calcularMetricas(
       label: "Frustradas",
       value: valorFrustradas,
       formatted: formatCurrency(valorFrustradas),
-      tooltip: `${frustradas.length} vendas frustradas`,
+      tooltip: `${frustradas.length} AfterPay enviada${frustradas.length !== 1 ? "s" : ""} e não paga${frustradas.length !== 1 ? "s" : ""}`,
       color: "danger",
     },
     entradasHoje: {
@@ -577,6 +590,13 @@ export async function calcularMetricas(
       formatted: formatCurrency(comissaoProjetada),
       tooltip: "Comissão das vendas AfterPay ainda não pagas",
       color: "brand",
+    },
+    naoPagos: {
+      label: "Pix/Boleto Não Pagos",
+      value: valorNaoPagos,
+      formatted: formatCurrency(valorNaoPagos),
+      tooltip: `${naoPagos.length} Pix/boleto gerado${naoPagos.length !== 1 ? "s" : ""} que venceu sem pagar (antecipado — não é frustrada)`,
+      color: "neutral",
     },
     valorReceber: {
       label: "A Receber",
@@ -624,7 +644,7 @@ export async function calcularMetricas(
       label: "Taxa Frustração",
       value: taxaFrustracao,
       formatted: formatPercent(taxaFrustracao),
-      tooltip: "Percentual de vendas frustradas",
+      tooltip: "AfterPay frustradas ÷ (AfterPay pagas + frustradas)",
       color:
         taxaFrustracao <= 10
           ? "success"
@@ -710,10 +730,7 @@ export async function calcularMetricas(
       antecipadas: dayAntecipadas.length,
       pagas: dayTx.filter((t) => t.status === "pago").length,
       frustradas: dayTx.filter(
-        (t) =>
-          t.status === "cancelado" ||
-          t.status === "devolvido" ||
-          t.status === "frustrado"
+        (t) => t.sale_type === "afterpay" && PERDIDO.has(t.status || "")
       ).length,
       comissao: safeNumber(dayReceita),
       investimento: safeNumber(dayAdSpend + dayAdSpend * (safeTaxPercent / 100)),
