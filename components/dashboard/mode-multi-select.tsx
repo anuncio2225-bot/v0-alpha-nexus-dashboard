@@ -55,7 +55,7 @@ export function ModeMultiSelect({ selected, onChange }: ModeMultiSelectProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full sm:w-[220px] justify-between bg-card border-border"
+          className="w-full min-w-0 sm:w-[220px] justify-between bg-card border-border"
         >
           <span className="flex items-center gap-2 min-w-0">
             <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0" />

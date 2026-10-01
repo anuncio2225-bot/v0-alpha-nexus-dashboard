@@ -59,8 +59,8 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
 
   if (loading) {
     return (
-      <Card className={cn("gap-0 py-0 rounded-[20px] border-[var(--border-glass)]", small ? "min-h-[112px]" : "min-h-[196px]", className, itemClassName)}>
-        <div className={cn("space-y-3", small ? "p-4" : "p-5")}>
+      <Card className={cn("gap-0 py-0 rounded-[20px] border-[var(--border-glass)]", small ? "min-h-[84px] sm:min-h-[112px]" : "min-h-[124px] sm:min-h-[196px]", className, itemClassName)}>
+        <div className={cn("space-y-3", small ? "p-3 sm:p-4" : "p-3.5 sm:p-5")}>
           <div className="flex items-center gap-3">
             <Skeleton className={cn("rounded-xl", small ? "h-8 w-8" : "h-10 w-10")} />
             <Skeleton className="h-4 w-24" />
@@ -74,7 +74,7 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
   const label = (
     <span
       className={cn(
-        "truncate text-[13px] text-muted-foreground",
+        "truncate text-[12px] text-muted-foreground sm:text-[13px]",
         data.tooltip && "cursor-help underline decoration-dotted decoration-muted-foreground/30 underline-offset-4"
       )}
     >
@@ -85,7 +85,8 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
   const valueClass = cn(
     small ? "metric-sm" : "metric",
     !small && textSize ? textSize : "",
-    small ? "text-[22px]" : "text-[30px]",
+    // No celular os valores encolhem para caberem dois cartões por linha.
+    small ? "text-[17px] sm:text-[22px]" : "text-[21px] sm:text-[30px]",
     negative
       ? "bg-[linear-gradient(90deg,#fda4af,#f43f5e_60%,#be123c)] bg-clip-text text-transparent"
       : "text-metal-fade"
@@ -97,20 +98,20 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
         <Card
           className={cn(
             "ambient card-hover relative h-full gap-0 overflow-hidden rounded-[20px] border-[var(--border-glass)] py-0",
-            small ? "min-h-[112px]" : "min-h-[196px]",
+            small ? "min-h-[84px] sm:min-h-[112px]" : "min-h-[124px] sm:min-h-[196px]",
             className
           )}
           style={{ ["--tone" as string]: ambient }}
         >
-          <div className={cn("relative z-10 flex h-full flex-col", small ? "p-4" : "p-5")}>
+          <div className={cn("relative z-10 flex h-full flex-col", small ? "p-3 sm:p-4" : "p-3.5 sm:p-5")}>
             {/* Ícone + rótulo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {Icon && (
                 <span
-                  className={cn("icon-tile shrink-0", small ? "h-8 w-8" : "h-10 w-10")}
+                  className={cn("icon-tile shrink-0", small ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10")}
                   style={{ ["--tile" as string]: hex }}
                 >
-                  <Icon className={small ? "h-4 w-4" : "h-[18px] w-[18px]"} />
+                  <Icon className={small ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} />
                 </span>
               )}
               <div className="min-w-0 leading-tight">
@@ -131,9 +132,9 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
             </div>
 
             {/* Valor com barrinha de destaque na borda, como nas referências */}
-            <div className={cn("relative", small ? "mt-3" : "mt-5")}>
+            <div className={cn("relative", small ? "mt-2 sm:mt-3" : "mt-3 sm:mt-5")}>
               <span
-                className="absolute -left-5 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full"
+                className="absolute -left-3.5 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full sm:-left-5"
                 style={{ background: hex, boxShadow: `0 0 12px ${hex}` }}
                 aria-hidden="true"
               />
@@ -160,7 +161,7 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
 
           {/* Mini-gráfico luminoso no rodapé */}
           {trend && !small && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72px] opacity-90">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40px] opacity-90 sm:h-[72px]">
               <Sparkline data={trend} color={hex} />
             </div>
           )}

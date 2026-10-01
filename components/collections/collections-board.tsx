@@ -257,8 +257,9 @@ export function CollectionsBoard({
       {/* Filtros e acoes */}
       <Card className="border-border bg-card p-4">
         <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="relative flex-1 sm:max-w-xs">
+          {/* Celular: busca em cima e os 4 filtros dois a dois */}
+          <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+            <div className="relative col-span-2 flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
