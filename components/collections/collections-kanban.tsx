@@ -108,10 +108,9 @@ export function CollectionsKanban({
         >
           {ordered.map((status) => {
             const colClients = clients.filter((c) => c.status_id === status.id);
-            const colTotal = colClients.reduce(
-              (s, c) => s + (Number(c.remaining_value) || 0),
-              0
-            );
+            // Em aberto soma o que falta receber; quitado soma o que entrou
+            // (antes a coluna "Pago" aparecia sempre zerada).
+            const colTotal = colClients.reduce((s, c) => s + valorDoCard(c).valor, 0);
             return (
               <SortableColumn
                 key={status.id}
@@ -148,11 +147,15 @@ export function CollectionsKanban({
                     )}
                     <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-brand">
-                        <SensitiveValue>
-                          {formatCurrency(Number(c.remaining_value) || 0)}
-                        </SensitiveValue>
-                      </span>
+                      {(() => {
+                        const v = valorDoCard(c);
+                        return (
+                          <span className={cn("text-sm font-semibold", v.pago ? "text-success" : "text-brand")}>
+                            <SensitiveValue>{formatCurrency(v.valor)}</SensitiveValue>
+                            {v.pago && <span className="ml-1 text-[10px] font-normal">recebido</span>}
+                          </span>
+                        );
+                      })()}
                       {c.next_collection_date && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <CalendarClock className="h-3 w-3" />
@@ -298,4 +301,12 @@ function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entreg
       )}
     </div>
   );
+}
+
+/** Valor do card: o que falta receber; se já foi quitado, o que foi recebido. */
+function valorDoCard(c: CollectionClient): { valor: number; pago: boolean } {
+  const falta = Number(c.remaining_value) || 0;
+  const recebido = Number(c.paid_value) || 0;
+  if (falta <= 0 && recebido > 0) return { valor: recebido, pago: true };
+  return { valor: falta, pago: false };
 }
