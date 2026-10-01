@@ -397,6 +397,37 @@ export function normalizeGeneric(
     )
   );
 
+  // Envio (Payt manda shipping.status: waiting_code → posted/in_transit/delivered…)
+  const trackingCode = safeString(
+    pickFirst(payload, [
+      "shipping.tracking_code",
+      "shipping.tracking.code",
+      "shipping.code",
+      "tracking_code",
+      "tracking.code",
+      "codigo_rastreio",
+    ])
+  );
+  const rawShipping = safeString(pickFirst(payload, ["shipping.status", "shipping_status", "delivery_status"]));
+  const SHIPPING_PT: Record<string, string> = {
+    waiting_code: "Aguardando código",
+    waiting: "Aguardando envio",
+    pending: "Aguardando envio",
+    posted: "Postado",
+    shipped: "Enviado",
+    sent: "Enviado",
+    in_transit: "Em trânsito",
+    transit: "Em trânsito",
+    out_for_delivery: "Saiu para entrega",
+    waiting_pickup: "Aguardando retirada",
+    delivered: "Entregue",
+    returned: "Devolvido",
+    canceled: "Cancelado",
+    cancelled: "Cancelado",
+  };
+  const shippingStatus = SHIPPING_PT[rawShipping.toLowerCase()] || rawShipping;
+  const shippingCompany = safeString(pickFirst(payload, ["shipping.carrier", "shipping.company", "shipping.service"]));
+
   const utmSource = safeString(pickFirst(payload, ["utm_source", "link.sources.src"]));
   const utmCampaign = safeString(pickFirst(payload, ["utm_campaign"]));
   const src = safeString(pickFirst(payload, ["src", "link.sources.src"]));
@@ -437,6 +468,10 @@ export function normalizeGeneric(
 
     sale_date: saleDate || undefined,
     payment_date: paymentDate || undefined,
+
+    tracking_code: trackingCode || undefined,
+    shipping_status: shippingStatus || undefined,
+    shipping_company: shippingCompany || undefined,
 
     utm_source: utmSource || undefined,
     utm_campaign: utmCampaign || undefined,

@@ -244,8 +244,9 @@ export function eventoDaMudanca(
     }
   }
 
-  // Entrega: só enquanto a venda está viva e ainda não paga.
-  if (s1 === "agendado" || s1 === "aguardando") {
+  // Entrega: venda viva (AfterPay a caminho/em cobrança) ou já paga
+  // (antecipado também precisa acompanhar a entrega).
+  if (s1 === "agendado" || s1 === "aguardando" || s1 === "pago") {
     const e0 = trackingStage(antes?.shipping_status);
     const e1 = trackingStage(depois.shipping_status);
     // Código de rastreio novo. O Pag2Pay manda o evento "codigoRastreio" com

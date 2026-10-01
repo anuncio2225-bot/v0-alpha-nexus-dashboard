@@ -685,6 +685,8 @@ export interface CollectionClient {
   next_collection_date: string | null;
   tracking_code: string | null;
   delivery_status: string | null;
+  /** Modalidade da venda: afterpay (paga na entrega) | antecipado | recuperacao. */
+  sale_type?: string | null;
   shipping_company: string | null;
   address_full: string | null;
   last_contact_at: string | null;
@@ -727,6 +729,11 @@ export interface CollectionCalendarEmail {
 }
 
 export interface CollectionMetrics {
+  /** Pedidos e valor por etapa da entrega (agendado → pago). */
+  funil?: Record<
+    "agendado" | "transito" | "agencia" | "cobranca" | "pago" | "frustrado",
+    { count: number; value: number }
+  >;
   total_due_today: number;
   received_today: number;
   scheduled_today: number;

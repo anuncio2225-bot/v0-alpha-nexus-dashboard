@@ -573,6 +573,7 @@ export async function processWebhook(
         address_full: event.address_full || null,
         transaction_code: event.external_id,
         original_status: event.original_status || null,
+        sale_type: (tx.sale_type as string) || null,
       };
 
       await supabase.rpc("seed_collection_defaults", { p_user_id: userId });

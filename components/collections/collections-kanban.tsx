@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
+import { deliveryStatusLabel } from "@/lib/collections/whatsapp";
 import type { CollectionClient, CollectionStatus } from "@/types";
 import { CalendarClock, GripVertical } from "lucide-react";
 
@@ -42,6 +43,29 @@ export function CollectionsKanban({
   const [overCol, setOverCol] = useState<string | null>(null);
 
   const ordered = [...statuses].sort((a, b) => a.position - b.position);
+
+  // Barra de rolagem lateral também no TOPO (fixa ao descer a página): com
+  // muitos clientes, a barra nativa fica lá no fim da coluna mais comprida.
+  const quadroRef = useRef<HTMLDivElement>(null);
+  const barraRef = useRef<HTMLDivElement>(null);
+  const [larguraTotal, setLarguraTotal] = useState(0);
+  useEffect(() => {
+    const quadro = quadroRef.current;
+    if (!quadro) return;
+    const medir = () => setLarguraTotal(quadro.scrollWidth);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(quadro);
+    for (const filho of Array.from(quadro.children)) ro.observe(filho);
+    return () => ro.disconnect();
+  }, [statuses.length, clients.length]);
+  const sincronizando = useRef(false);
+  function espelhar(origem: HTMLDivElement | null, destino: HTMLDivElement | null) {
+    if (!origem || !destino || sincronizando.current) return;
+    sincronizando.current = true;
+    destino.scrollLeft = origem.scrollLeft;
+    requestAnimationFrame(() => (sincronizando.current = false));
+  }
 
   // Sensor da reordenacao de COLUNAS (dnd-kit). A alca tem um pequeno limiar
   // para nao conflitar com cliques.
@@ -69,7 +93,19 @@ export function CollectionsKanban({
         items={ordered.map((s) => s.id)}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div
+          ref={barraRef}
+          onScroll={() => espelhar(barraRef.current, quadroRef.current)}
+          className="sticky top-0 z-20 mb-2 overflow-x-auto rounded-md bg-background/90 backdrop-blur"
+          aria-hidden
+        >
+          <div style={{ width: larguraTotal, height: 12 }} />
+        </div>
+        <div
+          ref={quadroRef}
+          onScroll={() => espelhar(quadroRef.current, barraRef.current)}
+          className="flex gap-3 overflow-x-auto pb-4"
+        >
           {ordered.map((status) => {
             const colClients = clients.filter((c) => c.status_id === status.id);
             const colTotal = colClients.reduce(
@@ -110,6 +146,7 @@ export function CollectionsKanban({
                         {c.product_name}
                       </p>
                     )}
+                    <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-sm font-semibold text-brand">
                         <SensitiveValue>
@@ -229,6 +266,36 @@ function SortableColumn({
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * AfterPay e antecipado rodam no mesmo quadro: a etiqueta diz a modalidade, e
+ * a entrega aparece em todo card que tem rastreio — inclusive nos já pagos.
+ */
+const MODALIDADE: Record<string, { texto: string; classe: string }> = {
+  afterpay: { texto: "AfterPay", classe: "border-sky-500/40 bg-sky-500/10 text-sky-500" },
+  antecipado: { texto: "Antecipado", classe: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500" },
+  recuperacao: { texto: "Recuperação", classe: "border-amber-500/40 bg-amber-500/10 text-amber-500" },
+};
+
+function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entrega?: string | null }) {
+  const m = saleType ? MODALIDADE[saleType] : null;
+  const e = deliveryStatusLabel(entrega);
+  if (!m && !e) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {m && (
+        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", m.classe)}>
+          {m.texto}
+        </span>
+      )}
+      {e && (
+        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+          {e}
+        </span>
+      )}
     </div>
   );
 }

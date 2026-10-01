@@ -120,6 +120,7 @@ interface TxRow {
   shipping_status?: string | null;
   shipping_company?: string | null;
   address_full?: string | null;
+  sale_type?: string | null;
 }
 
 // Codigo numerico Braip -> rotulo legivel (camada automatica "braip_status")
@@ -299,6 +300,7 @@ export async function syncTransactionToCollection(
     payment_link: t.payment_link || null,
     tracking_code: t.tracking_code || null,
     delivery_status: t.shipping_status || null,
+    sale_type: t.sale_type || null,
     shipping_company: t.shipping_company || null,
     address_full: t.address_full || null,
     braip_status: braipStatus,

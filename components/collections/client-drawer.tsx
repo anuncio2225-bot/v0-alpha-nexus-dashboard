@@ -409,6 +409,19 @@ export function ClientDrawer({
                       label="Pagamento"
                       value={client.payment_method}
                     />
+                    <InfoRow
+                      icon={CreditCard}
+                      label="Modalidade"
+                      value={
+                        client.sale_type === "afterpay"
+                          ? "AfterPay (paga na entrega)"
+                          : client.sale_type === "recuperacao"
+                            ? "Recuperação"
+                            : client.sale_type === "antecipado"
+                              ? "Antecipado (pagou antes do envio)"
+                              : null
+                      }
+                    />
                     {client.transaction_code && (
                       <InfoRow
                         icon={Tag}

@@ -79,7 +79,40 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
     },
   ];
 
+  const ETAPAS = [
+    { k: "agendado", label: "Total agendado", cor: "#6366f1" },
+    { k: "transito", label: "Em trânsito", cor: "#3b82f6" },
+    { k: "agencia", label: "Na agência (retirar)", cor: "#f59e0b" },
+    { k: "cobranca", label: "Aguardando pagamento", cor: "#f97316" },
+    { k: "pago", label: "Pagos", cor: "#22c55e" },
+    { k: "frustrado", label: "Frustrados", cor: "#ef4444" },
+  ] as const;
+
   return (
+    <div className="space-y-3">
+    {/* Funil da entrega — mesmo recorte do quadro do Pag2Pay */}
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      {ETAPAS.map((e) => {
+        const f = m?.funil?.[e.k];
+        return (
+          <Card key={e.k} className="bg-card border-border p-4" style={{ borderLeft: `3px solid ${e.cor}` }}>
+            <p className="text-xs text-muted-foreground">{e.label}</p>
+            {isLoading ? (
+              <Skeleton className="mt-2 h-7 w-24" />
+            ) : (
+              <>
+                <p className="mt-1 text-xl font-bold font-heading text-foreground">
+                  <SensitiveValue>{formatCurrency(f?.value || 0)}</SensitiveValue>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {f?.count || 0} pedido{(f?.count || 0) !== 1 ? "s" : ""}
+                </p>
+              </>
+            )}
+          </Card>
+        );
+      })}
+    </div>
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
       {items.map((it) => (
         <Card key={it.label} className="bg-card border-border p-4">
@@ -96,6 +129,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
           )}
         </Card>
       ))}
+    </div>
     </div>
   );
 }
