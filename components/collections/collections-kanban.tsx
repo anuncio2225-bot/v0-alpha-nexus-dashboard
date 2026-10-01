@@ -135,22 +135,23 @@ export function CollectionsKanban({
                     draggable
                     onDragStart={() => setDragId(c.id)}
                     onClick={() => onCardClick(c)}
-                    className="cursor-pointer border-border bg-card p-2.5 transition-colors hover:border-brand/50"
+                    className="cursor-pointer gap-0 border-border bg-card px-3 py-2 transition-colors hover:border-brand/50"
                   >
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate text-sm font-medium leading-tight text-foreground">
                       {c.name}
                     </p>
                     {c.product_name && (
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="truncate text-[11px] leading-tight text-muted-foreground">
                         {c.product_name}
                       </p>
                     )}
-                    <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
-                    <div className="mt-2 flex items-center justify-between">
+                    {/* Etiquetas e valor na mesma linha: card mais baixo */}
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
                       {(() => {
                         const v = valorDoCard(c);
                         return (
-                          <span className={cn("text-sm font-semibold", v.pago ? "text-success" : "text-brand")}>
+                          <span className={cn("ml-auto shrink-0 whitespace-nowrap text-sm font-semibold", v.pago ? "text-success" : "text-brand")}>
                             <SensitiveValue>{formatCurrency(v.valor)}</SensitiveValue>
                             {v.pago && <span className="ml-1 text-[10px] font-normal">recebido</span>}
                           </span>
@@ -226,7 +227,7 @@ function SortableColumn({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex w-64 shrink-0 flex-col rounded-lg border bg-card/50 transition-colors",
+        "flex w-72 shrink-0 flex-col rounded-lg border bg-card/50 transition-colors",
         isCardOver ? "border-brand" : "border-border",
         isDragging && "z-10 opacity-60"
       )}
@@ -288,7 +289,7 @@ function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entreg
   const e = deliveryStatusLabel(entrega);
   if (!m && !e) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       {m && (
         <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", m.classe)}>
           {m.texto}

@@ -93,17 +93,17 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
   return (
     <div className="space-y-3">
     {/* Funil da entrega — mesmo recorte do quadro do Pag2Pay */}
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4 2xl:grid-cols-8">
       {ETAPAS.map((e) => {
         const f = m?.funil?.[e.k];
         return (
-          <Card key={e.k} className="bg-card border-border p-4" style={{ borderLeft: `3px solid ${e.cor}` }}>
+          <Card key={e.k} className="gap-0 bg-card border-border p-3 sm:p-4" style={{ borderLeft: `3px solid ${e.cor}` }}>
             <p className="text-xs text-muted-foreground">{e.label}</p>
             {isLoading ? (
               <Skeleton className="mt-2 h-7 w-24" />
             ) : (
               <>
-                <p className="mt-1 text-xl font-bold font-heading text-foreground">
+                <p className="mt-1 text-base font-bold font-heading text-foreground sm:text-xl">
                   <SensitiveValue>{formatCurrency(f?.value || 0)}</SensitiveValue>
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -115,9 +115,9 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
         );
       })}
     </div>
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
       {items.map((it) => (
-        <Card key={it.label} className="bg-card border-border p-4">
+        <Card key={it.label} className="gap-0 bg-card border-border p-3 sm:p-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">{it.label}</p>
             <it.icon className={`h-4 w-4 ${it.color}`} />
@@ -125,7 +125,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
           {isLoading ? (
             <Skeleton className="mt-2 h-7 w-20" />
           ) : (
-            <p className={`mt-1 text-xl font-bold font-heading ${it.color}`}>
+            <p className={`mt-1 text-base font-bold font-heading sm:text-xl ${it.color}`}>
               {it.sensitive ? <SensitiveValue>{it.value}</SensitiveValue> : it.value}
             </p>
           )}

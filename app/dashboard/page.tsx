@@ -100,6 +100,14 @@ export default function DashboardPage() {
 
   // "Quarta-feira, 23 de setembro de 2026": só a primeira letra maiúscula.
   // (A classe CSS `capitalize` fazia "Quarta-Feira, 23 De Setembro De 2026".)
+  // Período do filtro, escrito em todos os cartões ("Hoje, 01/10", "25/09 – 01/10").
+  const periodo = (() => {
+    const fmt = (d: Date) => format(d, "dd/MM", { locale: ptBR });
+    if (preset === "today") return `Hoje, ${fmt(range.from)}`;
+    if (preset === "yesterday") return `Ontem, ${fmt(range.from)}`;
+    return `${fmt(range.from)} – ${fmt(range.to)}`;
+  })();
+
   const formattedDate = (() => {
     if (!now) return "";
     const s = format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -213,7 +221,7 @@ export default function DashboardPage() {
             {greeting || "Olá"}{firstName ? `, ${firstName}` : ""}
           </h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap [&>*]:min-w-0">
           {/* Botao de Refresh Manual */}
           <Button
             variant="outline"
@@ -228,7 +236,7 @@ export default function DashboardPage() {
                 (isLoading || refreshing) && "animate-spin"
               )}
             />
-            {refreshing ? "Atualizando..." : "Atualizar"}
+            <span className="hidden sm:inline">{refreshing ? "Atualizando..." : "Atualizar"}</span>
           </Button>
           {/* Seletor de Modalidade (multi-select, persistido) */}
           <ModeMultiSelect
@@ -240,12 +248,14 @@ export default function DashboardPage() {
             selected={selectedProducts}
             onChange={setSelectedProducts}
           />
+          <div className="col-span-3 sm:col-span-1">
           <DateFilter
             value={preset}
             onChange={setPreset}
             range={range}
             onRangeChange={setRange}
           />
+          </div>
         </div>
       </div>
 
@@ -296,41 +306,34 @@ export default function DashboardPage() {
       {/* ================================================================ */}
       {/* DESTAQUES — 5 cartões iguais com mini-gráfico dos dias do período */}
       {/* ================================================================ */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 xl:grid-cols-5">
         <KpiCard
-          data={(() => {
-            const fmt = (d: Date) => format(d, "dd/MM", { locale: ptBR });
-            const subtitle =
-              preset === "today"
-                ? `Hoje, ${fmt(range.from)}`
-                : preset === "yesterday"
-                  ? `Ontem, ${fmt(range.from)}`
-                  : `${fmt(range.from)} – ${fmt(range.to)}`;
-            return kpis?.entradasHoje
-              ? { ...kpis.entradasHoje, subtitle, color: "brand" as const }
-              : { label: "Pagas no Período", subtitle, value: 0, formatted: "R$ 0,00", color: "brand" as const };
-          })()}
+          data={
+            kpis?.entradasHoje
+              ? { ...kpis.entradasHoje, subtitle: periodo, color: "brand" as const }
+              : { label: "Pagas no Período", subtitle: periodo, value: 0, formatted: "R$ 0,00", color: "brand" as const }
+          }
           icon={CheckCircle}
           loading={isLoading}
           itemClassName="lg:col-span-3 xl:col-span-1"
           trend={dailyData.map((d) => d.pagas)}
         />
         <KpiCard
-          data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), color: "info" as const }}
+          data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), subtitle: periodo, color: "info" as const }}
           icon={Calendar}
           loading={isLoading}
           itemClassName="lg:col-span-3 xl:col-span-1"
           trend={dailyData.map((d) => d.agendadas)}
         />
         <KpiCard
-          data={{ ...(kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0,00" }), color: "warning" as const }}
+          data={{ ...(kpis?.investimento || { label: "Investimento", value: 0, formatted: "R$ 0,00" }), subtitle: periodo, color: "warning" as const }}
           icon={Megaphone}
           loading={isLoading}
           itemClassName="lg:col-span-2 xl:col-span-1"
           trend={dailyData.map((d) => d.investimento)}
         />
         <KpiCard
-          data={kpis?.lucro || { label: "Lucro Estimado", value: 0, formatted: "R$ 0,00" }}
+          data={{ ...(kpis?.lucro || { label: "Lucro Estimado", value: 0, formatted: "R$ 0,00" }), subtitle: periodo }}
           icon={Zap}
           loading={isLoading}
           itemClassName="lg:col-span-2 xl:col-span-1"
@@ -339,17 +342,18 @@ export default function DashboardPage() {
         <KpiCard
           data={(() => {
             const raw = kpis?.roi;
-            if (!raw) return { label: "ROI", value: 0, formatted: "1,00x", color: "neutral" as const };
+            if (!raw) return { label: "ROI", value: 0, formatted: "1,00x", subtitle: periodo, color: "neutral" as const };
             const multiplier = 1 + (raw.value ?? 0) / 100;
             return {
               ...raw,
+              subtitle: periodo,
               formatted: `${multiplier.toFixed(2).replace(".", ",")}x`,
               color: (multiplier >= 1 ? "brand" : "danger") as "brand" | "danger",
             };
           })()}
           icon={Percent}
           loading={isLoading}
-          itemClassName="sm:col-span-2 lg:col-span-2 xl:col-span-1"
+          itemClassName="col-span-2 lg:col-span-2 xl:col-span-1"
           trend={dailyData.map((d) => (d.investimento > 0 ? d.comissao / d.investimento : 0))}
         />
       </div>
@@ -360,9 +364,11 @@ export default function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center gap-2">
           <span className="live-dot" />
-          <h2 className="text-sm font-medium text-muted-foreground">Métricas do período</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Métricas do período <span className="text-muted-foreground/60">· {periodo}</span>
+          </h2>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           <KpiCard data={kpis?.cpa || { label: "CPA", value: 0, formatted: "R$ 0,00" }} icon={ShoppingCart} loading={isLoading} compact />
           <KpiCard data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0,00" }} icon={DollarSign} loading={isLoading} compact />
           <KpiCard data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0,00" }} icon={Clock} loading={isLoading} compact />
