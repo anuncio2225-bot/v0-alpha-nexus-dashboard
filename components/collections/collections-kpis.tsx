@@ -83,15 +83,17 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
     { k: "agendado", label: "Total agendado", cor: "#6366f1" },
     { k: "transito", label: "Em trânsito", cor: "#3b82f6" },
     { k: "agencia", label: "Na agência (retirar)", cor: "#f59e0b" },
-    { k: "cobranca", label: "Aguardando pagamento", cor: "#f97316" },
+    { k: "cobranca", label: "Entregue · aguardando pgto", cor: "#f97316" },
+    { k: "pix_boleto", label: "Pix/boleto gerado", cor: "#0ea5e9" },
     { k: "pago", label: "Pagos", cor: "#22c55e" },
-    { k: "frustrado", label: "Frustrados", cor: "#ef4444" },
+    { k: "frustrado", label: "Frustrados (AfterPay)", cor: "#ef4444" },
+    { k: "nao_pago", label: "Pix/boleto não pago", cor: "#64748b" },
   ] as const;
 
   return (
     <div className="space-y-3">
     {/* Funil da entrega — mesmo recorte do quadro do Pag2Pay */}
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
       {ETAPAS.map((e) => {
         const f = m?.funil?.[e.k];
         return (

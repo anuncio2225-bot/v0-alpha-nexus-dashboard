@@ -367,7 +367,7 @@ export default function DashboardPage() {
           <KpiCard data={kpis?.comissaoReal || { label: "Comissão Real", value: 0, formatted: "R$ 0,00" }} icon={DollarSign} loading={isLoading} compact />
           <KpiCard data={kpis?.antecipadas || { label: "Antecipadas", value: 0, formatted: "R$ 0,00" }} icon={Clock} loading={isLoading} compact />
           <KpiCard data={kpis?.recuperacoes || { label: "Recuperação", value: 0, formatted: "R$ 0,00" }} icon={RefreshCw} loading={isLoading} compact />
-          <KpiCard data={kpis?.comissaoProjetada || { label: "Comissão Projetada", value: 0, formatted: "R$ 0,00" }} icon={TrendingUp} loading={isLoading} compact />
+          <KpiCard data={kpis?.naoPagos || { label: "Pix/Boleto Não Pagos", value: 0, formatted: "R$ 0,00" }} icon={TrendingUp} loading={isLoading} compact />
           <KpiCard data={kpis?.valorReceber || { label: "A Receber", value: 0, formatted: "R$ 0,00" }} icon={Target} loading={isLoading} compact />
           <KpiCard data={kpis?.ticketMedio || { label: "Ticket Médio", value: 0, formatted: "R$ 0,00" }} icon={BarChart3} loading={isLoading} compact />
           <KpiCard data={{ ...(kpis?.taxaConversao || { label: "Taxa Conversão", value: 0, formatted: "0,0%" }), color: "info" as const }} icon={Target} loading={isLoading} compact />

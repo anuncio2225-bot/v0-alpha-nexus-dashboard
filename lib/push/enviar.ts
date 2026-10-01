@@ -295,7 +295,9 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     aguardando_retirada: `${info.emoji} Aguardando retirada`,
     pedido_entregue: `${info.emoji} Pedido entregue`,
     falha_entrega: `${info.emoji} Falha na entrega`,
-    venda_frustrada: `${info.emoji} Venda ${v.status === "cancelado" ? "cancelada" : "frustrada"} · ${valor}`,
+    venda_frustrada: afterpay
+      ? `${info.emoji} AfterPay frustrado · ${valor}`
+      : `${info.emoji} Pix/boleto não pago · ${valor}`,
     reembolso: `${info.emoji} Reembolso · ${valor}`,
     estoque_baixo: `${info.emoji} Estoque baixo`, // montado em lib/stock/alerta.ts
   };
