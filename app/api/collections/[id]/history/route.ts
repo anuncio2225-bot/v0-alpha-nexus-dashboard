@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, podeVerCliente } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
@@ -14,6 +14,9 @@ export async function GET(_request: Request, { params }: Params) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!(await podeVerCliente(supabase, user.id, await getEffectiveUserId(supabase, user.id), id))) {
+    return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
   }
 
   const { data, error } = await fetchAll(supabase
@@ -39,6 +42,9 @@ export async function POST(request: Request, { params }: Params) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!(await podeVerCliente(supabase, user.id, await getEffectiveUserId(supabase, user.id), id))) {
+    return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
   }
 
   const body = await request.json();

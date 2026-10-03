@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
   // Membro restrito a um atendente: exporta apenas os clientes do SRC dele.
   if (scope.srcFilter && scope.srcAreas.cobranca) {
-    query = query.eq("src", scope.srcFilter);
+    query = query.ilike("src", scope.srcFilter);
   }
 
   if (statusIds.length > 0) query = query.in("status_id", statusIds);

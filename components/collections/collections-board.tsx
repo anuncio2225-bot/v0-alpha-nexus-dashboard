@@ -37,6 +37,7 @@ import { AttendantSelect } from "./attendant-select";
 import { buildWhatsappUrl } from "@/lib/collections/whatsapp";
 import type { CollectionFilters } from "@/app/dashboard/collections/page";
 import { MultiSelectFilter } from "./multi-select-filter";
+import { useTeamPermissions } from "@/hooks/use-team-permissions";
 import { NewClientDialog } from "./new-client-dialog";
 import { CollectionsKanban } from "./collections-kanban";
 import { ClientDrawer } from "./client-drawer";
@@ -60,6 +61,9 @@ export function CollectionsBoard({
   filters,
   onFiltersChange,
 }: CollectionsBoardProps) {
+  // Atendente vinculada: vê e trabalha os clientes dela, sem gestão do quadro.
+  const { atendenteEm } = useTeamPermissions();
+  const atendente = atendenteEm("cobranca");
   const [view, setView] = useState<"table" | "kanban">("table");
   const [newOpen, setNewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -343,6 +347,7 @@ export function CollectionsBoard({
               <Upload className="mr-2 h-4 w-4" />
               {exporting ? "Exportando..." : "Exportar"}
             </Button>
+            {!atendente && (
             <Button
               variant="outline"
               onClick={handleImport}
@@ -352,6 +357,7 @@ export function CollectionsBoard({
               <Download className="mr-2 h-4 w-4" />
               {importing ? "Importando..." : "Importar do Webhook"}
             </Button>
+            )}
             <Button onClick={() => setNewOpen(true)} className="bg-brand hover:bg-brand/90">
               <Plus className="mr-2 h-4 w-4" />
               Novo Cliente
@@ -416,12 +422,16 @@ export function CollectionsBoard({
                     }
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
+                      {atendente ? (
+                        <span className="text-sm text-muted-foreground">{c.attendant_name || c.src}</span>
+                      ) : (
                       <AttendantSelect
                         clientId={c.id}
                         currentName={c.attendant_name || c.src}
                         attendants={attendants}
                         onChanged={mutate}
                       />
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-foreground">{c.name}</div>

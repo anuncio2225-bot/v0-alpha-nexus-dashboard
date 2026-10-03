@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-01 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-02 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (29):
+-- Migrações registradas no banco (30):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -37,6 +37,7 @@
 --   20261001141139  rastreio_consultado_em
 --   20261001141513  cron_rastreio_pag2pay
 --   20261001141633  crm_modalidade
+--   20261002235318  pago_manual
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -657,6 +658,8 @@ create table public.transactions (
   origin_type text default 'own'::text,
   affiliate_name text,
   tracking_checked_at timestamp with time zone,
+  pago_manual_em timestamp with time zone,
+  status_antes_manual text,
   constraint transactions_pkey PRIMARY KEY (id),
   constraint transactions_user_gateway_external_unique UNIQUE (user_id, gateway, external_id)
 );

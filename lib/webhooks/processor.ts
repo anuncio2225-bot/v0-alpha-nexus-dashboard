@@ -447,7 +447,7 @@ export async function processWebhook(
       const { data: prev } = await supabase
         .from("transactions")
         .select(
-          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full"
+          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em"
         )
         .eq("user_id", userId)
         .eq("gateway", event.gateway)
@@ -470,9 +470,14 @@ export async function processWebhook(
         ] as const) {
           if (!tx[k] && prev[k]) tx[k] = prev[k];
         }
+        // Pago à mão na Cobrança (ex.: AfterPay adiantado por fora): o gateway
+        // ainda acha que está em aberto e pode mandar aguardando/frustrado.
+        // Só reembolso derruba um pago manual.
+        const pagoManual =
+          !!prev.pago_manual_em && event.status !== "devolvido" && event.status !== "pago";
         if (
           prev.status === "pago" &&
-          (event.status === "agendado" || event.status === "aguardando")
+          (pagoManual || event.status === "agendado" || event.status === "aguardando")
         ) {
           tx.status = "pago";
           tx.payment_date = prev.payment_date;

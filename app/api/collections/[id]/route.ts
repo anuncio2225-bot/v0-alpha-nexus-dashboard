@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, podeVerCliente, scopedSrc } from "@/lib/team/scope";
+import { desfazerPagoManual, marcarVendaPagaManual } from "@/lib/collections/pago-manual";
 import {
   upsertManualTransaction,
   deleteManualTransaction,
@@ -21,11 +22,14 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const ownerId = await getEffectiveUserId(supabase, user.id);
+  if (!(await podeVerCliente(supabase, user.id, ownerId, id))) return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
+
   const { data, error } = await supabase
     .from("collection_clients")
     .select("*")
     .eq("id", id)
-    .eq("user_id", await getEffectiveUserId(supabase, user.id))
+    .eq("user_id", ownerId)
     .single();
 
   if (error) {
@@ -45,6 +49,12 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  {
+    const dono = await getEffectiveUserId(supabase, user.id);
+    if (!(await podeVerCliente(supabase, user.id, dono, id))) return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
+  }
+  // Atendente não troca o cliente de dono (atribuição é do dono da conta).
+  const escopoAtendente = await scopedSrc(supabase, user.id, "cobranca");
 
   const body = await request.json();
 
@@ -90,6 +100,12 @@ export async function PATCH(request: Request, { params }: Params) {
   ];
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
+  }
+  if (escopoAtendente) {
+    for (const k of ["attendant_id", "attendant_name", "src"]) {
+      delete updates[k];
+      delete body[k];
+    }
   }
 
   // Ao (re)atribuir um atendente pela Cobrança, resolvemos o registro autoritativo
@@ -163,6 +179,12 @@ export async function PATCH(request: Request, { params }: Params) {
     updates.paid_value = total;
     updates.remaining_value = 0;
   }
+  // Passou a "Pago" sem data: pago hoje (ou na data que veio no corpo).
+  if (isPaidStatusName(newStatusName) && !isPaidStatusName(current.status_name)) {
+    updates.payment_date = body.payment_date || current.payment_date || new Date().toISOString();
+  } else if (!isPaidStatusName(newStatusName) && isPaidStatusName(current.status_name)) {
+    updates.payment_date = null;
+  }
 
   const { data, error } = await supabase
     .from("collection_clients")
@@ -203,6 +225,22 @@ export async function PATCH(request: Request, { params }: Params) {
         .eq("user_id", scopedUserId)
         .maybeSingle();
       isWebhookOrder = !!linkedTx && linkedTx.gateway !== "manual";
+    }
+
+    // Venda do gateway marcada como paga À MÃO (ex.: AfterPay que o cliente
+    // adiantou): a venda passa a contar como paga no Dashboard na data
+    // informada, e o webhook não a desfaz. Saiu de "Pago": desfaz.
+    if (isWebhookOrder && current.transaction_id) {
+      if (isPaidStatusName(data.status_name) && !isPaidStatusName(current.status_name)) {
+        await marcarVendaPagaManual(
+          supabase,
+          scopedUserId,
+          current.transaction_id,
+          body.payment_date || data.payment_date
+        );
+      } else if (!isPaidStatusName(data.status_name) && isPaidStatusName(current.status_name)) {
+        await desfazerPagoManual(supabase, scopedUserId, current.transaction_id);
+      }
     }
 
     if (!isWebhookOrder) {
@@ -261,6 +299,10 @@ export async function DELETE(_request: Request, { params }: Params) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  {
+    const dono = await getEffectiveUserId(supabase, user.id);
+    if (!(await podeVerCliente(supabase, user.id, dono, id))) return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
   }
 
   const scopedUserId = await getEffectiveUserId(supabase, user.id);

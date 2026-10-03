@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 
   // Membro restrito a um atendente: so ve os clientes com o SRC dele.
   if (scope.srcFilter && scope.srcAreas.cobranca) {
-    query = query.eq("src", scope.srcFilter);
+    query = query.ilike("src", scope.srcFilter);
   }
 
   if (statusIds.length > 0) query = query.in("status_id", statusIds);
@@ -168,6 +168,13 @@ export async function POST(request: Request) {
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .single();
     attendantName = at?.name || null;
+  }
+
+  // Atendente que cria um cliente: ele já nasce vinculado a ela.
+  const escopoCriacao = await getTeamDataScope(supabase, user.id);
+  if (escopoCriacao.srcFilter && escopoCriacao.srcAreas.cobranca) {
+    body.src = escopoCriacao.srcFilter;
+    attendantName = attendantName || escopoCriacao.srcFilter;
   }
 
   const { data, error } = await supabase

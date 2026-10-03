@@ -94,6 +94,9 @@ export interface TeamContext {
   canExport: boolean;
   ownerName: string | null;
   ownerId: string;
+  /** Membro vinculado a um atendente: SRC e as áreas onde o filtro vale. */
+  attendantSrc?: string | null;
+  srcAreas?: TeamSrcAreas | null;
 }
 
 export const ALL_PERMISSIONS_TRUE: TeamPermissions = {

@@ -79,7 +79,7 @@ export function Sidebar({ profile }: SidebarProps) {
   const router = useRouter();
   const { isCollapsed: storedCollapsed, isHydrated, toggle } = useSidebar();
   const { hidden: valuesHidden, toggle: toggleValues } = useHideValues();
-  const { isOwner, isMember, permissions, ownerName, isLoading } =
+  const { isOwner, isMember, permissions, ownerName, isLoading, atendenteEm } =
     useTeamPermissions();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -105,6 +105,8 @@ export function Sidebar({ profile }: SidebarProps) {
   // para donos); membros so escondem itens apos resolver o contexto.
   const visibleItems = navItems.filter((item) => {
     if (item.ownerOnly) return isOwner;
+    // Afiliação mostra as vendas de afiliados da conta inteira: não é da atendente.
+    if (item.href === "/dashboard/affiliation" && atendenteEm("atendentes")) return false;
     if (isOwner || isLoading || !isMember) return true;
     return permissions?.[item.perm] === true;
   });

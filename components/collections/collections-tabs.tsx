@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Users, CalendarDays, BarChart3, Settings } from "lucide-react";
+import { useTeamPermissions } from "@/hooks/use-team-permissions";
 
 const tabs = [
   { href: "/dashboard/collections", label: "Clientes", icon: Users },
@@ -14,9 +15,12 @@ const tabs = [
 
 export function CollectionsTabs() {
   const pathname = usePathname();
+  // Configuração do quadro é do dono; atendente não vê a aba.
+  const { atendenteEm } = useTeamPermissions();
+  const visiveis = atendenteEm("cobranca") ? tabs.filter((t) => !t.href.endsWith("/settings")) : tabs;
   return (
     <div className="flex flex-wrap gap-1 border-b border-border">
-      {tabs.map((t) => {
+      {visiveis.map((t) => {
         const active = pathname === t.href;
         return (
           <Link
