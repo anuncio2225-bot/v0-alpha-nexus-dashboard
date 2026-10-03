@@ -21,7 +21,8 @@ import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
 import { deliveryStatusLabel } from "@/lib/collections/whatsapp";
 import type { CollectionClient, CollectionStatus } from "@/types";
-import { CalendarClock, GripVertical } from "lucide-react";
+import { CalendarClock, Copy, GripVertical } from "lucide-react";
+import { toast } from "sonner";
 
 interface KanbanProps {
   clients: CollectionClient[];
@@ -145,6 +146,27 @@ export function CollectionsKanban({
                         {c.product_name}
                       </p>
                     )}
+                    {/* AfterPay entregue/em cobrança: link de pagamento a um toque */}
+                    {c.payment_link && Number(c.remaining_value) > 0 &&
+                      ["cobrar (afterpay)", "aguardando pagamento", "pagamento pendente", "entregue"].includes(
+                        (c.status_name || "").toLowerCase()
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await navigator.clipboard.writeText(c.payment_link!);
+                              toast.success(`Link de ${c.name.split(" ")[0]} copiado`);
+                            } catch {
+                              window.prompt("Copie o link:", c.payment_link!);
+                            }
+                          }}
+                          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-brand/30 bg-brand/10 py-1 text-[11px] font-medium text-brand hover:bg-brand/20"
+                        >
+                          <Copy className="h-3 w-3" /> Copiar link de pagamento
+                        </button>
+                      )}
                     {/* Etiquetas e valor na mesma linha: card mais baixo */}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />

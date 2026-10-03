@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,17 @@ export function CollectionsBoard({
   const [newOpen, setNewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Veio da notificação (?tx=<venda>): abre direto o cliente, com o link de
+  // pagamento à mão para cobrar.
+  useEffect(() => {
+    const tx = new URLSearchParams(window.location.search).get("tx");
+    if (!tx) return;
+    fetch(`/api/collections/por-venda/${encodeURIComponent(tx)}`)
+      .then((r) => r.json())
+      .then((d) => d?.id && setSelectedId(d.id))
+      .catch(() => {});
+  }, []);
 
   const {
     search,

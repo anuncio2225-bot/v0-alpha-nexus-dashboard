@@ -148,6 +148,7 @@ export async function GET(request: Request) {
     "saiu para entrega": "transito",
     "aguardando retirada": "agencia",
     entregue: "cobranca",
+    "cobrar (afterpay)": "cobranca",
     "aguardando pagamento": "cobranca",
     "pagamento pendente": "cobranca",
     pago: "pago",

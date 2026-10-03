@@ -40,7 +40,7 @@ self.addEventListener("push", (evento) => {
             ? fetch("/api/push/recebido", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ endpoint: inscricao.endpoint }),
+                body: JSON.stringify({ endpoint: inscricao.endpoint, envio: dados.envio }),
               })
             : null
         )
