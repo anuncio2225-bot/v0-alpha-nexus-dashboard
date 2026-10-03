@@ -71,6 +71,9 @@ export function collectionColumnFor(t: {
     // Cobranca aberta. Problema na entrega tem prioridade sobre a cobranca.
     if (stage === "falha_entrega") return ["Falha na Entrega", base];
     if (vencido) return ["Pagamento Pendente", base];
+    // AfterPay entregue esperando pagar tem coluna própria — não se mistura
+    // com Pix/boleto antecipado gerado e não pago.
+    if (t.sale_type === "afterpay") return ["Cobrar (AfterPay)", base];
     return [base];
   }
 
@@ -91,6 +94,7 @@ const SYSTEM_STATUS = new Set([
   "Agendado",
   "Aguardando Pagamento",
   "Frustrado",
+  "Cobrar (AfterPay)",
   ...TRACKING_COLUMNS,
 ]);
 

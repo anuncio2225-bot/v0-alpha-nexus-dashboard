@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-02 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-03 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (30):
+-- Migrações registradas no banco (32):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -38,6 +38,8 @@
 --   20261001141513  cron_rastreio_pag2pay
 --   20261001141633  crm_modalidade
 --   20261002235318  pago_manual
+--   20261003172125  cobrar_afterpay_e_avisos
+--   20261003172152  seed_cobrar_afterpay
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -467,6 +469,14 @@ create table public.profit_partners (
   constraint profit_partners_pkey PRIMARY KEY (id)
 );
 
+create table public.push_avisos (
+  owner_id uuid not null,
+  referencia text not null,
+  evento text not null,
+  created_at timestamp with time zone default now() not null,
+  constraint push_avisos_pkey PRIMARY KEY (owner_id, referencia, evento)
+);
+
 create table public.push_envios (
   id uuid default gen_random_uuid() not null,
   owner_id uuid not null,
@@ -477,6 +487,8 @@ create table public.push_envios (
   tentados integer default 0 not null,
   ignorado text,
   created_at timestamp with time zone default now() not null,
+  recebidos integer default 0 not null,
+  recebido_em timestamp with time zone,
   constraint push_envios_pkey PRIMARY KEY (id)
 );
 
@@ -974,6 +986,7 @@ begin
     ('Saiu para Entrega', '#d946ef', 'map-pin', 3, false, true),
     ('Aguardando Retirada', '#f59e0b', 'store', 4, false, true),
     ('Entregue', '#14b8a6', 'package-check', 5, false, true),
+    ('Cobrar (AfterPay)', '#f97316', 'hand-coins', 5, false, true),
     ('Falha na Entrega', '#dc2626', 'package-x', 6, false, true),
     ('Aguardando Pagamento', '#3b82f6', 'clock', 7, false, true),
     ('Pagamento Pendente', '#ef4444', 'alert-triangle', 8, true, true),
@@ -1111,6 +1124,7 @@ alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
 alter table public.profit_config_versoes enable row level security;
 alter table public.profit_partners enable row level security;
+alter table public.push_avisos enable row level security;
 alter table public.push_envios enable row level security;
 alter table public.push_preferencias enable row level security;
 alter table public.push_subscriptions enable row level security;

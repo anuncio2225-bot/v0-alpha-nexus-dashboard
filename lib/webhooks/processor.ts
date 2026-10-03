@@ -447,7 +447,7 @@ export async function processWebhook(
       const { data: prev } = await supabase
         .from("transactions")
         .select(
-          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em"
+          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em, src"
         )
         .eq("user_id", userId)
         .eq("gateway", event.gateway)
@@ -467,6 +467,8 @@ export async function processWebhook(
           "shipping_company",
           "payment_link",
           "address_full",
+          // Atendente atribuída no CRM: evento que não traz src não a apaga.
+          "src",
         ] as const) {
           if (!tx[k] && prev[k]) tx[k] = prev[k];
         }
@@ -638,7 +640,7 @@ export async function processWebhook(
         product_name: event.product_name || null,
         plan_name: event.plan_name || null,
         total_value: (tx.total_value as number) || event.amount || 0,
-        src: event.src || null,
+        src: (tx.src as string) || event.src || null,
         origin_type: event.origin_type || "own",
         affiliate_name: event.affiliate_name || null,
       };

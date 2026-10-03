@@ -72,6 +72,19 @@ export async function enviarAviso(
   }
   const admin = createAdminClient();
 
+  // Aviso único por venda e evento: o gateway às vezes manda o mesmo evento
+  // duas vezes no mesmo segundo (dois "pagamento aprovado" chegaram juntos).
+  // A chave primária decide quem envia; o segundo desiste.
+  const ehDeVenda = aviso.evento !== "teste" && aviso.evento !== "relatorio" && !!aviso.referencia;
+  if (ehDeVenda && !somenteEndpoint) {
+    const { error: jaFoi } = await admin
+      .from("push_avisos")
+      // Evento + título: "Código de rastreio gerado" e "Pedido a caminho" são
+      // o mesmo tipo de aviso, mas momentos diferentes do pedido.
+      .insert({ owner_id: ownerId, referencia: aviso.referencia, evento: `${aviso.evento}|${aviso.titulo}` });
+    if (jaFoi) return { enviados: 0, removidos: 0, tentados: 0, ignorado: "aviso já enviado" };
+  }
+
   let q = admin
     .from("push_subscriptions")
     .select("id, member_id, endpoint, p256dh, auth")
@@ -120,9 +133,24 @@ export async function enviarAviso(
   if (!alvos.length)
     return registrar(ownerId, aviso, { enviados: 0, removidos: 0, tentados: 0, ignorado: "ninguém quer este aviso" });
 
+  // Linha do registro criada antes do envio: o aparelho devolve o id dela ao
+  // mostrar a notificação (prova de que ESTA notificação apareceu).
+  const { data: envio } = await admin
+    .from("push_envios")
+    .insert({
+      owner_id: ownerId,
+      evento: aviso.evento,
+      titulo: aviso.titulo,
+      referencia: aviso.referencia || null,
+      tentados: alvos.length,
+    })
+    .select("id")
+    .single();
+
   const hora = new Date().toISOString();
   const cargaDe = (semProduto: boolean) =>
     JSON.stringify({
+      envio: envio?.id,
       tipo: aviso.evento,
       titulo: aviso.titulo,
       corpo: semProduto && aviso.corpoSemProduto !== undefined ? aviso.corpoSemProduto : aviso.corpo,
@@ -141,7 +169,11 @@ export async function enviarAviso(
         await webpush.sendNotification(
           { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } },
           cargaDe(semProduto),
-          { TTL: 3600, urgency: aviso.evento === "pagamento_aprovado" ? "high" : "normal" }
+          {
+            // 1 dia: celular desligado na hora ainda recebe quando ligar.
+            TTL: 86400,
+            urgency: URGENTE.has(aviso.evento) ? "high" : "normal",
+          }
         );
         enviados++;
         aceitas.push(i.id);
@@ -161,13 +193,31 @@ export async function enviarAviso(
       .update({ ultimo_sucesso_em: new Date().toISOString() })
       .in("id", aceitas);
 
-  return registrar(ownerId, aviso, {
+  const resultado = {
     enviados,
     removidos: mortas.length,
     tentados: alvos.length,
     ignorado: enviados === 0 ? "serviço de push recusou" : undefined,
-  });
+  };
+  if (envio?.id) {
+    await admin
+      .from("push_envios")
+      .update({ enviados, ignorado: resultado.ignorado || null })
+      .eq("id", envio.id);
+    return resultado;
+  }
+  return registrar(ownerId, aviso, resultado);
 }
+
+/** Eventos que pedem ação na hora: entrega batendo à porta e dinheiro. */
+const URGENTE = new Set([
+  "pagamento_aprovado",
+  "saiu_para_entrega",
+  "pedido_entregue",
+  "cobranca_aberta",
+  "aguardando_retirada",
+  "falha_entrega",
+]);
 
 /** Guarda o resultado do envio (push_envios). Nunca atrapalha o envio. */
 async function registrar(ownerId: string, aviso: Aviso, r: ResultadoEnvio): Promise<ResultadoEnvio> {
@@ -287,7 +337,7 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     pix_gerado: `${info.emoji} Pix gerado · ${valor}`,
     boleto_gerado: `${info.emoji} Boleto gerado · ${valor}`,
     venda_agendada: `${info.emoji} Venda agendada · ${valor}`,
-    cobranca_aberta: `${info.emoji} Entregue — cobrar ${valor}`,
+    cobranca_aberta: `${info.emoji} Entregue — cobrar ${valor}`, // toque abre o cliente com o link
     pedido_enviado: trackingStage(v.shipping_status)
       ? `${info.emoji} Pedido a caminho`
       : `${info.emoji} Código de rastreio gerado`,
@@ -313,7 +363,8 @@ export function avisoDaVenda(ev: EventoPush, v: VendaParaAviso): Aviso {
     corpo: `${partes}${final}`,
     corpoSemProduto: `${cliente}${final}`,
     referencia: v.external_id || v.id,
-    url: ev === "cobranca_aberta" || entrega || ev === "falha_entrega" ? "/dashboard/collections" : "/dashboard",
+    // Toque na notificação abre o cliente na Cobrança (link de pagamento à mão).
+    url: v.id ? `/dashboard/collections?tx=${v.id}` : "/dashboard/collections",
     // Uma tag por venda E por tipo de aviso: cada etapa fica na tela. Com a
     // tag só da venda, o "código de rastreio" apagava o "venda agendada" do
     // mesmo pedido e parecia que o aviso nunca tinha chegado.

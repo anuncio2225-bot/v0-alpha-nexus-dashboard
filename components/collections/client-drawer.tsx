@@ -48,6 +48,7 @@ import {
   ExternalLink,
   Tag,
   Building2,
+  Copy,
 } from "lucide-react";
 import {
   buildWhatsappUrl,
@@ -282,13 +283,31 @@ export function ClientDrawer({
                   WhatsApp
                 </Button>
                 {client.payment_link && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open(client.payment_link!, "_blank")}
-                  >
-                    Link de pagamento
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 border-brand/40 text-brand"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(client.payment_link!);
+                          toast.success("Link de pagamento copiado");
+                        } catch {
+                          window.prompt("Copie o link:", client.payment_link!);
+                        }
+                      }}
+                    >
+                      <Copy className="size-4" />
+                      Copiar link de pagamento
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => window.open(client.payment_link!, "_blank")}
+                    >
+                      Abrir
+                    </Button>
+                  </>
                 )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
