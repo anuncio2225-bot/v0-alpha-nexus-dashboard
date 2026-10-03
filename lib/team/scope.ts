@@ -125,3 +125,28 @@ export async function podeVerAtendente(
     .maybeSingle();
   return (data?.src || "").trim().toLowerCase() === src.trim().toLowerCase();
 }
+
+/**
+ * Atendente (membro limitado ao SRC na Cobrança) só abre, edita e registra
+ * pagamento dos clientes dela. Devolve true quando pode mexer no cliente.
+ */
+export async function podeVerCliente(
+  supabase: SupabaseClient,
+  userId: string,
+  ownerId: string,
+  clientId: string
+): Promise<boolean> {
+  const src = await scopedSrc(supabase, userId, "cobranca");
+  if (!src) return true;
+  const { data } = await supabase
+    .from("collection_clients")
+    .select("src, attendant_name")
+    .eq("id", clientId)
+    .eq("user_id", ownerId)
+    .maybeSingle();
+  const alvo = src.trim().toLowerCase();
+  return (
+    (data?.src || "").trim().toLowerCase() === alvo ||
+    (data?.attendant_name || "").trim().toLowerCase() === alvo
+  );
+}

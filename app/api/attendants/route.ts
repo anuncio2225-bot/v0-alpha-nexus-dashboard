@@ -95,6 +95,9 @@ export async function PATCH(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (await scopedSrc(supabase, user.id, "atendentes")) {
+    return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
+  }
 
   const body = await request.json();
   const { id, ...updates } = body;
@@ -124,6 +127,9 @@ export async function DELETE(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (await scopedSrc(supabase, user.id, "atendentes")) {
+    return NextResponse.json({ error: "Acesso restrito ao seu atendente" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);

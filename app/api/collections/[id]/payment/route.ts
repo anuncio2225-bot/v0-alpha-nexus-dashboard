@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, podeVerCliente } from "@/lib/team/scope";
+import { marcarVendaPagaManual } from "@/lib/collections/pago-manual";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -13,6 +14,11 @@ export async function POST(request: Request, { params }: Params) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const dono = await getEffectiveUserId(supabase, user.id);
+  if (!(await podeVerCliente(supabase, user.id, dono, id))) {
+    return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -57,6 +63,9 @@ export async function POST(request: Request, { params }: Params) {
     updates.status_id = targetStatus.id;
     updates.status_name = targetStatus.name;
   }
+  // Data do pagamento: a informada (ex.: pagou ontem) ou agora.
+  const dataPagamento = body.payment_date ? new Date(`${body.payment_date}T12:00:00-03:00`).toISOString() : new Date().toISOString();
+  if (remaining <= 0) updates.payment_date = dataPagamento;
 
   const { data: updated, error } = await supabase
     .from("collection_clients")
@@ -81,6 +90,11 @@ export async function POST(request: Request, { params }: Params) {
     payment_amount: amount,
     payment_method: body.payment_method || null,
   });
+
+  // Quitado: a venda do gateway passa a contar como paga no Dashboard.
+  if (remaining <= 0 && client.transaction_id) {
+    await marcarVendaPagaManual(supabase, dono, client.transaction_id, dataPagamento);
+  }
 
   return NextResponse.json({ client: updated });
 }

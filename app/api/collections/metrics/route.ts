@@ -59,7 +59,7 @@ export async function GET(request: Request) {
 
   // Membro restrito a um atendente: KPIs refletem so o SRC dele.
   if (scope.srcFilter && scope.srcAreas.cobranca) {
-    clientsQuery = clientsQuery.eq("src", scope.srcFilter);
+    clientsQuery = clientsQuery.ilike("src", scope.srcFilter);
   }
 
   if (statusIds.length > 0) clientsQuery = clientsQuery.in("status_id", statusIds);

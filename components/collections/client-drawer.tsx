@@ -117,6 +117,9 @@ export function ClientDrawer({
   const [note, setNote] = useState("");
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("PIX");
+  // Data do pagamento (Brasília) — padrão hoje; dá para lançar "pagou ontem".
+  const hojeSP = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  const [payDate, setPayDate] = useState(hojeSP());
   const [scheduleDate, setScheduleDate] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -193,6 +196,7 @@ export function ClientDrawer({
         body: JSON.stringify({
           amount: Number(payAmount),
           payment_method: payMethod,
+          payment_date: payDate,
         }),
       });
       if (!res.ok) throw new Error();
@@ -591,6 +595,36 @@ export function ClientDrawer({
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-xs text-muted-foreground">Pago em</span>
+                      <Input
+                        type="date"
+                        value={payDate}
+                        max={hojeSP()}
+                        onChange={(e) => setPayDate(e.target.value || hojeSP())}
+                      />
+                    </div>
+                    {client.status_name?.toLowerCase() !== "pago" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        disabled={busy}
+                        onClick={() =>
+                          setPayAmount(
+                            String(
+                              Number(client.order_total_value) ||
+                                Number(client.remaining_value) ||
+                                Number(client.total_value) ||
+                                0
+                            )
+                          )
+                        }
+                      >
+                        Já pagou tudo — preencher valor total
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       onClick={registerPayment}
@@ -599,6 +633,10 @@ export function ClientDrawer({
                     >
                       Registrar pagamento
                     </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Quitado, o pedido vai para Pago e conta como pago no Dashboard na data acima —
+                      inclusive AfterPay que o cliente adiantou por fora.
+                    </p>
                   </div>
 
                   <Separator />

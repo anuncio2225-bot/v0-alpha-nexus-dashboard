@@ -48,6 +48,9 @@ export function useTeamPermissions() {
     canDelete: ctx.canDelete,
     canExport: ctx.canExport,
     ownerName: ctx.ownerName,
+    /** SRC da atendente quando o membro vê só o que é dela naquela área. */
+    atendenteEm: (area: "cobranca" | "atendentes" | "dashboard") =>
+      ctx.attendantSrc && ctx.srcAreas?.[area] !== false ? ctx.attendantSrc : null,
     can,
   };
 }

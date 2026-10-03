@@ -36,7 +36,7 @@ export async function getTeamContext(
     const { data: membership } = await supabase
       .from("team_members")
       .select(
-        "owner_id, status, permissions, can_edit, can_delete, can_export"
+        "owner_id, status, permissions, can_edit, can_delete, can_export, scope_mode, attendant_src, src_areas"
       )
       .eq("member_user_id", userId)
       .eq("status", "active")
@@ -72,6 +72,15 @@ export async function getTeamContext(
       canExport: !!membership.can_export,
       ownerName,
       ownerId: membership.owner_id,
+      attendantSrc:
+        membership.scope_mode === "attendant" && membership.attendant_src
+          ? String(membership.attendant_src)
+          : null,
+      srcAreas: {
+        cobranca: (membership.src_areas as Record<string, unknown> | null)?.cobranca !== false,
+        atendentes: (membership.src_areas as Record<string, unknown> | null)?.atendentes !== false,
+        dashboard: (membership.src_areas as Record<string, unknown> | null)?.dashboard !== false,
+      },
     };
   } catch {
     return fallbackOwner;

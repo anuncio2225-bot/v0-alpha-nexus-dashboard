@@ -32,7 +32,7 @@ function resolveRoute(pathname: string) {
 
 export function RouteAccessGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isOwner, isMember, permissions, isLoading } = useTeamPermissions();
+  const { isOwner, isMember, permissions, isLoading, atendenteEm } = useTeamPermissions();
 
   // Donos (e qualquer usuario que nao seja membro) tem acesso total — sem
   // bloqueio nenhum. Isso garante que nada muda para quem ja usa o sistema.
@@ -45,7 +45,10 @@ export function RouteAccessGuard({ children }: { children: React.ReactNode }) {
   // Rota nao mapeada => libera (nao bloqueia navegacao desconhecida)
   if (!route) return <>{children}</>;
 
-  const allowed = !route.ownerOnly && permissions?.[route.perm] === true;
+  const allowed =
+    !route.ownerOnly &&
+    permissions?.[route.perm] === true &&
+    !(route.prefix === "/dashboard/affiliation" && atendenteEm("atendentes"));
   if (allowed) return <>{children}</>;
 
   return (

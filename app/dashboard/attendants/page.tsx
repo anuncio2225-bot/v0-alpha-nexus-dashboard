@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { AttendantCard } from "@/components/attendants/attendant-card";
+import { useTeamPermissions } from "@/hooks/use-team-permissions";
 import { ConfigModal } from "@/components/attendants/config-modal";
 import { DetailsModal } from "@/components/attendants/details-modal";
 
@@ -87,6 +88,9 @@ interface Summary {
 }
 
 export default function AttendantsPage() {
+  // Atendente vinculada vê só o próprio resultado: sem ações de gestão.
+  const { atendenteEm } = useTeamPermissions();
+  const somenteLeitura = !!atendenteEm("atendentes");
   const [newOpen, setNewOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [detecting, setDetecting] = useState(false);
@@ -290,6 +294,7 @@ export default function AttendantsPage() {
               />
             </div>
           )}
+          {!somenteLeitura && (<>
           <Button variant="outline" onClick={() => runAutoDetect(false)} disabled={detecting}>
             <RefreshCw className={detecting ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
             Detectar
@@ -362,6 +367,7 @@ export default function AttendantsPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </>)}
         </div>
       </div>
 
@@ -419,6 +425,7 @@ export default function AttendantsPage() {
             {visibleAttendants.map((att) => (
               <AttendantCard
                 key={att.id}
+                somenteLeitura={somenteLeitura}
                 attendant={att}
                 period={period}
                 onConfigure={(a) => setConfigTarget(a)}

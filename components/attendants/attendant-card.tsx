@@ -58,9 +58,11 @@ interface Props {
   onConfigure: (a: Attendant) => void;
   onDetails: (a: Attendant, commission: CommissionResult) => void;
   onChanged: () => void;
+  /** Atendente vendo o próprio cartão: sem configurar, registrar, ativar ou remover. */
+  somenteLeitura?: boolean;
 }
 
-export function AttendantCard({ attendant, period, onConfigure, onDetails, onChanged }: Props) {
+export function AttendantCard({ attendant, period, onConfigure, onDetails, onChanged, somenteLeitura }: Props) {
   const [registering, setRegistering] = useState(false);
   const [togglingActive, setTogglingActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -237,7 +239,7 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               </span>
               <Switch
                 checked={!isInactive}
-                disabled={togglingActive}
+                disabled={togglingActive || somenteLeitura}
                 onCheckedChange={handleToggleActive}
                 aria-label="Ativar ou inativar atendente"
               />
@@ -372,6 +374,7 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
 
             {/* Ações */}
             <div className="flex flex-wrap gap-2">
+              {!somenteLeitura && (
               <Button
                 variant="outline"
                 size="sm"
@@ -380,6 +383,7 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               >
                 <Settings className="mr-1.5 h-3.5 w-3.5" /> Configurar
               </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -388,6 +392,7 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
               >
                 <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> Detalhes
               </Button>
+              {!somenteLeitura && (<>
               <Button
                 size="sm"
                 className="flex-1 min-w-[7rem] bg-brand hover:bg-brand/90"
@@ -435,6 +440,7 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              </>)}
             </div>
 
             {/* Modal de confirmação do registro de pagamento */}

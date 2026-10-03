@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { getEffectiveUserId, scopedSrc } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
@@ -38,6 +38,10 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = await getEffectiveUserId(supabase, user.id);
+  // Vendas de afiliados da conta inteira: não é da atendente vinculada.
+  if (await scopedSrc(supabase, user.id, "atendentes")) {
+    return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(request.url);
   const qStart = searchParams.get("period_start");
