@@ -86,11 +86,20 @@ export async function GET(request: NextRequest) {
       const frustradas = soma("frustradas");
       const roi = k.investimento.value > 0 ? `${(1 + k.roi.value / 100).toFixed(2).replace(".", ",")}x` : "—";
 
+      // Nome da conta no relatório: quem tem mais de uma conta no mesmo
+      // celular recebia dois resumos e não sabia qual era qual.
+      const { data: perfil } = await admin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", owner)
+        .maybeSingle();
+      const conta = (perfil?.email || "").split("@")[0] || perfil?.full_name || "";
+
       const r = await enviarAviso(
         owner,
         {
           evento: "relatorio",
-          titulo: `📊 Resumo de hoje · Lucro ${brl(k.lucro.value)}`,
+          titulo: `📊 ${conta ? `${conta} · ` : ""}Lucro ${brl(k.lucro.value)}`,
           corpo:
             `${agendadas + antecipadas} vendas (${agendadas} agendadas, ${antecipadas} antecipadas) · ${pagas} pagas` +
             (frustradas ? ` · ${frustradas} frustradas` : "") +
