@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { ehAtendente, getEffectiveUserId } from "@/lib/team/scope";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,8 @@ export async function POST(_req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // Webhooks (com os tokens) não são da atendente.
+  if (await ehAtendente(supabase, user.id)) return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
 
   try {
     const results: string[] = [];

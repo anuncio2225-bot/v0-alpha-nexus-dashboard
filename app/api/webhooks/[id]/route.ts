@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { ehAtendente, getEffectiveUserId } from "@/lib/team/scope";
 import { randomBytes } from "crypto";
 
 export async function PATCH(
@@ -13,6 +13,8 @@ export async function PATCH(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Webhooks (com os tokens) não são da atendente.
+  if (await ehAtendente(supabase, user.id)) return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -63,6 +65,8 @@ export async function DELETE(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Webhooks (com os tokens) não são da atendente.
+  if (await ehAtendente(supabase, user.id)) return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
 
   const { error } = await supabase
     .from("webhooks")

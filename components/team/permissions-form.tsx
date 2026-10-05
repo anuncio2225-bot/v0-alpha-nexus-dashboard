@@ -166,7 +166,8 @@ export function PermissionsForm({
           <div>
             <Label className="text-sm">Vincular a um atendente</Label>
             <p className="text-xs text-muted-foreground">
-              Restringe a visão deste membro aos dados do atendente (SRC).
+              Restringe a visão deste membro aos dados do atendente (SRC). Atendente vinculada vê só
+              Atendentes e Cobrança (e as notificações em Configurações), qualquer que seja a marcação acima.
             </p>
           </div>
           <Switch

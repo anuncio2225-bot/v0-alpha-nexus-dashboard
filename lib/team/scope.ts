@@ -150,3 +150,14 @@ export async function podeVerCliente(
     (data?.attendant_name || "").trim().toLowerCase() === alvo
   );
 }
+
+/** Membro vinculado a um atendente (vê só Atendentes, Cobrança e notificações). */
+export async function ehAtendente(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("team_members")
+    .select("scope_mode, attendant_src")
+    .eq("member_user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  return data?.scope_mode === "attendant" && !!data.attendant_src;
+}
