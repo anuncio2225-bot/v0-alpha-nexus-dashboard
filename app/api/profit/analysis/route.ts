@@ -3,6 +3,7 @@ import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { carregarVersoes, diaSP, versaoDoDia, type VersaoCustos } from "@/lib/profit/versoes";
+import { resolveKitUnits } from "@/lib/stock/kit";
 
 /**
  * ANÁLISE DE LUCRO (somente leitura).
@@ -31,6 +32,7 @@ interface Tx {
   sale_date: string | null;
   payment_date: string | null;
   created_at: string | null;
+  sale_type?: string | null;
 }
 
 interface ProductCost {
@@ -107,30 +109,29 @@ export async function GET(request: Request) {
     },
     kits: productCosts,
   };
-  const custosDa = (tx: Tx): VersaoCustos => {
-    const ref = tx.payment_date || tx.sale_date || tx.created_at;
-    return (ref && versaoDoDia(versoes, diaSP(ref))) || atual;
-  };
+  const custosDa = (tx: Tx, ref = tx.payment_date || tx.sale_date || tx.created_at): VersaoCustos =>
+    (ref && versaoDoDia(versoes, diaSP(ref))) || atual;
 
-  const kitCostFor = (tx: Tx): number => {
-    const v = custosDa(tx);
-    const unit = num(v.config.cost_per_unit);
-    const envio = num(v.config.shipping_cost);
+  // Envio do kit: o próprio do kit (se configurado) ou o padrão.
+  const envioDo = (tx: Tx, v: VersaoCustos): number => {
     const hay = `${tx.plan_name || ""} ${tx.product_name || ""}`.toLowerCase();
     const match = v.kits.find(
-      (pc) =>
-        pc.product_keyword &&
-        hay.includes(pc.product_keyword.trim().toLowerCase())
+      (pc) => pc.product_keyword && hay.includes(pc.product_keyword.trim().toLowerCase())
     );
-    if (match) {
-      const shipping =
-        match.custom_shipping === null || match.custom_shipping === undefined
-          ? envio
-          : num(match.custom_shipping);
-      return num(match.units_per_kit) * unit + shipping;
-    }
-    // Fallback: 1 unidade + envio padrão
-    return unit + envio;
+    return match && match.custom_shipping !== null && match.custom_shipping !== undefined
+      ? num(match.custom_shipping)
+      : num(v.config.shipping_cost);
+  };
+
+  // Custo de cada venda paga = potes do kit × custo do pote + envio. Potes pela
+  // MESMA regra da baixa de estoque ("2+1", kit cadastrado, "6 MESES" no nome);
+  // antes, kit sem cadastro (ex.: 6 MESES) contava como 1 pote só.
+  // O pote entra aqui (e não na compra do estoque, que não é saída do caixa da
+  // análise): cada venda leva o custo do que saiu da prateleira.
+  const kitCostFor = (tx: Tx): { produto: number; envio: number } => {
+    const v = custosDa(tx);
+    const { units } = resolveKitUnits(tx.plan_name, tx.product_name, v.kits);
+    return { produto: units * num(v.config.cost_per_unit), envio: envioDo(tx, v) };
   };
 
   // 3. Sócios
@@ -154,6 +155,23 @@ export async function GET(request: Request) {
     .eq("user_id", userId)
     .eq("status", "pago")
     .in("origin_type", ["own", "affiliate_incoming"]));
+
+  // AfterPay frustrado: o kit foi enviado e o cliente não pagou. O pote volta
+  // para o estoque, mas o envio já foi pago — é custo do mês em que saiu.
+  const { data: frustRaw } = await fetchAll(supabase
+    .from("transactions")
+    .select("origin_type, status, product_name, plan_name, sale_date, payment_date, created_at, sale_type")
+    .eq("user_id", userId)
+    .eq("status", "frustrado")
+    .eq("sale_type", "afterpay")
+    .or("origin_type.eq.own,origin_type.is.null")
+    .gte("sale_date", fromTs)
+    .lte("sale_date", toTs));
+  const frustradas = (frustRaw || []) as Tx[];
+  const envioFrustradas = frustradas.reduce((s, t) => {
+    const v = custosDa(t, t.sale_date || t.created_at);
+    return s + envioDo(t, v);
+  }, 0);
 
   const inPeriod = (tx: Tx): boolean => {
     const ref = tx.payment_date || tx.sale_date || tx.created_at;
@@ -266,6 +284,8 @@ export async function GET(request: Request) {
   // então o lucro/ROI da simulação consideram apenas o investimento em ads.
   let simRevenue = 0;
   let ownKitCosts = 0;
+  let ownProduto = 0;
+  let ownEnvio = 0;
   for (const t of ownTxs) {
     const price = num(t.product_price) || num(t.total_value) || num(t.amount);
     const c = custosDa(t).config;
@@ -274,7 +294,10 @@ export async function GET(request: Request) {
       gross * (1 - num(c.affiliate_platform_fee) / 100) -
       num(c.affiliate_platform_fixed);
     simRevenue += Math.max(0, net);
-    ownKitCosts += kitCostFor(t); // reutilizado na operação interna (2.4)
+    const k = kitCostFor(t); // reutilizado na operação interna (2.4)
+    ownProduto += k.produto;
+    ownEnvio += k.envio;
+    ownKitCosts += k.produto + k.envio;
   }
   const simProfit = simRevenue - adsInvestment;
   const simRoi = adsInvestment > 0 ? simRevenue / adsInvestment : 0;
@@ -285,13 +308,14 @@ export async function GET(request: Request) {
   let affKitCosts = 0;
   for (const t of affTxs) {
     affCommission += num(t.producer_commission);
-    affKitCosts += kitCostFor(t);
+    const k = kitCostFor(t);
+    affKitCosts += k.produto + k.envio;
   }
   const affProfit = affCommission - affKitCosts;
 
   // 2.4 Lucro operação interna (receita = comissão líquida das vendas próprias)
   const internalRevenue = ownTxs.reduce((s, t) => s + num(t.commission), 0);
-  const internalProfit = internalRevenue - ownKitCosts - adsInvestment;
+  const internalProfit = internalRevenue - ownKitCosts - envioFrustradas - adsInvestment;
 
   // 2.5 Lucro produtor total
   const producerTotal = internalProfit + affProfit;
@@ -330,6 +354,10 @@ export async function GET(request: Request) {
       revenue: internalRevenue,
       sales_count: ownTxs.length,
       kit_costs: ownKitCosts,
+      kit_produto: ownProduto,
+      kit_envio: ownEnvio,
+      frustradas_envio: envioFrustradas,
+      frustradas_count: frustradas.length,
       ads_investment: adsInvestment,
       profit: internalProfit,
     },
