@@ -57,6 +57,7 @@ import {
   formatPhoneDisplay,
 } from "@/lib/collections/whatsapp";
 import { trackingUrlFor } from "@/lib/tracking/stages";
+import { RegistrarPagamento } from "./registrar-pagamento";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -116,11 +117,6 @@ export function ClientDrawer({
   const history = data?.history ?? [];
 
   const [note, setNote] = useState("");
-  const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("PIX");
-  // Data do pagamento (Brasília) — padrão hoje; dá para lançar "pagou ontem".
-  const hojeSP = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
-  const [payDate, setPayDate] = useState(hojeSP());
   const [scheduleDate, setScheduleDate] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -182,30 +178,6 @@ export function ClientDrawer({
       refresh();
     } catch {
       toast.error("Erro ao adicionar anotacao");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function registerPayment() {
-    if (!clientId || !payAmount) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/collections/${clientId}/payment`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Number(payAmount),
-          payment_method: payMethod,
-          payment_date: payDate,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      setPayAmount("");
-      toast.success("Pagamento registrado");
-      refresh();
-    } catch {
-      toast.error("Erro ao registrar pagamento");
     } finally {
       setBusy(false);
     }
@@ -606,72 +578,15 @@ export function ClientDrawer({
 
                   <Separator />
 
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <DollarSign className="size-4" /> Registrar pagamento
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Valor"
-                        value={payAmount}
-                        onChange={(e) => setPayAmount(e.target.value)}
-                      />
-                      <Select value={payMethod} onValueChange={setPayMethod}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PIX">PIX</SelectItem>
-                          <SelectItem value="Boleto">Boleto</SelectItem>
-                          <SelectItem value="Cartao">Cartao</SelectItem>
-                          <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0 text-xs text-muted-foreground">Pago em</span>
-                      <Input
-                        type="date"
-                        value={payDate}
-                        max={hojeSP()}
-                        onChange={(e) => setPayDate(e.target.value || hojeSP())}
-                      />
-                    </div>
-                    {client.status_name?.toLowerCase() !== "pago" && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        disabled={busy}
-                        onClick={() =>
-                          setPayAmount(
-                            String(
-                              Number(client.order_total_value) ||
-                                Number(client.remaining_value) ||
-                                Number(client.total_value) ||
-                                0
-                            )
-                          )
-                        }
-                      >
-                        Já pagou tudo — preencher valor total
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={registerPayment}
-                      disabled={busy || !payAmount}
-                      className="w-full"
-                    >
-                      Registrar pagamento
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Quitado, o pedido vai para Pago e conta como pago no Dashboard na data acima —
-                      inclusive AfterPay que o cliente adiantou por fora.
-                    </p>
-                  </div>
+                  <RegistrarPagamento
+                    clientId={client.id}
+                    valorPedido={Number(client.order_total_value) || Number(client.total_value) || 0}
+                    recebido={history
+                      .filter((h) => h.type === "payment")
+                      .reduce((acc, h) => acc + (Number(h.payment_amount) || 0), 0)}
+                    quitado={(client.status_name || "").toLowerCase() === "pago"}
+                    onFeito={refresh}
+                  />
 
                   <Separator />
 
