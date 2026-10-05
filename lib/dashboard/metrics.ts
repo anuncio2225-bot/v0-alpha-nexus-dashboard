@@ -380,7 +380,11 @@ export async function calcularMetricas(
   const isAfterpayViva = (t: Tx) =>
     t.sale_type === "afterpay" && AFTERPAY_VIVA.has(t.status || "");
 
-  const pagas = workingList.filter((t) => t.status === "pago");
+  // Pagas = pagas NO PERÍODO pela data do pagamento. A lista de trabalho traz
+  // também os pedidos feitos no período; sem este filtro, um AfterPay pedido
+  // dia 01 e pago dia 05 contava como pago nos dois dias (comissão real,
+  // CAC e ranking das atendentes).
+  const pagas = workingList.filter((t) => t.status === "pago" && paidInPeriod(t));
   // "Agendadas" = todas as vendas AfterPay do período que seguem valendo.
   const agendadas = workingList.filter(
     (t) => isAfterpayViva(t) && soldInPeriod(t)
@@ -728,7 +732,8 @@ export async function calcularMetricas(
       label: format(day, "dd/MM"),
       agendadas: dayAgendadas.length,
       antecipadas: dayAntecipadas.length,
-      pagas: dayTx.filter((t) => t.status === "pago").length,
+      // Paga entra no dia em que o dinheiro entrou, não no dia do pedido.
+      pagas: pagas.filter((t) => spDay(t.payment_date || t.sale_date || t.created_at) === dayStr).length,
       frustradas: dayTx.filter(
         (t) => t.sale_type === "afterpay" && PERDIDO.has(t.status || "")
       ).length,
