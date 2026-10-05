@@ -38,6 +38,7 @@ export function RegistrarPagamento({
   valorPedido,
   recebido,
   quitado,
+  dataPedido,
   onFeito,
 }: {
   clientId: string;
@@ -46,6 +47,8 @@ export function RegistrarPagamento({
   /** Soma dos pagamentos já lançados. */
   recebido: number;
   quitado: boolean;
+  /** Data do pedido (YYYY-MM-DD): pagamento não pode ser antes dela. */
+  dataPedido?: string | null;
   onFeito: () => void;
 }) {
   const falta = Math.max(0, valorPedido - recebido);
@@ -55,6 +58,9 @@ export function RegistrarPagamento({
   const [ocupado, setOcupado] = useState(false);
 
   const somaAgora = partes.reduce((s, p) => s + num(p.valor), 0);
+  // Data fora do intervalo pedido→hoje joga o pagamento em outro mês (some do
+  // Dashboard, do lucro e da comissão do período).
+  const dataInvalida = (!!dataPedido && data < dataPedido) || data > hojeSP();
   const vaiQuitar = quitar || recebido + somaAgora >= valorPedido - 0.01;
   const mudar = (i: number, campo: keyof Parte, v: string) =>
     setPartes((ps) => ps.map((p, j) => (j === i ? { ...p, [campo]: v } : p)));
@@ -171,8 +177,20 @@ export function RegistrarPagamento({
 
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-xs text-muted-foreground">Pago em</span>
-            <Input type="date" value={data} max={hojeSP()} onChange={(e) => setData(e.target.value || hojeSP())} />
+            <Input
+              type="date"
+              value={data}
+              min={dataPedido || undefined}
+              max={hojeSP()}
+              onChange={(e) => setData(e.target.value || hojeSP())}
+            />
           </div>
+          {dataInvalida && (
+            <p className="text-xs text-destructive">
+              A data do pagamento não pode ser antes do pedido ({dataPedido!.split("-").reverse().join("/")}) nem
+              depois de hoje.
+            </p>
+          )}
 
           <label className="flex cursor-pointer items-start gap-2 text-sm">
             <Checkbox checked={quitar} onCheckedChange={(c) => setQuitar(c === true)} className="mt-0.5" />
@@ -185,7 +203,7 @@ export function RegistrarPagamento({
           <Button
             size="sm"
             onClick={registrar}
-            disabled={ocupado || (somaAgora <= 0 && !quitar)}
+            disabled={ocupado || dataInvalida || (somaAgora <= 0 && !quitar)}
             className="w-full"
           >
             {ocupado
