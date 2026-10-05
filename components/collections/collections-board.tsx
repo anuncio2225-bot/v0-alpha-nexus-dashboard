@@ -64,7 +64,25 @@ export function CollectionsBoard({
   // Atendente vinculada: vê e trabalha os clientes dela, sem gestão do quadro.
   const { atendenteEm } = useTeamPermissions();
   const atendente = atendenteEm("cobranca");
-  const [view, setView] = useState<"table" | "kanban">("table");
+  // Quadro (Kanban) é a tela principal; a escolha de cada pessoa fica
+  // lembrada neste navegador.
+  const [view, setViewState] = useState<"table" | "kanban">("kanban");
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem("cobranca:visao");
+      if (salvo === "table" || salvo === "kanban") setViewState(salvo);
+    } catch {
+      // sem armazenamento: fica no quadro
+    }
+  }, []);
+  const setView = (v: "table" | "kanban") => {
+    setViewState(v);
+    try {
+      localStorage.setItem("cobranca:visao", v);
+    } catch {
+      // ignora
+    }
+  };
   const [newOpen, setNewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
