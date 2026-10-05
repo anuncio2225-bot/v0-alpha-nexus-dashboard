@@ -17,13 +17,18 @@ export interface ProfitAnalysis {
   internal_operation: {
     revenue: number;
     sales_count: number;
+    /** Frete dos pedidos enviados no período (= envios.frete). */
     kit_costs: number;
-    /** Potes do kit (custo do estoque que saiu). */
-    kit_produto?: number;
-    kit_envio?: number;
-    /** Envio de AfterPay frustrado (kit foi e voltou, o frete ficou). */
-    frustradas_envio?: number;
-    frustradas_count?: number;
+    envios?: {
+      pedidos: number;
+      frete: number;
+      afterpay_em_aberto: number;
+      afterpay_pagos: number;
+      antecipados: number;
+      frustrados: number;
+    };
+    /** Potes que saíram do estoque — só informação, já pagos. */
+    estoque_saiu?: { potes: number; valor: number };
     ads_investment: number;
     profit: number;
   };
