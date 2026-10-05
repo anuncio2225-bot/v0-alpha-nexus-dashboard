@@ -268,6 +268,8 @@ export interface Attendant {
   platform_fee_percent: number;
   platform_fee_fixed: number;
   fixed_per_sale: number;
+  /** Ordem do cartão escolhida pelo dono (null = fim, por nome). */
+  sort_order?: number | null;
 }
 
 export interface AttendantRule {
@@ -325,7 +327,23 @@ export interface CommissionResult {
    * ou entregue em cobrança). NÃO entra no total a pagar: vira comissão quando
    * o cliente paga. Estimado com a faixa atual.
    */
-  afterpay_pendente?: { vendas: number; base: number; comissao: number };
+  afterpay_pendente?: {
+    vendas: number;
+    base: number;
+    comissao: number;
+    /** Quem ainda vai pagar (a caminho / em cobrança). */
+    clientes?: ClienteComissao[];
+  };
+}
+
+/** Cliente de uma venda da atendente e quanto ela ganha com ele. */
+export interface ClienteComissao {
+  nome: string | null;
+  produto: string | null;
+  data: string;
+  status: string | null;
+  comissao: number;
+  afterpay: boolean;
 }
 
 // ============================================================================
@@ -496,7 +514,14 @@ export interface CampaignData {
 export interface AttendantRanking {
   id: string;
   name: string;
+  /** Vendas no período: pagas + agendadas em aberto. */
   sales: number;
+  /** Pagas no período. */
+  pagas: number;
+  /** AfterPay agendado/em cobrança, ainda não pago. */
+  agendadas: number;
+  /** Valor das agendadas que ainda vai entrar. */
+  aReceber: number;
   revenue: number;
   commission: number;
   goal: number;

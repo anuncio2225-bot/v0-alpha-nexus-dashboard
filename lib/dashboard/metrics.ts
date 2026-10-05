@@ -811,13 +811,10 @@ export async function calcularMetricas(
       // attendant_id (que fica vazio nas transações). Casamento
       // case-insensitive, igual à rota de comissão individual.
       const attSrc = (att.src || "").trim().toLowerCase();
-      const attTx = attSrc
-        ? workingList.filter(
-            (t) =>
-              (t.src || "").trim().toLowerCase() === attSrc &&
-              t.status === "pago"
-          )
-        : [];
+      const daAtendente = (t: Tx) => !!attSrc && (t.src || "").trim().toLowerCase() === attSrc;
+      const attTx = pagas.filter(daAtendente);
+      // Agendadas que ainda vão pagar (a caminho / em cobrança) e quanto falta entrar.
+      const abertas = afterpayEmAberto.filter(daAtendente);
       const revenue = safeNumber(sumValue(attTx));
       const commission = safeNumber(sumCommission(attTx));
       const goal = safeNumber(att.monthly_goal);
@@ -826,14 +823,17 @@ export async function calcularMetricas(
       return {
         id: att.id,
         name: att.name,
-        sales: attTx.length,
+        sales: attTx.length + abertas.length,
+        pagas: attTx.length,
+        agendadas: abertas.length,
+        aReceber: safeNumber(sumValue(abertas)),
         revenue,
         commission,
         goal,
         goalProgress,
       };
     })
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a, b) => b.revenue - a.revenue || b.sales - a.sales || b.aReceber - a.aReceber)
     .slice(0, 6);
 
   // Financial breakdown for pie chart (usando receitaBase do modo)

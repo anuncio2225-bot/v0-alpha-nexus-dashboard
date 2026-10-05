@@ -14,6 +14,8 @@ export async function GET() {
     .from("attendants")
     .select("*")
     .eq("user_id", await getEffectiveUserId(supabase, user.id))
+    // Ordem escolhida pelo dono; quem não foi ordenada vai para o fim, por nome.
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   // Membro limitado a um atendente vê só o próprio cartão.
   const src = await scopedSrc(supabase, user.id, "atendentes");

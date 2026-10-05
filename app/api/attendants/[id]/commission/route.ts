@@ -71,7 +71,7 @@ export async function GET(
     const { data: txs, error: txErr } = await fetchAll(supabase
       .from("transactions")
       .select(
-        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name, sale_type"
       )
       .eq("user_id", userId)
       // Comparação case-insensitive: "Bruna" == "bruna" == "BRUNA"
@@ -93,7 +93,7 @@ export async function GET(
     const { data: abertos } = await fetchAll(supabase
       .from("transactions")
       .select(
-        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date"
+        "status, amount, total_value, paid_value, product_price, commission, affiliate_commission, sale_date, payment_date, customer_name, product_name"
       )
       .eq("user_id", userId)
       .ilike("src", att.src)
@@ -141,6 +141,7 @@ export async function GET(
       payment_date: cc.payment_date || cc.created_at,
       customer_name: cc.name,
       product_name: cc.product_name,
+      sale_type: null,
     }));
 
   paidSales = [...paidSales, ...manualSales];
@@ -168,6 +169,11 @@ export async function GET(
         customer_paid: customerPaid,
         base_value: saleBaseValue(tx, att),
         commission: saleBaseValue(tx, att) * (result.commission_tier.percent / 100),
+        // O que ela ganha com este cliente (comissão + fixo por venda).
+        ganho:
+          saleBaseValue(tx, att) * (result.commission_tier.percent / 100) + (att.fixed_per_sale || 0),
+        // AfterPay pago = comissão liberada (entrou no total a pagar).
+        afterpay: tx.sale_type === "afterpay",
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));

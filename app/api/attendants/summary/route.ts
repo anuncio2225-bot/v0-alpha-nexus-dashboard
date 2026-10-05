@@ -45,6 +45,7 @@ export async function GET(request: Request) {
       total_paid_sales: 0,
       total_pendente: 0,
       top_seller: null,
+      ranking: [],
     });
   }
 
@@ -64,6 +65,16 @@ export async function GET(request: Request) {
   let totalPaidSales = 0;
   let totalPendente = 0;
   let topSeller: { name: string; sales: number } | null = null;
+  // Ranking: vendas pagas no período, depois o valor vendido (base da comissão).
+  const ranking: {
+    id: string;
+    name: string;
+    vendas: number;
+    vendido: number;
+    a_receber: number;
+    a_liberar: number;
+    afterpay_abertos: number;
+  }[] = [];
 
   for (const att of list) {
     if (!att.src) continue;
@@ -107,8 +118,18 @@ export async function GET(request: Request) {
       const ref = (tx.sale_date || "").slice(0, 10);
       return ref >= period.start && ref <= period.end;
     });
-    totalPendente += afterpayPendente(att, pendentes, result.commission_tier.percent).comissao;
+    const aLiberar = afterpayPendente(att, pendentes, result.commission_tier.percent);
+    totalPendente += aLiberar.comissao;
     totalPaidSales += result.total_sales;
+    ranking.push({
+      id: att.id,
+      name: att.name,
+      vendas: result.total_sales,
+      vendido: result.base_value_total,
+      a_receber: result.total_to_pay,
+      a_liberar: aLiberar.comissao,
+      afterpay_abertos: aLiberar.vendas,
+    });
 
     if (!topSeller || result.total_sales > topSeller.sales) {
       topSeller = { name: att.name, sales: result.total_sales };
@@ -121,5 +142,6 @@ export async function GET(request: Request) {
     total_paid_sales: totalPaidSales,
     total_pendente: totalPendente,
     top_seller: topSeller && topSeller.sales > 0 ? topSeller : null,
+    ranking: ranking.sort((a, b) => b.vendas - a.vendas || b.vendido - a.vendido || b.afterpay_abertos - a.afterpay_abertos),
   });
 }

@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,15 +38,52 @@ import {
   Settings,
   BarChart3,
   Wallet,
-  User,
   Calendar,
   CheckCircle2,
-  Square,
   AlertTriangle,
   Trophy,
   Trash2,
+  Clock,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from "lucide-react";
 import type { Attendant, CommissionResult } from "@/types";
+
+/** Linha de venda paga que a rota de comissão devolve. */
+interface VendaCliente {
+  date: string;
+  customer_name: string | null;
+  commission: number;
+  ganho?: number;
+  afterpay?: boolean;
+}
+
+// 1º ouro, 2º prata, 3º bronze; do 4º em diante, sem medalha.
+const MEDALHAS = [
+  "bg-amber-400 text-amber-950",
+  "bg-slate-300 text-slate-900",
+  "bg-orange-600 text-orange-50",
+];
+const CORES = [
+  "bg-brand/15 text-brand",
+  "bg-violet-500/15 text-violet-400",
+  "bg-sky-500/15 text-sky-400",
+  "bg-pink-500/15 text-pink-400",
+  "bg-amber-500/15 text-amber-400",
+  "bg-teal-500/15 text-teal-400",
+];
+function corDoNome(nome: string) {
+  let h = 0;
+  for (const ch of nome) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CORES[h % CORES.length];
+}
+function iniciais(nome: string) {
+  const p = nome.trim().split(/\s+/);
+  return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : p[0]?.[1] || "")).toUpperCase();
+}
+const dataCurta = (ymd: string) => (ymd ? `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}` : "—");
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -60,9 +96,31 @@ interface Props {
   onChanged: () => void;
   /** Atendente vendo o próprio cartão: sem configurar, registrar, ativar ou remover. */
   somenteLeitura?: boolean;
+  /** Posição no ranking do período (1 = mais vendas). */
+  posicao?: number;
+  /** Modo "Organizar": mostra as setas para mudar a ordem. */
+  organizando?: boolean;
+  ordem?: number;
+  primeiro?: boolean;
+  ultimo?: boolean;
+  onMover?: (direcao: -1 | 1) => void;
 }
 
-export function AttendantCard({ attendant, period, onConfigure, onDetails, onChanged, somenteLeitura }: Props) {
+export function AttendantCard({
+  attendant,
+  period,
+  onConfigure,
+  onDetails,
+  onChanged,
+  somenteLeitura,
+  posicao,
+  organizando,
+  ordem,
+  primeiro,
+  ultimo,
+  onMover,
+}: Props) {
+  const [aba, setAba] = useState<"pagos" | "abertos" | null>(null);
   const [registering, setRegistering] = useState(false);
   const [togglingActive, setTogglingActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -201,59 +259,98 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
     }
   }
 
+  const pagos = (data?.sales || []) as VendaCliente[];
+  const abertos = data?.afterpay_pendente?.clientes || [];
+  const aLiberar = data?.afterpay_pendente?.comissao || 0;
+  const medalha = posicao ? MEDALHAS[posicao - 1] : undefined;
+
   return (
-    <Card className={cn("bg-card border-border card-hover", isInactive && "opacity-60")}>
-      <CardContent className="p-4 space-y-4">
+    <Card
+      className={cn(
+        "flex h-full flex-col overflow-hidden border-border bg-card transition-shadow hover:shadow-lg",
+        isInactive && "opacity-60",
+        organizando && "ring-1 ring-brand/40"
+      )}
+    >
+      {organizando && (
+        <div className="flex items-center justify-between border-b border-border bg-brand/5 px-3 py-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <GripVertical className="h-3.5 w-3.5" /> Posição {ordem}
+          </span>
+          <span className="flex gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={primeiro}
+              onClick={() => onMover?.(-1)}
+              aria-label="Mover para antes"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={ultimo}
+              onClick={() => onMover?.(1)}
+              aria-label="Mover para depois"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          </span>
+        </div>
+      )}
+      <CardContent className="flex flex-1 flex-col gap-4 p-4">
         {/* Cabeçalho */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="rounded-full bg-brand/10 p-1.5">
-                <User className="h-4 w-4 text-brand" />
-              </div>
-              <h3 className="font-semibold text-foreground truncate">
-                {attendant.name}
-              </h3>
-              {attendant.auto_detected && (
-                <Badge variant="outline" className="text-[10px] border-brand/30 text-brand shrink-0">
-                  auto
-                </Badge>
+        <div className="flex items-start gap-3">
+          <div className="relative shrink-0">
+            <div
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold",
+                corDoNome(attendant.name)
               )}
+            >
+              {iniciais(attendant.name)}
+            </div>
+            {medalha && (
+              <span
+                className={cn(
+                  "absolute -bottom-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-card px-1 text-[10px] font-bold",
+                  medalha
+                )}
+              >
+                {posicao}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="truncate font-semibold text-foreground">{attendant.name}</h3>
               {isInactive && (
-                <Badge variant="outline" className="text-[10px] border-border text-muted-foreground shrink-0">
+                <Badge variant="outline" className="shrink-0 border-border text-[10px] text-muted-foreground">
                   inativa
                 </Badge>
               )}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {attendant.src ? `SRC: ${attendant.src}` : "sem SRC"}
-              {" · "}
+            <p className="truncate text-xs text-muted-foreground">
               {roleLabels[attendant.role] || attendant.role}
-              {attendant.email ? ` · ${attendant.email}` : ""}
+              {attendant.src ? ` · SRC ${attendant.src}` : " · sem SRC"}
             </p>
-          </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">
-                {isInactive ? "Inativa" : "Ativa"}
-              </span>
-              <Switch
-                checked={!isInactive}
-                disabled={togglingActive || somenteLeitura}
-                onCheckedChange={handleToggleActive}
-                aria-label="Ativar ou inativar atendente"
-              />
-            </div>
-            <Badge variant="outline" className="gap-1 text-xs border-border text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              Dia {attendant.payment_closing_day}
-            </Badge>
             {data?.period && (
-              <span className="text-[11px] text-muted-foreground">
-                {formatPeriodRange(data.period.start, data.period.end)}
-              </span>
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {formatPeriodRange(data.period.start, data.period.end)} · fecha dia {attendant.payment_closing_day}
+              </p>
             )}
           </div>
+          <Switch
+            checked={!isInactive}
+            disabled={togglingActive || somenteLeitura}
+            onCheckedChange={handleToggleActive}
+            aria-label={isInactive ? "Ativar atendente" : "Inativar atendente"}
+            className="shrink-0"
+          />
         </div>
 
         {needsConfig && (
@@ -264,183 +361,208 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
         )}
 
         {!data ? (
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-48 w-full" />
         ) : (
           <>
-            {/* Progresso de vendas */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">{data.total_sales}</span>
-                  {data.next_tier ? ` / ${nextTarget} vendas` : " vendas"}
-                </span>
-                <span className="font-medium text-brand">
-                  Faixa atual: {data.commission_tier.percent}%
-                </span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              {data.next_tier ? (
-                <p className="text-xs text-muted-foreground">
-                  Próxima faixa: {data.next_tier.percent}% (faltam {data.next_tier.sales_needed} vendas)
+            {/* Quanto tem a receber: liberado (pago) e AfterPay que ainda vai entrar */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-success/25 bg-success/10 p-3">
+                <p className="flex items-center gap-1 text-[11px] font-medium text-success">
+                  <Wallet className="h-3.5 w-3.5" /> A receber
                 </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Faixa máxima atingida</p>
-              )}
+                <p className="mt-1 text-xl font-bold leading-none text-success">
+                  <SensitiveValue>{formatCurrency(data.total_to_pay)}</SensitiveValue>
+                </p>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {periodPaid ? (
+                    <span className="flex items-center gap-1 font-medium text-success">
+                      <CheckCircle2 className="h-3 w-3" /> Já recebeu
+                    </span>
+                  ) : (
+                    `${data.total_sales} paga${data.total_sales !== 1 ? "s" : ""} · liberado`
+                  )}
+                </p>
+              </div>
+              <div className="rounded-lg border border-warning/25 bg-warning/10 p-3">
+                <p className="flex items-center gap-1 text-[11px] font-medium text-warning">
+                  <Clock className="h-3.5 w-3.5" /> AfterPay a liberar
+                </p>
+                <p className="mt-1 text-xl font-bold leading-none text-warning">
+                  <SensitiveValue>{formatCurrency(aLiberar)}</SensitiveValue>
+                </p>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {abertos.length} cliente{abertos.length !== 1 ? "s" : ""} vão pagar
+                </p>
+              </div>
             </div>
 
-            <Separator />
-
-            {/* Comissão + bônus */}
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Wallet className="h-3.5 w-3.5" /> Comissão
+            {/* Faixa e progresso */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  Faixa <span className="font-semibold text-brand">{data.commission_tier.percent}%</span>
+                  {" · "}
+                  <SensitiveValue>{formatCurrency(data.commission_value)}</SensitiveValue> de comissão
                 </span>
-                <span className="font-medium text-foreground">
-                  <SensitiveValue>{formatCurrency(data.commission_value)}</SensitiveValue>
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({data.commission_tier.percent}% de {formatCurrency(data.base_value_total)})
-                  </span>
+                <span className="shrink-0 text-muted-foreground">
+                  {data.next_tier
+                    ? `${data.next_tier.percent}% em ${data.next_tier.sales_needed} venda${data.next_tier.sales_needed !== 1 ? "s" : ""}`
+                    : "faixa máxima"}
                 </span>
               </div>
+              <Progress value={progress} className="h-1.5" />
+            </div>
 
-              {attendant.fixed_per_sale > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Fixo por venda</span>
-                  <span className="font-medium text-foreground">
-                    <SensitiveValue>{formatCurrency(data.fixed_per_sale_total)}</SensitiveValue>
+            {/* Bônus e fixo em etiquetas, sem ocupar uma linha cada */}
+            {(data.bonuses.length > 0 || attendant.fixed_per_sale > 0) && (
+              <div className="flex flex-wrap gap-1.5">
+                {attendant.fixed_per_sale > 0 && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+                    Fixo <SensitiveValue>{formatCurrency(data.fixed_per_sale_total)}</SensitiveValue>
                   </span>
-                </div>
-              )}
-
-              {data.bonuses.map((b, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Trophy className="h-3.5 w-3.5" /> Bônus ({b.label})
-                  </span>
-                  <span className="flex items-center gap-1.5">
+                )}
+                {data.bonuses.map((b, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
+                      b.achieved
+                        ? "border-success/30 bg-success/10 text-success"
+                        : "border-border text-muted-foreground"
+                    )}
+                  >
+                    <Trophy className="h-3 w-3" />
+                    {b.label}
                     {b.achieved ? (
                       <>
-                        <span className="font-medium text-success">
-                          <SensitiveValue>{formatCurrency(b.value)}</SensitiveValue>
-                        </span>
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                        {" · "}
+                        <SensitiveValue>{formatCurrency(b.value)}</SensitiveValue>
                       </>
                     ) : (
-                      <>
-                        <span className="text-muted-foreground/60">
-                          faltam {b.remaining}
-                        </span>
-                        <Square className="h-3.5 w-3.5 text-muted-foreground/40" />
-                      </>
+                      ` · faltam ${b.remaining}`
                     )}
                   </span>
-                </div>
-              ))}
-            </div>
-
-            {data.afterpay_pendente && data.afterpay_pendente.vendas > 0 && (
-              <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
-                <span className="text-muted-foreground">
-                  AfterPay a liberar
-                  <span className="block text-xs">
-                    {data.afterpay_pendente.vendas} venda
-                    {data.afterpay_pendente.vendas !== 1 ? "s" : ""} a caminho ou em cobrança — entra
-                    no total quando o cliente pagar
-                  </span>
-                </span>
-                <span className="shrink-0 font-medium text-foreground">
-                  <SensitiveValue>{formatCurrency(data.afterpay_pendente.comissao)}</SensitiveValue>
-                </span>
+                ))}
               </div>
             )}
 
-            <Separator />
-
-            {/* Total */}
-            <div className="flex items-center justify-between rounded-md bg-success/10 px-3 py-2">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                Total a pagar
-                {periodPaid && (
-                  <Badge className="gap-1 border-success/30 bg-success/15 text-success">
-                    <CheckCircle2 className="h-3 w-3" /> Pago
-                  </Badge>
-                )}
-              </span>
-              <span className="text-lg font-bold text-success">
-                <SensitiveValue>{formatCurrency(data.total_to_pay)}</SensitiveValue>
-              </span>
+            {/* Clientes: quem pagou (comissão liberada) e quem ainda vai pagar */}
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="grid grid-cols-2 text-xs">
+                {(
+                  [
+                    { k: "pagos", t: `Pagaram (${pagos.length})` },
+                    { k: "abertos", t: `Vão pagar (${abertos.length})` },
+                  ] as const
+                ).map((x) => (
+                  <button
+                    key={x.k}
+                    type="button"
+                    onClick={() => setAba(aba === x.k ? null : x.k)}
+                    className={cn(
+                      "flex items-center justify-center gap-1 py-2 font-medium transition-colors",
+                      aba === x.k ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted/40"
+                    )}
+                  >
+                    {x.t}
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", aba === x.k && "rotate-180")} />
+                  </button>
+                ))}
+              </div>
+              {aba && (
+                <ul className="max-h-56 divide-y divide-border overflow-y-auto border-t border-border">
+                  {(aba === "pagos" ? pagos.length : abertos.length) === 0 ? (
+                    <li className="px-3 py-3 text-center text-xs text-muted-foreground">
+                      {aba === "pagos" ? "Nenhum cliente pagou no período" : "Nenhum AfterPay em aberto"}
+                    </li>
+                  ) : aba === "pagos" ? (
+                    pagos.map((v, i) => (
+                      <LinhaCliente
+                        key={i}
+                        nome={v.customer_name}
+                        detalhe={`pagou ${dataCurta(v.date)}`}
+                        etiqueta={v.afterpay ? "AfterPay liberado" : undefined}
+                        valor={v.ganho ?? v.commission}
+                        cor="text-success"
+                      />
+                    ))
+                  ) : (
+                    abertos.map((c, i) => (
+                      <LinhaCliente
+                        key={i}
+                        nome={c.nome}
+                        detalhe={`vendeu ${dataCurta(c.data)}`}
+                        etiqueta={c.status === "aguardando" ? "Em cobrança" : "A caminho"}
+                        valor={c.comissao}
+                        cor="text-warning"
+                      />
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
 
             {/* Ações */}
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-auto flex gap-2 pt-1">
               {!somenteLeitura && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 min-w-[7rem]"
-                onClick={() => onConfigure(attendant)}
-              >
-                <Settings className="mr-1.5 h-3.5 w-3.5" /> Configurar
-              </Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => onConfigure(attendant)}>
+                  <Settings className="mr-1.5 h-3.5 w-3.5" /> Configurar
+                </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 min-w-[7rem]"
-                onClick={() => onDetails(attendant, data)}
-              >
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => onDetails(attendant, data)}>
                 <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> Detalhes
               </Button>
-              {!somenteLeitura && (<>
-              <Button
-                size="sm"
-                className="flex-1 min-w-[7rem] bg-brand hover:bg-brand/90"
-                disabled={data.total_to_pay <= 0 || periodPaid}
-                onClick={() => setShowRegister(true)}
-              >
-                {periodPaid ? (
-                  <>
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Pago
-                  </>
-                ) : (
-                  <>
-                    <Wallet className="mr-1.5 h-3.5 w-3.5" /> Registrar
-                  </>
-                )}
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              {!somenteLeitura && (
+                <>
                   <Button
-                    variant="outline"
                     size="sm"
-                    className="text-destructive hover:text-destructive"
-                    aria-label="Remover atendente"
+                    className="flex-1 bg-brand hover:bg-brand/90"
+                    disabled={data.total_to_pay <= 0 || periodPaid}
+                    onClick={() => setShowRegister(true)}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {periodPaid ? (
+                      <>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Pago
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="mr-1.5 h-3.5 w-3.5" /> Pagar
+                      </>
+                    )}
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-card border-border">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Remover {attendant.name}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      As vendas dela continuarão no sistema mas não serão mais
-                      vinculadas a esta atendente.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      disabled={deleting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={handleDelete}
-                    >
-                      {deleting ? "Removendo..." : "Remover"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              </>)}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        aria-label="Remover atendente"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-card border-border">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remover {attendant.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          As vendas dela continuarão no sistema mas não serão mais
+                          vinculadas a esta atendente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          disabled={deleting}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={handleDelete}
+                        >
+                          {deleting ? "Removendo..." : "Remover"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
             </div>
 
             {/* Modal de confirmação do registro de pagamento */}
@@ -526,6 +648,36 @@ export function AttendantCard({ attendant, period, onConfigure, onDetails, onCha
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Cliente na lista do cartão: nome, quando, etiqueta e quanto ela ganha. */
+function LinhaCliente({
+  nome,
+  detalhe,
+  etiqueta,
+  valor,
+  cor,
+}: {
+  nome: string | null;
+  detalhe: string;
+  etiqueta?: string;
+  valor: number;
+  cor: string;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-2 px-3 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-foreground">{nome || "Cliente sem nome"}</p>
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {detalhe}
+          {etiqueta && <span className="rounded bg-muted px-1 py-px text-[10px]">{etiqueta}</span>}
+        </p>
+      </div>
+      <span className={cn("shrink-0 text-xs font-semibold", cor)}>
+        +<SensitiveValue>{formatCurrency(valor)}</SensitiveValue>
+      </span>
+    </li>
   );
 }
 
