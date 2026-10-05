@@ -39,6 +39,7 @@ export function RegistrarPagamento({
   recebido,
   quitado,
   dataPedido,
+  dataPagamento,
   onFeito,
 }: {
   clientId: string;
@@ -49,6 +50,8 @@ export function RegistrarPagamento({
   quitado: boolean;
   /** Data do pedido (YYYY-MM-DD): pagamento não pode ser antes dela. */
   dataPedido?: string | null;
+  /** Data em que foi quitado (YYYY-MM-DD), para poder corrigir. */
+  dataPagamento?: string | null;
   onFeito: () => void;
 }) {
   const falta = Math.max(0, valorPedido - recebido);
@@ -56,6 +59,8 @@ export function RegistrarPagamento({
   const [data, setData] = useState(hojeSP());
   const [quitar, setQuitar] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [novaData, setNovaData] = useState(dataPagamento || hojeSP());
 
   const somaAgora = partes.reduce((s, p) => s + num(p.valor), 0);
   // Data fora do intervalo pedido→hoje joga o pagamento em outro mês (some do
@@ -64,6 +69,25 @@ export function RegistrarPagamento({
   const vaiQuitar = quitar || recebido + somaAgora >= valorPedido - 0.01;
   const mudar = (i: number, campo: keyof Parte, v: string) =>
     setPartes((ps) => ps.map((p, j) => (j === i ? { ...p, [campo]: v } : p)));
+
+  async function corrigirData() {
+    setOcupado(true);
+    try {
+      const r = await fetch(`/api/collections/${clientId}/payment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_date: novaData }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error);
+      toast.success(`Data do pagamento: ${novaData.split("-").reverse().join("/")}`);
+      setCorrigindo(false);
+      onFeito();
+    } catch (e) {
+      toast.error((e as Error).message || "Erro ao corrigir a data");
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   async function registrar() {
     const validas = partes.filter((p) => num(p.valor) > 0);
@@ -114,9 +138,49 @@ export function RegistrarPagamento({
       </div>
 
       {quitado ? (
-        <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-          Pedido quitado — conta como pago no Dashboard.
-        </p>
+        <div className="space-y-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-success">
+              Pedido quitado
+              {dataPagamento && ` em ${dataPagamento.split("-").reverse().join("/")}`} — conta como pago nessa data.
+            </span>
+            {!corrigindo && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  setNovaData(dataPagamento || hojeSP());
+                  setCorrigindo(true);
+                }}
+              >
+                Corrigir data
+              </Button>
+            )}
+          </div>
+          {corrigindo && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={novaData}
+                min={dataPedido || undefined}
+                max={hojeSP()}
+                onChange={(e) => setNovaData(e.target.value)}
+              />
+              <Button
+                size="sm"
+                onClick={corrigirData}
+                disabled={ocupado || !novaData || (!!dataPedido && novaData < dataPedido) || novaData > hojeSP()}
+              >
+                Salvar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setCorrigindo(false)} disabled={ocupado}>
+                Cancelar
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {/* Uma linha por parte paga */}

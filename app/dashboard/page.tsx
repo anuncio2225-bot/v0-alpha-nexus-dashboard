@@ -501,19 +501,13 @@ export default function DashboardPage() {
                         <p className="truncate text-sm font-medium text-foreground">
                           {att.name}
                         </p>
-                        <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
-                          <span className="rounded bg-muted px-1.5 py-px text-foreground">
-                            {att.sales} venda{att.sales !== 1 ? "s" : ""}
-                          </span>
-                          <span className="rounded bg-success/10 px-1.5 py-px text-success">
-                            {att.pagas ?? 0} paga{(att.pagas ?? 0) !== 1 ? "s" : ""}
-                          </span>
-                          <span className="rounded bg-warning/10 px-1.5 py-px text-warning">
-                            {att.agendadas ?? 0} agendada{(att.agendadas ?? 0) !== 1 ? "s" : ""}
-                          </span>
-                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {att.sales} vendas | <span className="text-success">{att.pagas ?? 0} pagas</span> |{" "}
+                          <span className="text-warning">{att.agendadas ?? 0} agendadas</span> |{" "}
+                          <SensitiveValue>{formatCurrency(att.aReceber ?? 0)}</SensitiveValue> a receber
+                        </p>
                       </div>
-                      <div className="shrink-0 text-right">
+                      <div className="text-right">
                         <p
                           className={cn(
                             "text-sm font-semibold tabular-nums",
@@ -522,13 +516,6 @@ export default function DashboardPage() {
                         >
                           <SensitiveValue>{formatCurrency(att.revenue)}</SensitiveValue>
                         </p>
-                        <p className="text-[11px] text-muted-foreground">recebido</p>
-                        {(att.aReceber ?? 0) > 0 && (
-                          <p className="mt-0.5 text-xs font-medium tabular-nums text-warning">
-                            <SensitiveValue>{formatCurrency(att.aReceber)}</SensitiveValue>
-                            <span className="ml-1 text-[11px] font-normal">a receber</span>
-                          </p>
-                        )}
                       </div>
                     </div>
                     {att.goal > 0 && (
