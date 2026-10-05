@@ -34,13 +34,30 @@ import {
   CalendarRange,
   Clock,
   ArrowUpDown,
-  Check,
-  X,
+  GripVertical,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
-import { AttendantCard } from "@/components/attendants/attendant-card";
+import { AttendantCard, MEDALHAS, corDoNome, iniciais } from "@/components/attendants/attendant-card";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useTeamPermissions } from "@/hooks/use-team-permissions";
 import { ConfigModal } from "@/components/attendants/config-modal";
 import { DetailsModal } from "@/components/attendants/details-modal";
@@ -114,8 +131,28 @@ interface Posicao {
 type Ordenacao = "minha" | "ranking" | "nome";
 const CHAVE_ORDEM = "atendentes:ordenar";
 
-// 1º ouro, 2º prata, 3º bronze.
-const MEDALHAS = ["bg-amber-400 text-amber-950", "bg-slate-300 text-slate-900", "bg-orange-600 text-orange-50"];
+type Alca = React.ButtonHTMLAttributes<HTMLButtonElement> & { ref?: (el: HTMLElement | null) => void };
+
+/** Cartão que muda de lugar arrastando pela alça (⋮⋮). */
+function CartaoArrastavel({
+  id,
+  children,
+}: {
+  id: string;
+  children: (alca: Alca, arrastando: boolean) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("h-full", isDragging && "relative z-20")}
+    >
+      {children({ ref: setActivatorNodeRef, ...attributes, ...listeners } as Alca, isDragging)}
+    </div>
+  );
+}
 
 export default function AttendantsPage() {
   // Atendente vinculada vê só o próprio resultado: sem ações de gestão.
@@ -142,9 +179,13 @@ export default function AttendantsPage() {
       localStorage.setItem(CHAVE_ORDEM, v);
     } catch {}
   };
-  // Modo "Organizar": ids na ordem em edição (null = fora do modo).
-  const [ordemEditando, setOrdemEditando] = useState<string[] | null>(null);
-  const [salvandoOrdem, setSalvandoOrdem] = useState(false);
+  // Arrastar só começa depois de mover um pouco (clique na alça não vira arrasto);
+  // no celular, segurar a alça um instante.
+  const sensores = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const [configTarget, setConfigTarget] = useState<Attendant | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<Attendant | null>(null);
@@ -178,52 +219,40 @@ export default function AttendantsPage() {
     ? attendants
     : attendants.filter((a) => a.status !== "inactive");
   const visibleAttendants = useMemo(() => {
-    if (ordemEditando) {
-      const porId = new Map(filtradas.map((a) => [a.id, a]));
-      return ordemEditando.map((id) => porId.get(id)).filter((a): a is Attendant => !!a);
-    }
     if (ordenarPor === "nome") return [...filtradas].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     if (ordenarPor === "ranking") {
       const idx = new Map(ranking.map((r, i) => [r.id, i]));
       return [...filtradas].sort((a, b) => (idx.get(a.id) ?? 999) - (idx.get(b.id) ?? 999));
     }
     return filtradas; // já vem na ordem salva pelo dono
-  }, [filtradas, ordenarPor, ranking, ordemEditando]);
+  }, [filtradas, ordenarPor, ranking]);
   const maxVendas = Math.max(1, ...ranking.map((r) => r.vendas));
+  const totalPagas = ranking.reduce((s, r) => s + r.vendas, 0);
+  const inactiveCount = attendants.filter((a) => a.status === "inactive").length;
 
-  const mover = (i: number, direcao: -1 | 1) =>
-    setOrdemEditando((ids) => {
-      if (!ids) return ids;
-      const novo = [...ids];
-      const j = i + direcao;
-      if (j < 0 || j >= novo.length) return ids;
-      [novo[i], novo[j]] = [novo[j], novo[i]];
-      return novo;
-    });
-
-  async function salvarOrdem() {
-    if (!ordemEditando) return;
-    setSalvandoOrdem(true);
+  // Soltou o cartão em outro lugar: vira "Minha ordem" e salva na hora.
+  async function aoSoltar({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    const ids = visibleAttendants.map((a) => a.id);
+    const novo = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    // As inativas escondidas ficam depois das visíveis, na ordem em que estavam.
+    const todos = [...novo, ...attendants.map((a) => a.id).filter((id) => !novo.includes(id))];
+    const porId = new Map(attendants.map((a) => [a.id, a]));
+    escolherOrdem("minha");
+    mutate({ attendants: todos.map((id) => porId.get(id)).filter((a): a is Attendant => !!a) }, false);
     try {
-      // As inativas escondidas ficam depois das visíveis, na ordem em que estavam.
-      const resto = attendants.map((a) => a.id).filter((id) => !ordemEditando.includes(id));
       const res = await fetch("/api/attendants/ordem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...ordemEditando, ...resto] }),
+        body: JSON.stringify({ ids: todos }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
-      toast.success("Ordem salva");
-      escolherOrdem("minha");
-      setOrdemEditando(null);
-      mutate();
     } catch (e) {
       toast.error((e as Error).message || "Erro ao salvar a ordem");
     } finally {
-      setSalvandoOrdem(false);
+      mutate();
     }
   }
-  const inactiveCount = attendants.filter((a) => a.status === "inactive").length;
 
   const runMerge = async () => {
     setMerging(true);
@@ -467,78 +496,22 @@ export default function AttendantsPage() {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpis.map((k) => (
-          <Card key={k.label} className="bg-card border-border">
-            <CardContent className="flex items-center gap-3 p-3 sm:p-4">
-              <div className={cn("shrink-0 rounded-lg p-2", k.cor)}>
-                <k.icon className="h-5 w-5" />
-              </div>
+      {/* Resumo do período — uma faixa só, para sobrar espaço para as atendentes */}
+      <Card className="gap-0 overflow-hidden border-border bg-card py-0">
+        <div className="grid grid-cols-2 divide-border lg:grid-cols-4 lg:divide-x [&>*:nth-child(-n+2)]:border-b lg:[&>*:nth-child(-n+2)]:border-b-0 [&>*:nth-child(odd)]:border-r lg:[&>*:nth-child(odd)]:border-r-0">
+          {kpis.map((k) => (
+            <div key={k.label} className="flex items-center gap-2.5 px-4 py-2.5">
+              <k.icon className={cn("h-4 w-4 shrink-0", k.cor.split(" ")[0])} />
               <div className="min-w-0">
-                <p className="truncate text-xs text-muted-foreground">{k.label}</p>
-                <p className="truncate text-lg font-bold text-foreground">
+                <p className="truncate text-[11px] text-muted-foreground">{k.label}</p>
+                <p className="truncate text-base font-semibold tabular-nums leading-tight text-foreground">
                   {k.sensitive ? <SensitiveValue>{k.value}</SensitiveValue> : k.value}
                 </p>
-                <p className="hidden truncate text-[11px] text-muted-foreground/80 sm:block">{k.hint}</p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Ranking das vendedoras no período */}
-      {!somenteLeitura && ranking.length > 1 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-semibold text-foreground">
-                <Trophy className="h-4 w-4 text-amber-400" /> Ranking do período
-              </h2>
-              <span className="text-xs text-muted-foreground">por vendas pagas</span>
             </div>
-            <ol className="space-y-2">
-              {ranking.map((r, i) => (
-                <li key={r.id} className="grid grid-cols-[1.75rem_1fr_auto] items-center gap-3">
-                  <span
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
-                      r.vendas > 0 && i < 3 ? MEDALHAS[i] : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">{r.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">{r.vendas}</span> paga{r.vendas !== 1 ? "s" : ""}
-                        {r.afterpay_abertos > 0 && ` · ${r.afterpay_abertos} AfterPay em aberto`}
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-brand transition-all"
-                        style={{ width: `${(r.vendas / maxVendas) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="w-24 text-right text-xs sm:w-40">
-                    <p className="font-semibold text-success">
-                      <SensitiveValue>{formatCurrency(r.a_receber)}</SensitiveValue>
-                    </p>
-                    {r.a_liberar > 0 && (
-                      <p className="text-[11px] text-warning">
-                        +<SensitiveValue>{formatCurrency(r.a_liberar)}</SensitiveValue> a liberar
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-      )}
+          ))}
+        </div>
+      </Card>
 
       {/* Lista */}
       {isLoading ? (
@@ -561,85 +534,155 @@ export default function AttendantsPage() {
         <>
           {/* Ordem dos cartões */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {ordemEditando ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Use as setas de cada cartão para mudar a posição.
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setOrdemEditando(null)} disabled={salvandoOrdem}>
-                    <X className="mr-1.5 h-4 w-4" /> Cancelar
-                  </Button>
-                  <Button size="sm" className="bg-brand hover:bg-brand/90" onClick={salvarOrdem} disabled={salvandoOrdem}>
-                    <Check className="mr-1.5 h-4 w-4" /> {salvandoOrdem ? "Salvando..." : "Salvar ordem"}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <Select value={ordenarPor} onValueChange={(v) => escolherOrdem(v as Ordenacao)}>
-                    <SelectTrigger className="h-9 w-[190px] bg-card-elevated border-border">
-                      <ArrowUpDown className="mr-1 h-4 w-4 text-muted-foreground" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="minha">Minha ordem</SelectItem>
-                      <SelectItem value="ranking">Ranking (mais vendas)</SelectItem>
-                      <SelectItem value="nome">Nome (A–Z)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {!somenteLeitura && filtradas.length > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9"
-                      onClick={() => setOrdemEditando(visibleAttendants.map((a) => a.id))}
-                    >
-                      Organizar
-                    </Button>
-                  )}
-                </div>
-                {inactiveCount > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="show-inactive" className="text-xs text-muted-foreground cursor-pointer">
-                      Mostrar inativas ({inactiveCount})
-                    </Label>
-                    <Switch
-                      id="show-inactive"
-                      checked={showInactive}
-                      onCheckedChange={setShowInactive}
-                    />
-                  </div>
-                )}
-              </>
+            <div className="flex items-center gap-3">
+              <Select value={ordenarPor} onValueChange={(v) => escolherOrdem(v as Ordenacao)}>
+                <SelectTrigger className="h-9 w-[200px] bg-card-elevated border-border">
+                  <ArrowUpDown className="mr-1 h-4 w-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minha">Minha ordem</SelectItem>
+                  <SelectItem value="ranking">Mais vendas primeiro</SelectItem>
+                  <SelectItem value="nome">Nome (A–Z)</SelectItem>
+                </SelectContent>
+              </Select>
+              {!somenteLeitura && filtradas.length > 1 && (
+                <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+                  <GripVertical className="h-3.5 w-3.5" /> arraste o cartão para organizar
+                </span>
+              )}
+            </div>
+            {inactiveCount > 0 && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="show-inactive" className="text-xs text-muted-foreground cursor-pointer">
+                  Mostrar inativas ({inactiveCount})
+                </Label>
+                <Switch id="show-inactive" checked={showInactive} onCheckedChange={setShowInactive} />
+              </div>
             )}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {visibleAttendants.map((att, i) => (
-              <AttendantCard
-                key={att.id}
-                somenteLeitura={somenteLeitura}
-                attendant={att}
-                period={period}
-                posicao={posicaoDe.get(att.id)}
-                organizando={!!ordemEditando}
-                ordem={i + 1}
-                primeiro={i === 0}
-                ultimo={i === visibleAttendants.length - 1}
-                onMover={(d) => mover(i, d)}
-                onConfigure={(a) => setConfigTarget(a)}
-                onDetails={(a, commission: CommissionResult) => {
-                  setDetailsTarget(a);
-                  setDetailsPeriod(commission.period);
-                }}
-                onChanged={() => {
-                  mutate();
-                  mutateSummary();
-                }}
-              />
-            ))}
-          </div>
+
+          <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoSoltar}>
+            <SortableContext items={visibleAttendants.map((a) => a.id)} strategy={rectSortingStrategy}>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleAttendants.map((att) => (
+                  <CartaoArrastavel key={att.id} id={att.id}>
+                    {(alca, arrastando) => (
+                      <AttendantCard
+                        somenteLeitura={somenteLeitura}
+                        attendant={att}
+                        period={period}
+                        posicao={posicaoDe.get(att.id)}
+                        alca={somenteLeitura ? undefined : alca}
+                        arrastando={arrastando}
+                        onConfigure={(a) => setConfigTarget(a)}
+                        onDetails={(a, commission: CommissionResult) => {
+                          setDetailsTarget(a);
+                          setDetailsPeriod(commission.period);
+                        }}
+                        onChanged={() => {
+                          mutate();
+                          mutateSummary();
+                        }}
+                      />
+                    )}
+                  </CartaoArrastavel>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {/* Ranking do período — embaixo, como tabela de placar */}
+          {!somenteLeitura && ranking.length > 1 && (
+            <Card className="gap-0 overflow-hidden border-border bg-card py-0">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Trophy className="h-4 w-4 text-amber-400" /> Ranking do período
+                </h2>
+                <span className="text-[11px] text-muted-foreground">{totalPagas} vendas pagas no total</span>
+              </div>
+              <div className="hidden grid-cols-[2rem_minmax(0,1fr)_5rem_6rem_7.5rem_7.5rem] gap-3 border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
+                <span>#</span>
+                <span>Atendente</span>
+                <span className="text-right">Pagas</span>
+                <span className="text-right">AfterPay aberto</span>
+                <span className="text-right">A receber</span>
+                <span className="text-right">A liberar</span>
+              </div>
+              <ol className="divide-y divide-border">
+                {ranking.map((r, i) => {
+                  const medalha = r.vendas > 0 && i < 3 ? MEDALHAS[i] : null;
+                  return (
+                    <li
+                      key={r.id}
+                      className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30 md:grid-cols-[2rem_minmax(0,1fr)_5rem_6rem_7.5rem_7.5rem]"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold",
+                          medalha || "text-muted-foreground"
+                        )}
+                      >
+                        {i + 1}
+                      </span>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                            corDoNome(r.name)
+                          )}
+                        >
+                          {iniciais(r.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">{r.name}</p>
+                          <div className="mt-1 h-1 w-full max-w-48 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-brand"
+                              style={{ width: `${(r.vendas / maxVendas) * 100}%` }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground md:hidden">
+                            {r.vendas} pagas · {r.afterpay_abertos} em aberto
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "hidden text-right text-sm font-semibold tabular-nums md:block",
+                          r.vendas > 0 ? "text-foreground" : "text-muted-foreground/60"
+                        )}
+                      >
+                        {r.vendas}
+                      </span>
+                      <span className="hidden text-right text-sm tabular-nums text-muted-foreground md:block">
+                        {r.afterpay_abertos}
+                      </span>
+                      <div className="text-right md:contents">
+                        <span
+                          className={cn(
+                            "block text-sm font-semibold tabular-nums md:text-right",
+                            r.a_receber > 0 ? "text-success" : "text-muted-foreground/60"
+                          )}
+                        >
+                          <SensitiveValue>{formatCurrency(r.a_receber)}</SensitiveValue>
+                        </span>
+                        <span
+                          className={cn(
+                            "block text-[11px] tabular-nums md:text-right md:text-sm",
+                            r.a_liberar > 0 ? "text-warning" : "text-muted-foreground/60"
+                          )}
+                        >
+                          <SensitiveValue>{formatCurrency(r.a_liberar)}</SensitiveValue>
+                          <span className="md:hidden"> a liberar</span>
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </Card>
+          )}
         </>
       )}
 
