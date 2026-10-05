@@ -590,6 +590,11 @@ export function ClientDrawer({
                         ? new Date(new Date(client.order_date).getTime() - 3 * 3600_000).toISOString().slice(0, 10)
                         : null
                     }
+                    dataPagamento={
+                      client.payment_date
+                        ? new Date(new Date(client.payment_date).getTime() - 3 * 3600_000).toISOString().slice(0, 10)
+                        : null
+                    }
                     onFeito={refresh}
                   />
 

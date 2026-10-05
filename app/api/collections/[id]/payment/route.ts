@@ -164,3 +164,105 @@ export async function POST(request: Request, { params }: Params) {
 function fmt(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 }
+
+/** Dia em Brasília (YYYY-MM-DD) de um timestamp. */
+function diaSP(iso: string) {
+  return new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * PATCH /api/collections/[id]/payment — corrige a data de um pagamento já
+ * quitado ({ payment_date: "YYYY-MM-DD" }). Data errada joga a venda em outro
+ * período: some da comissão da atendente e da Análise de Lucro do mês.
+ */
+export async function PATCH(request: Request, { params }: Params) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const dono = await getEffectiveUserId(supabase, user.id);
+  if (!(await podeVerCliente(supabase, user.id, dono, id))) {
+    return NextResponse.json({ error: "Acesso restrito aos seus clientes" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const novoDia = typeof body.payment_date === "string" ? body.payment_date : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(novoDia)) {
+    return NextResponse.json({ error: "Informe a data do pagamento" }, { status: 400 });
+  }
+
+  const { data: client } = await supabase
+    .from("collection_clients")
+    .select("id, status_name, order_date, payment_date, transaction_id")
+    .eq("id", id)
+    .eq("user_id", dono)
+    .single();
+  if (!client) {
+    return NextResponse.json({ error: "Cliente nao encontrado" }, { status: 404 });
+  }
+  if ((client.status_name || "").toLowerCase() !== "pago") {
+    return NextResponse.json({ error: "Só dá para corrigir a data de um pedido quitado" }, { status: 400 });
+  }
+
+  const diaPedido = client.order_date ? diaSP(client.order_date) : null;
+  const hoje = diaSP(new Date().toISOString());
+  if ((diaPedido && novoDia < diaPedido) || novoDia > hoje) {
+    return NextResponse.json(
+      { error: "Data do pagamento fora do intervalo: entre a data do pedido e hoje." },
+      { status: 400 }
+    );
+  }
+
+  const quando = new Date(`${novoDia}T12:00:00-03:00`).toISOString();
+  const { error } = await supabase
+    .from("collection_clients")
+    .update({ payment_date: quando, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", dono);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Venda do gateway quitada à mão: Dashboard, comissão e lucro leem a data daqui.
+  // Venda paga pelo próprio gateway mantém a data do gateway.
+  if (client.transaction_id) {
+    await supabase
+      .from("transactions")
+      .update({ payment_date: quando, updated_at: new Date().toISOString() })
+      .eq("id", client.transaction_id)
+      .eq("user_id", dono)
+      .not("pago_manual_em", "is", null);
+  }
+
+  // Histórico: as linhas do pagamento passam a mostrar a data certa.
+  const br = (d: string) => d.split("-").reverse().join("/");
+  const antigo = client.payment_date ? diaSP(client.payment_date) : null;
+  if (antigo && antigo !== novoDia) {
+    const { data: linhas } = await supabase
+      .from("collection_history")
+      .select("id, description")
+      .eq("user_id", dono)
+      .eq("client_id", id)
+      .eq("type", "payment");
+    for (const l of linhas || []) {
+      if (!l.description?.includes(`em ${br(antigo)}`)) continue;
+      await supabase
+        .from("collection_history")
+        .update({ description: l.description.replace(`em ${br(antigo)}`, `em ${br(novoDia)}`) })
+        .eq("id", l.id);
+    }
+  }
+  await supabase.from("collection_history").insert({
+    user_id: dono,
+    client_id: id,
+    type: "status_change",
+    description: `Data do pagamento corrigida${antigo ? ` de ${br(antigo)}` : ""} para ${br(novoDia)}`,
+  });
+
+  return NextResponse.json({ ok: true, payment_date: quando });
+}
