@@ -45,8 +45,6 @@ import {
   Trash2,
   Clock,
   ChevronDown,
-  ArrowUp,
-  ArrowDown,
   GripVertical,
 } from "lucide-react";
 import type { Attendant, CommissionResult } from "@/types";
@@ -61,12 +59,12 @@ interface VendaCliente {
 }
 
 // 1º ouro, 2º prata, 3º bronze; do 4º em diante, sem medalha.
-const MEDALHAS = [
+export const MEDALHAS = [
   "bg-amber-400 text-amber-950",
   "bg-slate-300 text-slate-900",
   "bg-orange-600 text-orange-50",
 ];
-const CORES = [
+export const CORES_ATENDENTE = [
   "bg-brand/15 text-brand",
   "bg-violet-500/15 text-violet-400",
   "bg-sky-500/15 text-sky-400",
@@ -74,12 +72,12 @@ const CORES = [
   "bg-amber-500/15 text-amber-400",
   "bg-teal-500/15 text-teal-400",
 ];
-function corDoNome(nome: string) {
+export function corDoNome(nome: string) {
   let h = 0;
   for (const ch of nome) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return CORES[h % CORES.length];
+  return CORES_ATENDENTE[h % CORES_ATENDENTE.length];
 }
-function iniciais(nome: string) {
+export function iniciais(nome: string) {
   const p = nome.trim().split(/\s+/);
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : p[0]?.[1] || "")).toUpperCase();
 }
@@ -98,12 +96,9 @@ interface Props {
   somenteLeitura?: boolean;
   /** Posição no ranking do período (1 = mais vendas). */
   posicao?: number;
-  /** Modo "Organizar": mostra as setas para mudar a ordem. */
-  organizando?: boolean;
-  ordem?: number;
-  primeiro?: boolean;
-  ultimo?: boolean;
-  onMover?: (direcao: -1 | 1) => void;
+  /** Alça de arrastar (dnd-kit): presente = o cartão pode mudar de lugar. */
+  alca?: React.ButtonHTMLAttributes<HTMLButtonElement> & { ref?: (el: HTMLElement | null) => void };
+  arrastando?: boolean;
 }
 
 export function AttendantCard({
@@ -114,11 +109,8 @@ export function AttendantCard({
   onChanged,
   somenteLeitura,
   posicao,
-  organizando,
-  ordem,
-  primeiro,
-  ultimo,
-  onMover,
+  alca,
+  arrastando,
 }: Props) {
   const [aba, setAba] = useState<"pagos" | "abertos" | null>(null);
   const [registering, setRegistering] = useState(false);
@@ -267,41 +259,13 @@ export function AttendantCard({
   return (
     <Card
       className={cn(
-        "flex h-full flex-col overflow-hidden border-border bg-card transition-shadow hover:shadow-lg",
+        // gap-0/py-0: o Card base tem py-6 gap-6, que deixava um vão em cima e embaixo.
+        "group/cartao flex h-full flex-col gap-0 overflow-hidden border-border bg-card py-0 transition-shadow hover:shadow-lg",
         isInactive && "opacity-60",
-        organizando && "ring-1 ring-brand/40"
+        arrastando && "shadow-2xl ring-1 ring-brand/50"
       )}
     >
-      {organizando && (
-        <div className="flex items-center justify-between border-b border-border bg-brand/5 px-3 py-1.5 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <GripVertical className="h-3.5 w-3.5" /> Posição {ordem}
-          </span>
-          <span className="flex gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={primeiro}
-              onClick={() => onMover?.(-1)}
-              aria-label="Mover para antes"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={ultimo}
-              onClick={() => onMover?.(1)}
-              aria-label="Mover para depois"
-            >
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-          </span>
-        </div>
-      )}
-      <CardContent className="flex flex-1 flex-col gap-4 p-4">
+      <CardContent className="flex flex-1 flex-col gap-3.5 p-4">
         {/* Cabeçalho */}
         <div className="flex items-start gap-3">
           <div className="relative shrink-0">
@@ -344,13 +308,25 @@ export function AttendantCard({
               </p>
             )}
           </div>
-          <Switch
-            checked={!isInactive}
-            disabled={togglingActive || somenteLeitura}
-            onCheckedChange={handleToggleActive}
-            aria-label={isInactive ? "Ativar atendente" : "Inativar atendente"}
-            className="shrink-0"
-          />
+          <div className="flex shrink-0 items-center gap-1">
+            <Switch
+              checked={!isInactive}
+              disabled={togglingActive || somenteLeitura}
+              onCheckedChange={handleToggleActive}
+              aria-label={isInactive ? "Ativar atendente" : "Inativar atendente"}
+            />
+            {alca && (
+              <button
+                type="button"
+                {...alca}
+                aria-label="Arrastar para mudar a ordem"
+                title="Arraste para mudar a ordem"
+                className="-mr-1.5 flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {needsConfig && (
@@ -366,11 +342,26 @@ export function AttendantCard({
           <>
             {/* Quanto tem a receber: liberado (pago) e AfterPay que ainda vai entrar */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-success/25 bg-success/10 p-3">
-                <p className="flex items-center gap-1 text-[11px] font-medium text-success">
+              <div
+                className={cn(
+                  "rounded-lg border p-3",
+                  data.total_to_pay > 0 ? "border-success/25 bg-success/10" : "border-border bg-muted/20"
+                )}
+              >
+                <p
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-medium",
+                    data.total_to_pay > 0 ? "text-success" : "text-muted-foreground"
+                  )}
+                >
                   <Wallet className="h-3.5 w-3.5" /> A receber
                 </p>
-                <p className="mt-1 text-xl font-bold leading-none text-success">
+                <p
+                  className={cn(
+                    "mt-1 text-xl font-bold leading-none tabular-nums",
+                    data.total_to_pay > 0 ? "text-success" : "text-muted-foreground/70"
+                  )}
+                >
                   <SensitiveValue>{formatCurrency(data.total_to_pay)}</SensitiveValue>
                 </p>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -383,11 +374,26 @@ export function AttendantCard({
                   )}
                 </p>
               </div>
-              <div className="rounded-lg border border-warning/25 bg-warning/10 p-3">
-                <p className="flex items-center gap-1 text-[11px] font-medium text-warning">
+              <div
+                className={cn(
+                  "rounded-lg border p-3",
+                  aLiberar > 0 ? "border-warning/25 bg-warning/10" : "border-border bg-muted/20"
+                )}
+              >
+                <p
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-medium",
+                    aLiberar > 0 ? "text-warning" : "text-muted-foreground"
+                  )}
+                >
                   <Clock className="h-3.5 w-3.5" /> AfterPay a liberar
                 </p>
-                <p className="mt-1 text-xl font-bold leading-none text-warning">
+                <p
+                  className={cn(
+                    "mt-1 text-xl font-bold leading-none tabular-nums",
+                    aLiberar > 0 ? "text-warning" : "text-muted-foreground/70"
+                  )}
+                >
                   <SensitiveValue>{formatCurrency(aLiberar)}</SensitiveValue>
                 </p>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -505,18 +511,18 @@ export function AttendantCard({
             {/* Ações */}
             <div className="mt-auto flex gap-2 pt-1">
               {!somenteLeitura && (
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => onConfigure(attendant)}>
+                <Button variant="outline" size="sm" className="min-w-0 flex-1 px-2 text-xs" onClick={() => onConfigure(attendant)}>
                   <Settings className="mr-1.5 h-3.5 w-3.5" /> Configurar
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => onDetails(attendant, data)}>
+              <Button variant="outline" size="sm" className="min-w-0 flex-1 px-2 text-xs" onClick={() => onDetails(attendant, data)}>
                 <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> Detalhes
               </Button>
               {!somenteLeitura && (
                 <>
                   <Button
                     size="sm"
-                    className="flex-1 bg-brand hover:bg-brand/90"
+                    className="min-w-0 flex-1 bg-brand px-2 text-xs hover:bg-brand/90"
                     disabled={data.total_to_pay <= 0 || periodPaid}
                     onClick={() => setShowRegister(true)}
                   >
