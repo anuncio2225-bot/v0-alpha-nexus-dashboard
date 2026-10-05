@@ -18,10 +18,13 @@ import { toast } from "sonner";
 import { User, Settings as SettingsIcon } from "lucide-react";
 import type { Profile, Settings } from "@/types";
 import { NotificacoesCelular } from "@/components/settings/notificacoes-celular";
+import { useTeamPermissions } from "@/hooks/use-team-permissions";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function SettingsPage() {
+  // Atendente vinculada: aqui só as notificações do celular dela.
+  const { ehAtendente: atendente } = useTeamPermissions();
   const [loading, setLoading] = useState(false);
   const [taxMultiplier, setTaxMultiplier] = useState("1.0");
   const [adsTaxPercentage, setAdsTaxPercentage] = useState("6");
@@ -81,6 +84,10 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {atendente ? (
+        <NotificacoesCelular />
+      ) : (
+      <>
       {/* Profile Card */}
       <Card className="bg-card border-border">
         <CardHeader>
@@ -181,6 +188,8 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

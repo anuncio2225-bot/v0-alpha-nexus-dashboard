@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/team/scope";
+import { ehAtendente, getEffectiveUserId } from "@/lib/team/scope";
 import { randomBytes } from "crypto";
 
 export async function GET() {
@@ -9,6 +9,8 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Webhooks (com os tokens) não são da atendente.
+  if (await ehAtendente(supabase, user.id)) return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
 
   const { data, error } = await supabase
     .from("webhooks")
@@ -27,6 +29,8 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Webhooks (com os tokens) não são da atendente.
+  if (await ehAtendente(supabase, user.id)) return NextResponse.json({ error: "Acesso restrito" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const name: string = (body?.name || "").trim();

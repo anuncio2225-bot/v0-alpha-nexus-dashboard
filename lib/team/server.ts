@@ -58,10 +58,14 @@ export async function getTeamContext(
         ownerProfile.full_name || ownerProfile.name || ownerProfile.email || null;
     }
 
-    const permissions = {
-      ...ALL_PERMISSIONS_FALSE,
-      ...(membership.permissions as Partial<TeamPermissions>),
-    } as TeamPermissions;
+    // Atendente vinculada vê só Atendentes, Cobrança e Configurações (para
+    // ativar as notificações) — independente do que estiver marcado.
+    const ehAtendente = membership.scope_mode === "attendant" && !!membership.attendant_src;
+    const permissions = (
+      ehAtendente
+        ? { ...ALL_PERMISSIONS_FALSE, atendentes: true, cobranca: true, settings: true }
+        : { ...ALL_PERMISSIONS_FALSE, ...(membership.permissions as Partial<TeamPermissions>) }
+    ) as TeamPermissions;
 
     return {
       isOwner: false,
