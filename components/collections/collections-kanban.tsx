@@ -21,7 +21,7 @@ import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { formatCurrency, cn } from "@/lib/utils";
 import { deliveryStatusLabel } from "@/lib/collections/whatsapp";
 import type { CollectionClient, CollectionStatus } from "@/types";
-import { CalendarClock, Copy, GripVertical } from "lucide-react";
+import { CalendarClock, Copy, GripVertical, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 interface KanbanProps {
@@ -169,7 +169,11 @@ export function CollectionsKanban({
                       )}
                     {/* Etiquetas e valor na mesma linha: card mais baixo */}
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <EtiquetasCard saleType={c.sale_type} entrega={c.delivery_status} />
+                      <EtiquetasCard
+                        saleType={c.sale_type}
+                        entrega={c.delivery_status}
+                        atendente={c.attendant_name || c.src}
+                      />
                       {(() => {
                         const v = valorDoCard(c);
                         return (
@@ -306,10 +310,18 @@ const MODALIDADE: Record<string, { texto: string; classe: string }> = {
   recuperacao: { texto: "Recuperação", classe: "border-amber-500/40 bg-amber-500/10 text-amber-500" },
 };
 
-function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entrega?: string | null }) {
+function EtiquetasCard({
+  saleType,
+  entrega,
+  atendente,
+}: {
+  saleType?: string | null;
+  entrega?: string | null;
+  atendente?: string | null;
+}) {
   const m = saleType ? MODALIDADE[saleType] : null;
   const e = deliveryStatusLabel(entrega);
-  if (!m && !e) return null;
+  if (!m && !e && !atendente) return null;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1">
       {m && (
@@ -320,6 +332,14 @@ function EtiquetasCard({ saleType, entrega }: { saleType?: string | null; entreg
       {e && (
         <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
           {e}
+        </span>
+      )}
+      {/* Atendente vinculada: o dono vê de quem é cada cliente; a atendente
+          vê o próprio nome (são só os dela). */}
+      {atendente && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+          <UserRound className="h-2.5 w-2.5" />
+          {atendente}
         </span>
       )}
     </div>
