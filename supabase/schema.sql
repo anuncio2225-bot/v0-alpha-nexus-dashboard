@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-03 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-05 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (32):
+-- Migrações registradas no banco (33):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -40,6 +40,7 @@
 --   20261002235318  pago_manual
 --   20261003172125  cobrar_afterpay_e_avisos
 --   20261003172152  seed_cobrar_afterpay
+--   20261005132623  equipe_le_regras_comissao
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -1160,9 +1161,21 @@ create policy "team_update_ad_investments" on public.ad_investments as permissiv
 create policy "attendant_payments_user" on public.attendant_payments as permissive for all to public
   using ((auth.uid() = user_id))
   with check ((auth.uid() = user_id));
+create policy "team_insert_attendant_payments" on public.attendant_payments as permissive for insert to public
+  with check (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "team_select_attendant_payments" on public.attendant_payments as permissive for select to public
+  using ((user_id = effective_user_id()));
 create policy "attendant_rules_user" on public.attendant_rules as permissive for all to public
   using ((auth.uid() = user_id))
   with check ((auth.uid() = user_id));
+create policy "team_delete_attendant_rules" on public.attendant_rules as permissive for delete to public
+  using (((user_id = effective_user_id()) AND team_can_delete()));
+create policy "team_insert_attendant_rules" on public.attendant_rules as permissive for insert to public
+  with check (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "team_select_attendant_rules" on public.attendant_rules as permissive for select to public
+  using ((user_id = effective_user_id()));
+create policy "team_update_attendant_rules" on public.attendant_rules as permissive for update to public
+  using (((user_id = effective_user_id()) AND team_can_edit()));
 create policy "attendants_delete_own" on public.attendants as permissive for delete to public
   using ((auth.uid() = user_id));
 create policy "attendants_insert_own" on public.attendants as permissive for insert to public
