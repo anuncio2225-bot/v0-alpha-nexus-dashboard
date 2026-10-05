@@ -85,7 +85,7 @@ export function ProfitOverview({
           footer={`${aff.sales_count} vendas`}
           rows={[
             { label: "Comissão produtor", value: aff.commission_total },
-            { label: "Custo dos kits", value: -aff.kit_costs },
+            { label: "Envio dos pedidos", value: -aff.kit_costs },
           ]}
         />
         <ProfitCard
@@ -93,20 +93,30 @@ export function ProfitOverview({
           title="Lucro Operação Interna"
           subtitle="Suas vendas próprias"
           total={op.profit}
-          footer={`${op.sales_count} vendas`}
+          footer={`${op.sales_count} vendas pagas · ${op.envios?.pedidos ?? 0} pedidos enviados`}
           rows={[
-            { label: "Vendas (líquido)", value: op.revenue },
-            ...(op.kit_produto !== undefined
-              ? [
-                  { label: "Potes (custo do estoque)", value: -op.kit_produto },
-                  { label: "Envio dos kits", value: -(op.kit_envio || 0) },
-                ]
-              : [{ label: "Custo dos kits", value: -op.kit_costs }]),
-            ...(op.frustradas_envio
-              ? [{ label: `Envio de frustradas (${op.frustradas_count})`, value: -op.frustradas_envio }]
-              : []),
+            { label: "Vendas pagas (líquido)", value: op.revenue },
+            { label: `Envio de ${op.envios?.pedidos ?? 0} pedidos`, value: -op.kit_costs },
             { label: "Investimento ads", value: -op.ads_investment },
           ]}
+          nota={
+            op.envios ? (
+              <>
+                <p>
+                  Enviados: {op.envios.afterpay_em_aberto} AfterPay a receber · {op.envios.afterpay_pagos} AfterPay
+                  pagos · {op.envios.antecipados} antecipados
+                  {op.envios.frustrados > 0 && ` · ${op.envios.frustrados} frustrados/devolvidos`}
+                </p>
+                {op.estoque_saiu && op.estoque_saiu.potes > 0 && (
+                  <p>
+                    Estoque que saiu: {op.estoque_saiu.potes} potes (
+                    <SensitiveValue>{formatCurrency(op.estoque_saiu.valor)}</SensitiveValue>) — já pago, não
+                    entra na conta.
+                  </p>
+                )}
+              </>
+            ) : undefined
+          }
         />
         <ProfitCard
           icon={<User className="h-4 w-4" />}
@@ -227,6 +237,7 @@ function ProfitCard({
   rows,
   footer,
   highlight,
+  nota,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -235,6 +246,8 @@ function ProfitCard({
   rows: { label: string; value: number }[];
   footer: string;
   highlight?: boolean;
+  /** Informação que não entra na conta (ex.: estoque que saiu). */
+  nota?: React.ReactNode;
 }) {
   return (
     <Card className={cn(highlight && "border-brand/40 bg-brand/5")}>
@@ -291,6 +304,11 @@ function ProfitCard({
             </span>
           </SensitiveValue>
           <p className="mt-1 text-xs text-muted-foreground">{footer}</p>
+          {nota && (
+            <div className="mt-2 space-y-1 rounded-md bg-muted/50 px-2.5 py-2 text-[11px] text-muted-foreground">
+              {nota}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

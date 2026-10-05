@@ -123,16 +123,24 @@ export async function GET(request: Request) {
       : num(v.config.shipping_cost);
   };
 
-  // Custo de cada venda paga = potes do kit × custo do pote + envio. Potes pela
-  // MESMA regra da baixa de estoque ("2+1", kit cadastrado, "6 MESES" no nome);
-  // antes, kit sem cadastro (ex.: 6 MESES) contava como 1 pote só.
-  // O pote entra aqui (e não na compra do estoque, que não é saída do caixa da
-  // análise): cada venda leva o custo do que saiu da prateleira.
-  const kitCostFor = (tx: Tx): { produto: number; envio: number } => {
-    const v = custosDa(tx);
-    const { units } = resolveKitUnits(tx.plan_name, tx.product_name, v.kits);
-    return { produto: units * num(v.config.cost_per_unit), envio: envioDo(tx, v) };
-  };
+  // Regra do dono: o ESTOQUE já está pago — os potes que saem não entram na
+  // conta (só aparecem como informação). O custo de cada pedido é o ENVIO, e
+  // ele existe desde que o pedido sai: AfterPay paga o frete no agendamento,
+  // mesmo que o cliente só pague (ou frustre) depois.
+  //  - AfterPay: enviado na data do pedido (agendado, aguardando, pago,
+  //    frustrado ou devolvido — todos saíram).
+  //  - Antecipado / recuperação: enviado quando paga (pago ou devolvido).
+  const dataDoEnvio = (tx: Tx) =>
+    tx.sale_type === "afterpay"
+      ? tx.sale_date || tx.created_at
+      : tx.payment_date || tx.sale_date || tx.created_at;
+  const AFTERPAY_ENVIADO = new Set(["agendado", "aguardando", "pago", "frustrado", "devolvido"]);
+  const foiEnviado = (tx: Tx) =>
+    tx.sale_type === "afterpay"
+      ? AFTERPAY_ENVIADO.has(tx.status || "")
+      : tx.status === "pago" || tx.status === "devolvido";
+  const potesDo = (tx: Tx, v: VersaoCustos) =>
+    resolveKitUnits(tx.plan_name, tx.product_name, v.kits).units;
 
   // 3. Sócios
   const { data: partnersRaw } = await supabase
@@ -156,22 +164,40 @@ export async function GET(request: Request) {
     .eq("status", "pago")
     .in("origin_type", ["own", "affiliate_incoming"]));
 
-  // AfterPay frustrado: o kit foi enviado e o cliente não pagou. O pote volta
-  // para o estoque, mas o envio já foi pago — é custo do mês em que saiu.
-  const { data: frustRaw } = await fetchAll(supabase
+  // Pedidos ENVIADOS no período (pagos ou não): é deles que sai o frete.
+  const { data: enviosRaw } = await fetchAll(supabase
     .from("transactions")
     .select("origin_type, status, product_name, plan_name, sale_date, payment_date, created_at, sale_type")
     .eq("user_id", userId)
-    .eq("status", "frustrado")
-    .eq("sale_type", "afterpay")
-    .or("origin_type.eq.own,origin_type.is.null")
-    .gte("sale_date", fromTs)
-    .lte("sale_date", toTs));
-  const frustradas = (frustRaw || []) as Tx[];
-  const envioFrustradas = frustradas.reduce((s, t) => {
-    const v = custosDa(t, t.sale_date || t.created_at);
-    return s + envioDo(t, v);
-  }, 0);
+    .in("status", ["agendado", "aguardando", "pago", "frustrado", "devolvido"])
+    .or("origin_type.eq.own,origin_type.eq.affiliate_incoming,origin_type.is.null")
+    .or(
+      `and(sale_date.gte.${fromTs},sale_date.lte.${toTs}),and(payment_date.gte.${fromTs},payment_date.lte.${toTs}),and(sale_date.is.null,created_at.gte.${fromTs},created_at.lte.${toTs})`
+    ));
+  const envios = ((enviosRaw || []) as Tx[]).filter((t) => {
+    if (!foiEnviado(t)) return false;
+    const ref = dataDoEnvio(t);
+    if (!ref) return false;
+    const ms = new Date(ref).getTime();
+    return ms >= fromMs && ms <= toMs;
+  });
+  const resumoEnvios = (lista: Tx[]) => {
+    let frete = 0;
+    let potes = 0;
+    let valorPotes = 0;
+    for (const t of lista) {
+      const v = custosDa(t, dataDoEnvio(t));
+      frete += envioDo(t, v);
+      const p = potesDo(t, v);
+      potes += p;
+      valorPotes += p * num(v.config.cost_per_unit);
+    }
+    return { pedidos: lista.length, frete, potes, valorPotes };
+  };
+  const enviosProprios = envios.filter((t) => t.origin_type !== "affiliate_incoming");
+  const envioProprio = resumoEnvios(enviosProprios);
+  const envioAfiliados = resumoEnvios(envios.filter((t) => t.origin_type === "affiliate_incoming"));
+  const contar = (f: (t: Tx) => boolean) => enviosProprios.filter(f).length;
 
   const inPeriod = (tx: Tx): boolean => {
     const ref = tx.payment_date || tx.sale_date || tx.created_at;
@@ -283,9 +309,6 @@ export async function GET(request: Request) {
   // O afiliado NÃO arca com custo de kit/envio (quem paga o produto é o produtor),
   // então o lucro/ROI da simulação consideram apenas o investimento em ads.
   let simRevenue = 0;
-  let ownKitCosts = 0;
-  let ownProduto = 0;
-  let ownEnvio = 0;
   for (const t of ownTxs) {
     const price = num(t.product_price) || num(t.total_value) || num(t.amount);
     const c = custosDa(t).config;
@@ -294,28 +317,23 @@ export async function GET(request: Request) {
       gross * (1 - num(c.affiliate_platform_fee) / 100) -
       num(c.affiliate_platform_fixed);
     simRevenue += Math.max(0, net);
-    const k = kitCostFor(t); // reutilizado na operação interna (2.4)
-    ownProduto += k.produto;
-    ownEnvio += k.envio;
-    ownKitCosts += k.produto + k.envio;
   }
+  const ownKitCosts = envioProprio.frete;
   const simProfit = simRevenue - adsInvestment;
   const simRoi = adsInvestment > 0 ? simRevenue / adsInvestment : 0;
   const simCpa = ownTxs.length > 0 ? adsInvestment / ownTxs.length : 0;
 
   // 2.3 Lucro com afiliados externos (receita = comissão de produtor)
   let affCommission = 0;
-  let affKitCosts = 0;
   for (const t of affTxs) {
     affCommission += num(t.producer_commission);
-    const k = kitCostFor(t);
-    affKitCosts += k.produto + k.envio;
   }
+  const affKitCosts = envioAfiliados.frete;
   const affProfit = affCommission - affKitCosts;
 
   // 2.4 Lucro operação interna (receita = comissão líquida das vendas próprias)
   const internalRevenue = ownTxs.reduce((s, t) => s + num(t.commission), 0);
-  const internalProfit = internalRevenue - ownKitCosts - envioFrustradas - adsInvestment;
+  const internalProfit = internalRevenue - ownKitCosts - adsInvestment;
 
   // 2.5 Lucro produtor total
   const producerTotal = internalProfit + affProfit;
@@ -354,10 +372,19 @@ export async function GET(request: Request) {
       revenue: internalRevenue,
       sales_count: ownTxs.length,
       kit_costs: ownKitCosts,
-      kit_produto: ownProduto,
-      kit_envio: ownEnvio,
-      frustradas_envio: envioFrustradas,
-      frustradas_count: frustradas.length,
+      // Frete de todo pedido que saiu no período (o único custo do pedido).
+      envios: {
+        pedidos: envioProprio.pedidos,
+        frete: envioProprio.frete,
+        afterpay_em_aberto: contar(
+          (t) => t.sale_type === "afterpay" && (t.status === "agendado" || t.status === "aguardando")
+        ),
+        afterpay_pagos: contar((t) => t.sale_type === "afterpay" && t.status === "pago"),
+        antecipados: contar((t) => t.sale_type !== "afterpay"),
+        frustrados: contar((t) => t.status === "frustrado" || t.status === "devolvido"),
+      },
+      // Só informação: o estoque já foi pago, não desconta do lucro.
+      estoque_saiu: { potes: envioProprio.potes, valor: envioProprio.valorPotes },
       ads_investment: adsInvestment,
       profit: internalProfit,
     },
