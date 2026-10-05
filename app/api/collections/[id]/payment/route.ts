@@ -91,6 +91,19 @@ export async function POST(request: Request, { params }: Params) {
   const dataPagamento = body.payment_date
     ? new Date(`${body.payment_date}T12:00:00-03:00`).toISOString()
     : new Date().toISOString();
+  // Pagamento antes do pedido ou no futuro cai em outro período (some do
+  // Dashboard, do lucro e da comissão) — recusa em vez de gravar errado.
+  const diaPedido = client.order_date
+    ? new Date(new Date(client.order_date).getTime() - 3 * 3600_000).toISOString().slice(0, 10)
+    : null;
+  const diaPagamento = new Date(new Date(dataPagamento).getTime() - 3 * 3600_000).toISOString().slice(0, 10);
+  const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  if ((diaPedido && diaPagamento < diaPedido) || diaPagamento > hoje) {
+    return NextResponse.json(
+      { error: "Data do pagamento fora do intervalo: entre a data do pedido e hoje." },
+      { status: 400 }
+    );
+  }
 
   const updates: Record<string, unknown> = {
     paid_value: pagoCard,

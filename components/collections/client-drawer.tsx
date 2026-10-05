@@ -585,6 +585,11 @@ export function ClientDrawer({
                       .filter((h) => h.type === "payment")
                       .reduce((acc, h) => acc + (Number(h.payment_amount) || 0), 0)}
                     quitado={(client.status_name || "").toLowerCase() === "pago"}
+                    dataPedido={
+                      client.order_date
+                        ? new Date(new Date(client.order_date).getTime() - 3 * 3600_000).toISOString().slice(0, 10)
+                        : null
+                    }
                     onFeito={refresh}
                   />
 
