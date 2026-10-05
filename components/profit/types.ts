@@ -18,6 +18,12 @@ export interface ProfitAnalysis {
     revenue: number;
     sales_count: number;
     kit_costs: number;
+    /** Potes do kit (custo do estoque que saiu). */
+    kit_produto?: number;
+    kit_envio?: number;
+    /** Envio de AfterPay frustrado (kit foi e voltou, o frete ficou). */
+    frustradas_envio?: number;
+    frustradas_count?: number;
     ads_investment: number;
     profit: number;
   };

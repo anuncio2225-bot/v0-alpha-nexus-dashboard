@@ -96,7 +96,15 @@ export function ProfitOverview({
           footer={`${op.sales_count} vendas`}
           rows={[
             { label: "Vendas (líquido)", value: op.revenue },
-            { label: "Custo dos kits", value: -op.kit_costs },
+            ...(op.kit_produto !== undefined
+              ? [
+                  { label: "Potes (custo do estoque)", value: -op.kit_produto },
+                  { label: "Envio dos kits", value: -(op.kit_envio || 0) },
+                ]
+              : [{ label: "Custo dos kits", value: -op.kit_costs }]),
+            ...(op.frustradas_envio
+              ? [{ label: `Envio de frustradas (${op.frustradas_count})`, value: -op.frustradas_envio }]
+              : []),
             { label: "Investimento ads", value: -op.ads_investment },
           ]}
         />
