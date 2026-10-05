@@ -539,7 +539,22 @@ export function ClientDrawer({
                           <CreditCard className="size-4" />
                           Link de pagamento
                         </dt>
-                        <dd className="text-right">
+                        <dd className="flex items-center justify-end gap-3 text-right">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(client.payment_link!);
+                                toast.success("Link de pagamento copiado");
+                              } catch {
+                                window.prompt("Copie o link:", client.payment_link!);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                          >
+                            Copiar
+                            <Copy className="size-3.5" />
+                          </button>
                           <a
                             href={client.payment_link}
                             target="_blank"
