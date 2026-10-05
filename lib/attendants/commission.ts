@@ -3,6 +3,7 @@ import type {
   AttendantRule,
   CommissionResult,
   CommissionBonus,
+  ClienteComissao,
 } from "@/types";
 
 /**
@@ -20,6 +21,9 @@ export interface CommissionTx {
   affiliate_commission: number | null;
   sale_date: string | null;
   payment_date: string | null;
+  sale_type?: string | null;
+  customer_name?: string | null;
+  product_name?: string | null;
 }
 
 function toYMD(d: Date): string {
@@ -96,11 +100,21 @@ export function afterpayPendente(
   attendant: Attendant,
   pendentes: CommissionTx[],
   tierPercent: number
-): { vendas: number; base: number; comissao: number } {
+): { vendas: number; base: number; comissao: number; clientes: ClienteComissao[] } {
   const base = pendentes.reduce((s, tx) => s + saleBaseValue(tx, attendant), 0);
   const comissao =
     base * (tierPercent / 100) + pendentes.length * (attendant.fixed_per_sale || 0);
-  return { vendas: pendentes.length, base, comissao };
+  const clientes = pendentes
+    .map((tx) => ({
+      nome: tx.customer_name ?? null,
+      produto: tx.product_name ?? null,
+      data: (tx.sale_date || "").slice(0, 10),
+      status: tx.status,
+      comissao: saleBaseValue(tx, attendant) * (tierPercent / 100) + (attendant.fixed_per_sale || 0),
+      afterpay: true,
+    }))
+    .sort((a, b) => b.data.localeCompare(a.data));
+  return { vendas: pendentes.length, base, comissao, clientes };
 }
 
 /** Dedução da plataforma por venda (apenas para relatório, modo produtor). */

@@ -22,8 +22,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/utils";
-import { Plus, Users, Wallet, ShoppingCart, Trophy, RefreshCw, GitMerge, CalendarRange, Clock } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
+import {
+  Plus,
+  Users,
+  Wallet,
+  ShoppingCart,
+  Trophy,
+  RefreshCw,
+  GitMerge,
+  CalendarRange,
+  Clock,
+  ArrowUpDown,
+  Check,
+  X,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Attendant, CommissionResult } from "@/types";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
@@ -85,7 +98,24 @@ interface Summary {
   total_paid_sales: number;
   total_pendente?: number;
   top_seller: { name: string; sales: number } | null;
+  ranking?: Posicao[];
 }
+
+interface Posicao {
+  id: string;
+  name: string;
+  vendas: number;
+  vendido: number;
+  a_receber: number;
+  a_liberar: number;
+  afterpay_abertos: number;
+}
+
+type Ordenacao = "minha" | "ranking" | "nome";
+const CHAVE_ORDEM = "atendentes:ordenar";
+
+// 1º ouro, 2º prata, 3º bronze.
+const MEDALHAS = ["bg-amber-400 text-amber-950", "bg-slate-300 text-slate-900", "bg-orange-600 text-orange-50"];
 
 export default function AttendantsPage() {
   // Atendente vinculada vê só o próprio resultado: sem ações de gestão.
@@ -97,6 +127,24 @@ export default function AttendantsPage() {
   const [merging, setMerging] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [autoRan, setAutoRan] = useState(false);
+
+  // Ordem dos cartões: a do dono (salva), pelo ranking ou por nome.
+  const [ordenarPor, setOrdenarPor] = useState<Ordenacao>("minha");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(CHAVE_ORDEM);
+      if (v === "minha" || v === "ranking" || v === "nome") setOrdenarPor(v);
+    } catch {}
+  }, []);
+  const escolherOrdem = (v: Ordenacao) => {
+    setOrdenarPor(v);
+    try {
+      localStorage.setItem(CHAVE_ORDEM, v);
+    } catch {}
+  };
+  // Modo "Organizar": ids na ordem em edição (null = fora do modo).
+  const [ordemEditando, setOrdemEditando] = useState<string[] | null>(null);
+  const [salvandoOrdem, setSalvandoOrdem] = useState(false);
 
   const [configTarget, setConfigTarget] = useState<Attendant | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<Attendant | null>(null);
@@ -124,9 +172,57 @@ export default function AttendantsPage() {
   );
 
   const attendants = data?.attendants || [];
-  const visibleAttendants = showInactive
+  const ranking = summary?.ranking || [];
+  const posicaoDe = new Map(ranking.filter((r) => r.vendas > 0).map((r, i) => [r.id, i + 1]));
+  const filtradas = showInactive
     ? attendants
     : attendants.filter((a) => a.status !== "inactive");
+  const visibleAttendants = useMemo(() => {
+    if (ordemEditando) {
+      const porId = new Map(filtradas.map((a) => [a.id, a]));
+      return ordemEditando.map((id) => porId.get(id)).filter((a): a is Attendant => !!a);
+    }
+    if (ordenarPor === "nome") return [...filtradas].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    if (ordenarPor === "ranking") {
+      const idx = new Map(ranking.map((r, i) => [r.id, i]));
+      return [...filtradas].sort((a, b) => (idx.get(a.id) ?? 999) - (idx.get(b.id) ?? 999));
+    }
+    return filtradas; // já vem na ordem salva pelo dono
+  }, [filtradas, ordenarPor, ranking, ordemEditando]);
+  const maxVendas = Math.max(1, ...ranking.map((r) => r.vendas));
+
+  const mover = (i: number, direcao: -1 | 1) =>
+    setOrdemEditando((ids) => {
+      if (!ids) return ids;
+      const novo = [...ids];
+      const j = i + direcao;
+      if (j < 0 || j >= novo.length) return ids;
+      [novo[i], novo[j]] = [novo[j], novo[i]];
+      return novo;
+    });
+
+  async function salvarOrdem() {
+    if (!ordemEditando) return;
+    setSalvandoOrdem(true);
+    try {
+      // As inativas escondidas ficam depois das visíveis, na ordem em que estavam.
+      const resto = attendants.map((a) => a.id).filter((id) => !ordemEditando.includes(id));
+      const res = await fetch("/api/attendants/ordem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...ordemEditando, ...resto] }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+      toast.success("Ordem salva");
+      escolherOrdem("minha");
+      setOrdemEditando(null);
+      mutate();
+    } catch (e) {
+      toast.error((e as Error).message || "Erro ao salvar a ordem");
+    } finally {
+      setSalvandoOrdem(false);
+    }
+  }
   const inactiveCount = attendants.filter((a) => a.status === "inactive").length;
 
   const runMerge = async () => {
@@ -215,35 +311,35 @@ export default function AttendantsPage() {
 
   const kpis = [
     {
-      label: "Atendentes ativas",
-      value: summary ? String(summary.total_attendants) : "—",
-      icon: Users,
-      sensitive: false,
-    },
-    {
-      label: "Total a pagar (período)",
+      label: "A pagar (liberado)",
+      hint: "comissão de clientes que já pagaram",
       value: summary ? formatCurrency(summary.total_to_pay) : "—",
       icon: Wallet,
+      cor: "text-success bg-success/10",
       sensitive: true,
     },
     {
       label: "AfterPay a liberar",
+      hint: "entra quando o cliente pagar",
       value: summary ? formatCurrency(summary.total_pendente || 0) : "—",
       icon: Clock,
+      cor: "text-warning bg-warning/10",
       sensitive: true,
     },
     {
       label: "Vendas pagas",
+      hint: "no período",
       value: summary ? String(summary.total_paid_sales) : "—",
       icon: ShoppingCart,
+      cor: "text-brand bg-brand/10",
       sensitive: false,
     },
     {
-      label: "Maior vendedora",
-      value: summary?.top_seller
-        ? `${summary.top_seller.name} (${summary.top_seller.sales})`
-        : "—",
-      icon: Trophy,
+      label: "Atendentes ativas",
+      hint: summary?.top_seller ? `destaque: ${summary.top_seller.name}` : "equipe",
+      value: summary ? String(summary.total_attendants) : "—",
+      icon: Users,
+      cor: "text-violet-400 bg-violet-500/10",
       sensitive: false,
     },
   ];
@@ -372,23 +468,77 @@ export default function AttendantsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="bg-card border-border">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-lg bg-brand/10 p-2">
-                <k.icon className="h-5 w-5 text-brand" />
+            <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+              <div className={cn("shrink-0 rounded-lg p-2", k.cor)}>
+                <k.icon className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground truncate">{k.label}</p>
-                <p className="text-lg font-bold text-foreground truncate">
+                <p className="truncate text-xs text-muted-foreground">{k.label}</p>
+                <p className="truncate text-lg font-bold text-foreground">
                   {k.sensitive ? <SensitiveValue>{k.value}</SensitiveValue> : k.value}
                 </p>
+                <p className="hidden truncate text-[11px] text-muted-foreground/80 sm:block">{k.hint}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Ranking das vendedoras no período */}
+      {!somenteLeitura && ranking.length > 1 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-semibold text-foreground">
+                <Trophy className="h-4 w-4 text-amber-400" /> Ranking do período
+              </h2>
+              <span className="text-xs text-muted-foreground">por vendas pagas</span>
+            </div>
+            <ol className="space-y-2">
+              {ranking.map((r, i) => (
+                <li key={r.id} className="grid grid-cols-[1.75rem_1fr_auto] items-center gap-3">
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
+                      r.vendas > 0 && i < 3 ? MEDALHAS[i] : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">{r.name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">{r.vendas}</span> paga{r.vendas !== 1 ? "s" : ""}
+                        {r.afterpay_abertos > 0 && ` · ${r.afterpay_abertos} AfterPay em aberto`}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-brand transition-all"
+                        style={{ width: `${(r.vendas / maxVendas) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-24 text-right text-xs sm:w-40">
+                    <p className="font-semibold text-success">
+                      <SensitiveValue>{formatCurrency(r.a_receber)}</SensitiveValue>
+                    </p>
+                    {r.a_liberar > 0 && (
+                      <p className="text-[11px] text-warning">
+                        +<SensitiveValue>{formatCurrency(r.a_liberar)}</SensitiveValue> a liberar
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lista */}
       {isLoading ? (
@@ -409,25 +559,75 @@ export default function AttendantsPage() {
         </Card>
       ) : (
         <>
-          {inactiveCount > 0 && (
-            <div className="flex items-center justify-end gap-2">
-              <Label htmlFor="show-inactive" className="text-xs text-muted-foreground cursor-pointer">
-                Mostrar inativas ({inactiveCount})
-              </Label>
-              <Switch
-                id="show-inactive"
-                checked={showInactive}
-                onCheckedChange={setShowInactive}
-              />
-            </div>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleAttendants.map((att) => (
+          {/* Ordem dos cartões */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {ordemEditando ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Use as setas de cada cartão para mudar a posição.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setOrdemEditando(null)} disabled={salvandoOrdem}>
+                    <X className="mr-1.5 h-4 w-4" /> Cancelar
+                  </Button>
+                  <Button size="sm" className="bg-brand hover:bg-brand/90" onClick={salvarOrdem} disabled={salvandoOrdem}>
+                    <Check className="mr-1.5 h-4 w-4" /> {salvandoOrdem ? "Salvando..." : "Salvar ordem"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <Select value={ordenarPor} onValueChange={(v) => escolherOrdem(v as Ordenacao)}>
+                    <SelectTrigger className="h-9 w-[190px] bg-card-elevated border-border">
+                      <ArrowUpDown className="mr-1 h-4 w-4 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minha">Minha ordem</SelectItem>
+                      <SelectItem value="ranking">Ranking (mais vendas)</SelectItem>
+                      <SelectItem value="nome">Nome (A–Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!somenteLeitura && filtradas.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9"
+                      onClick={() => setOrdemEditando(visibleAttendants.map((a) => a.id))}
+                    >
+                      Organizar
+                    </Button>
+                  )}
+                </div>
+                {inactiveCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="show-inactive" className="text-xs text-muted-foreground cursor-pointer">
+                      Mostrar inativas ({inactiveCount})
+                    </Label>
+                    <Switch
+                      id="show-inactive"
+                      checked={showInactive}
+                      onCheckedChange={setShowInactive}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleAttendants.map((att, i) => (
               <AttendantCard
                 key={att.id}
                 somenteLeitura={somenteLeitura}
                 attendant={att}
                 period={period}
+                posicao={posicaoDe.get(att.id)}
+                organizando={!!ordemEditando}
+                ordem={i + 1}
+                primeiro={i === 0}
+                ultimo={i === visibleAttendants.length - 1}
+                onMover={(d) => mover(i, d)}
                 onConfigure={(a) => setConfigTarget(a)}
                 onDetails={(a, commission: CommissionResult) => {
                   setDetailsTarget(a);
