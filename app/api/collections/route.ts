@@ -49,6 +49,10 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const saleTypes = (searchParams.get("sale_types") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => ["afterpay", "antecipado", "recuperacao"].includes(s));
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -82,6 +86,7 @@ export async function GET(request: Request) {
   if (products.length > 0) query = query.in("product_name", products);
   else if (product) query = query.eq("product_name", product);
   if (platforms.length > 0) query = query.in("platform_name", platforms);
+  if (saleTypes.length > 0) query = query.in("sale_type", saleTypes);
   if (searchParams.get("has_schedule") === "1") {
     query = query.not("next_collection_date", "is", null);
   }

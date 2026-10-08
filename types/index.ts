@@ -757,6 +757,21 @@ export interface CollectionCalendarEmail {
   created_at: string;
 }
 
+export interface ResumoModalidade {
+  pedidos: number;
+  /** Valor cheio dos pedidos. */
+  valor: number;
+  pagos: number;
+  /** Dinheiro que entrou (inclui pagamento parcial de quem ainda deve). */
+  recebido: number;
+  recebido_parcial: number;
+  abertos: number;
+  abertos_valor: number;
+  /** AfterPay: frustrados · antecipado: Pix/boleto não pago. */
+  perdidos: number;
+  perdidos_valor: number;
+}
+
 export interface CollectionMetrics {
   /** Pedidos e valor por etapa da entrega (agendado → pago). */
   funil?: Record<
@@ -766,8 +781,11 @@ export interface CollectionMetrics {
   total_due_today: number;
   received_today: number;
   scheduled_today: number;
-  braip_scheduled_count: number;
-  braip_scheduled_value: number;
+  /** AfterPay no status "Agendado" (qualquer plataforma). */
+  pedidos_agendados_count: number;
+  pedidos_agendados_value: number;
+  /** Recebido × em aberto × perdido por modalidade (antecipado inclui recuperação). */
+  modalidades?: Record<"afterpay" | "antecipado", ResumoModalidade>;
   no_response_count: number;
   recovery_rate: number;
   total_clients: number;

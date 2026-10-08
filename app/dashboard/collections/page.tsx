@@ -11,6 +11,8 @@ export interface CollectionFilters {
   attendants: string[];
   products: string[];
   platforms: string[];
+  /** Modalidade: afterpay, antecipado, recuperacao ([] = todas). */
+  saleTypes: string[];
 }
 
 const DEFAULT_FILTERS: CollectionFilters = {
@@ -19,13 +21,14 @@ const DEFAULT_FILTERS: CollectionFilters = {
   attendants: [],
   products: [],
   platforms: [],
+  saleTypes: [],
 };
 
 export default function CollectionsPage() {
   const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_FILTERS);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Cobrança</h1>
