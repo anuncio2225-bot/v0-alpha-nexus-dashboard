@@ -21,6 +21,7 @@ import {
 import { DateFilter } from "@/components/dashboard/date-filter";
 import { ProductMultiSelect } from "@/components/dashboard/product-multi-select";
 import { ModeMultiSelect } from "@/components/dashboard/mode-multi-select";
+import { OperacaoRealSection } from "@/components/dashboard/operacao-real";
 import { getDateRange, formatCurrency, cn } from "@/lib/utils";
 import type { FilterPreset, DashboardMetrics, DateRange, OperationalMode, Profile } from "@/types";
 import {
@@ -357,6 +358,12 @@ export default function DashboardPage() {
           trend={dailyData.map((d) => (d.investimento > 0 ? d.comissao / d.investimento : 0))}
         />
       </div>
+
+      {/* ================================================================ */}
+      {/* RESULTADO DA OPERAÇÃO — custos, lucro líquido e ROI real;         */}
+      {/* agendados × antecipados e própria × afiliados                    */}
+      {/* ================================================================ */}
+      <OperacaoRealSection from={from} to={to} periodo={periodo} />
 
       {/* ================================================================ */}
       {/* MÉTRICAS — 12 cartões do mesmo tamanho (divide por 2, 3, 4 e 6)  */}

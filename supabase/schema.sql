@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-05 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-08 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (33):
+-- Migrações registradas no banco (34):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -41,6 +41,7 @@
 --   20261003172125  cobrar_afterpay_e_avisos
 --   20261003172152  seed_cobrar_afterpay
 --   20261005132623  equipe_le_regras_comissao
+--   20261008013342  previsibilidade
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -128,6 +129,7 @@ create table public.attendants (
   platform_fee_fixed numeric default 0,
   fixed_per_sale numeric default 0,
   auto_detected boolean default false,
+  sort_order integer,
   constraint attendants_pkey PRIMARY KEY (id)
 );
 
@@ -407,6 +409,25 @@ create table public.monthly_tax_config (
   constraint monthly_tax_config_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'paid'::text]))),
   constraint monthly_tax_config_pkey PRIMARY KEY (id),
   constraint monthly_tax_config_user_id_year_month_key UNIQUE (user_id, year, month)
+);
+
+create table public.previsibilidade_config (
+  user_id uuid not null,
+  entradas jsonb default '{}'::jsonb not null,
+  cenarios jsonb default '[]'::jsonb not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint previsibilidade_config_pkey PRIMARY KEY (user_id)
+);
+
+create table public.previsibilidade_historico (
+  id uuid default gen_random_uuid() not null,
+  user_id uuid not null,
+  nome text not null,
+  entradas jsonb not null,
+  resultado jsonb not null,
+  criado_por uuid,
+  created_at timestamp with time zone default now() not null,
+  constraint previsibilidade_historico_pkey PRIMARY KEY (id)
 );
 
 create table public.product_costs (
@@ -772,6 +793,8 @@ alter table public.stock_movements add constraint stock_movements_transaction_id
 alter table public.stock_movements add constraint stock_movements_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 alter table public.stock_config add constraint stock_config_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 alter table public.meta_connections add constraint meta_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+alter table public.previsibilidade_config add constraint previsibilidade_config_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+alter table public.previsibilidade_historico add constraint previsibilidade_historico_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
 -- ---------------------------------------------------------------- ÍNDICES
 CREATE INDEX idx_balance_logs_account ON public.account_balance_logs USING btree (account_id);
@@ -809,6 +832,7 @@ CREATE INDEX idx_meta_perf_user_account_date ON public.meta_ads_performance USIN
 CREATE INDEX idx_meta_perf_user_date ON public.meta_ads_performance USING btree (user_id, date);
 CREATE INDEX idx_meta_connections_user ON public.meta_connections USING btree (user_id);
 CREATE INDEX idx_monthly_tax_config_user_year ON public.monthly_tax_config USING btree (user_id, year);
+CREATE INDEX previsibilidade_historico_user_idx ON public.previsibilidade_historico USING btree (user_id, created_at DESC);
 CREATE INDEX idx_product_costs_user ON public.product_costs USING btree (user_id);
 CREATE UNIQUE INDEX idx_profiles_webhook_token ON public.profiles USING btree (webhook_token);
 CREATE INDEX idx_profit_partners_user ON public.profit_partners USING btree (user_id);
@@ -1120,6 +1144,8 @@ alter table public.meta_ads_performance enable row level security;
 alter table public.meta_config enable row level security;
 alter table public.meta_connections enable row level security;
 alter table public.monthly_tax_config enable row level security;
+alter table public.previsibilidade_config enable row level security;
+alter table public.previsibilidade_historico enable row level security;
 alter table public.product_costs enable row level security;
 alter table public.profiles enable row level security;
 alter table public.profit_config enable row level security;
@@ -1423,6 +1449,18 @@ create policy "team_select_monthly_tax_config" on public.monthly_tax_config as p
 create policy "team_update_monthly_tax_config" on public.monthly_tax_config as permissive for update to public
   using (((user_id = effective_user_id()) AND team_can_edit()))
   with check (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "previsibilidade_config_insert" on public.previsibilidade_config as permissive for insert to authenticated
+  with check (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "previsibilidade_config_select" on public.previsibilidade_config as permissive for select to authenticated
+  using ((user_id = effective_user_id()));
+create policy "previsibilidade_config_update" on public.previsibilidade_config as permissive for update to authenticated
+  using (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "previsibilidade_historico_delete" on public.previsibilidade_historico as permissive for delete to authenticated
+  using (((user_id = effective_user_id()) AND team_can_delete()));
+create policy "previsibilidade_historico_insert" on public.previsibilidade_historico as permissive for insert to authenticated
+  with check (((user_id = effective_user_id()) AND team_can_edit()));
+create policy "previsibilidade_historico_select" on public.previsibilidade_historico as permissive for select to authenticated
+  using ((user_id = effective_user_id()));
 create policy "product_costs_user" on public.product_costs as permissive for all to public
   using ((auth.uid() = user_id))
   with check ((auth.uid() = user_id));

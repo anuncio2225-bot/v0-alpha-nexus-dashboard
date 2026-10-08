@@ -115,6 +115,7 @@
   --warning-foreground: #fffbeb;
   --danger: #dc2626;
   --danger-foreground: #fef2f2;
+  --info: #2563eb;
 
   /* UI elements */
   --border: #e4e4e7;
@@ -210,6 +211,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-info: var(--info);
   --color-card-elevated: var(--card-elevated);
   --color-card-hover: var(--card-elevated);
   
