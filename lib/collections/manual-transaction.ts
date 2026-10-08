@@ -51,6 +51,8 @@ interface ManualClient {
   transaction_code?: string | null;
   address_full?: string | null;
   tracking_code?: string | null;
+  /** afterpay (pedido agendado pago à mão), antecipado ou recuperacao. */
+  sale_type?: string | null;
 }
 
 /**
@@ -88,7 +90,10 @@ export async function upsertManualTransaction(
     transaction_code: client.transaction_code || externalId,
     status: "pago",
     original_status: "Pago",
-    sale_type: "antecipado",
+    sale_type: ["afterpay", "antecipado", "recuperacao"].includes(client.sale_type || "")
+      ? client.sale_type
+      : "antecipado",
+    pay_on_delivery: client.sale_type === "afterpay",
     origin_type: "own",
     customer_name: client.name || "Cliente sem nome",
     customer_phone: client.phone || null,

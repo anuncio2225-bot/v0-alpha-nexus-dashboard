@@ -30,6 +30,8 @@ interface KpiCardProps {
   trend?: number[];
   /** Classes do item da grade (ex.: quantas colunas ocupa). */
   itemClassName?: string;
+  /** Detalhe no rodapé (ex.: agendadas × antecipadas). Toma o lugar do mini-gráfico. */
+  partes?: { rotulo: string; valor: string; cor: string }[];
 }
 
 type Tone = "brand" | "success" | "warning" | "danger" | "neutral" | "info";
@@ -51,7 +53,7 @@ function resolveTone(data: KpiData): Tone {
   return data.value > 0 ? "brand" : "neutral";
 }
 
-export function KpiCard({ data, icon: Icon, loading, className, textSize, compact, mini, trend, itemClassName }: KpiCardProps) {
+export function KpiCard({ data, icon: Icon, loading, className, textSize, compact, mini, trend, itemClassName, partes }: KpiCardProps) {
   const small = compact || mini;
   const tone = resolveTone(data);
   const { hex, ambient } = TONES[tone];
@@ -146,6 +148,22 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
               )}
             </div>
 
+            {partes && partes.length > 0 && (
+              <div className="mt-auto space-y-1 pt-3">
+                {partes.map((p) => (
+                  <div key={p.rotulo} className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+                    <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: p.cor, boxShadow: `0 0 6px ${p.cor}` }} />
+                      <span className="truncate">{p.rotulo}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                      <SensitiveValue>{p.valor}</SensitiveValue>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {data.changeLabel && (
               <span
                 className={cn(
@@ -160,7 +178,7 @@ export function KpiCard({ data, icon: Icon, loading, className, textSize, compac
           </div>
 
           {/* Mini-gráfico luminoso no rodapé */}
-          {trend && !small && (
+          {trend && !small && !(partes && partes.length > 0) && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40px] opacity-90 sm:h-[72px]">
               <Sparkline data={trend} color={hex} />
             </div>

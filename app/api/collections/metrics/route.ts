@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveUserId, getTeamDataScope } from "@/lib/team/scope";
+import { getTeamDataScope } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   let clientsQuery = supabase
     .from("collection_clients")
     .select(
-      "id, status_name, braip_status, attendant_name, product_name, total_value, order_total_value, sale_type, paid_value, remaining_value, next_collection_date, last_contact_at, days_without_response"
+      "id, status_name, braip_status, attendant_name, product_name, total_value, order_total_value, sale_type, paid_value, remaining_value, payment_date, next_collection_date, last_contact_at, days_without_response"
     )
     .eq("user_id", scope.ownerId);
 
@@ -89,21 +89,6 @@ export async function GET(request: Request) {
 
   const { data: clients } = await fetchAll(clientsQuery);
 
-  // Pagamentos registrados hoje — restritos aos clientes filtrados
-  const clientIds = (clients || []).map((c) => c.id);
-  let paymentsToday: { payment_amount: number | null }[] | null = [];
-  if (clientIds.length > 0) {
-    const { data } = await fetchAll(supabase
-      .from("collection_history")
-      .select("payment_amount, created_at, client_id")
-      .eq("user_id", await getEffectiveUserId(supabase, user.id))
-      .eq("type", "payment")
-      .in("client_id", clientIds)
-      .gte("created_at", `${today}T00:00:00`)
-      .lte("created_at", `${today}T23:59:59.999`));
-    paymentsToday = data;
-  }
-
   const list = clients || [];
   const isPaid = (c: { status_name: string | null }) =>
     (c.status_name || "").toLowerCase() === "pago";
@@ -113,12 +98,57 @@ export async function GET(request: Request) {
     iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : Infinity;
 
   const dueToday = list.filter((c) => c.next_collection_date === today);
-  const totalDueToday = dueToday.reduce(
-    (s, c) => s + (Number(c.remaining_value) || 0),
-    0
+
+  // RECEBIDO HOJE (dia de Brasília) — o que entrou hoje, pela plataforma ou
+  // lançado à mão:
+  //  - pedido quitado hoje (payment_date de hoje — o webhook e o "registrar
+  //    pagamento" gravam): o que foi pago, menos parcelas de dias anteriores;
+  //  - pagamento parcial lançado hoje em quem ainda não quitou.
+  // Antes só contava o lançado à mão: venda paga pela plataforma dava R$ 0.
+  const diaSP = (iso: string | null) =>
+    iso ? new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10) : "";
+  const inicioHoje = `${today}T00:00:00-03:00`;
+  const fimHoje = `${today}T23:59:59.999-03:00`;
+  const quitadosHoje = list.filter((c) => isPaid(c) && diaSP(c.payment_date) === today);
+  const idsQuitados = new Set(quitadosHoje.map((c) => c.id));
+  const historico = async (ids: string[], antesDeHoje: boolean) => {
+    const out: { payment_amount: number | null; client_id: string }[] = [];
+    // Em lotes: centenas de ids numa URL só passam do limite do PostgREST.
+    for (let i = 0; i < ids.length; i += 150) {
+      let q = supabase
+        .from("collection_history")
+        .select("payment_amount, client_id")
+        .eq("user_id", scope.ownerId)
+        .eq("type", "payment")
+        .in("client_id", ids.slice(i, i + 150));
+      q = antesDeHoje ? q.lt("created_at", inicioHoje) : q.gte("created_at", inicioHoje).lte("created_at", fimHoje);
+      const { data } = await fetchAll(q);
+      out.push(...((data || []) as { payment_amount: number | null; client_id: string }[]));
+    }
+    return out;
+  };
+  const [parciaisHoje, parcelasAntigas] = await Promise.all([
+    historico(list.filter((c) => !idsQuitados.has(c.id)).map((c) => c.id), false),
+    historico([...idsQuitados], true),
+  ]);
+  const antigoPor = new Map<string, number>();
+  for (const p of parcelasAntigas) antigoPor.set(p.client_id, (antigoPor.get(p.client_id) || 0) + (Number(p.payment_amount) || 0));
+  const valorPedido = (c: (typeof list)[number]) => Number(c.order_total_value) || Number(c.total_value) || 0;
+  const receivedToday =
+    quitadosHoje.reduce(
+      (s, c) => s + Math.max((Number(c.paid_value) || valorPedido(c)) - (antigoPor.get(c.id) || 0), 0),
+      0
+    ) + parciaisHoje.reduce((s, p) => s + (Number(p.payment_amount) || 0), 0);
+  const clientesRecebidosHoje = new Set([...idsQuitados, ...parciaisHoje.map((p) => p.client_id)]).size;
+
+  // A RECEBER = AfterPay já entregue e ainda não pago (o dinheiro que está
+  // na mão do cliente agora), pelo que falta de cada pedido.
+  const ENTREGUE = new Set(["entregue", "cobrar (afterpay)", "aguardando pagamento", "pagamento pendente"]);
+  const entreguesNaoPagos = list.filter(
+    (c) => c.sale_type === "afterpay" && ENTREGUE.has((c.status_name || "").toLowerCase())
   );
-  const receivedToday = (paymentsToday || []).reduce(
-    (s, p) => s + (Number(p.payment_amount) || 0),
+  const totalDueToday = entreguesNaoPagos.reduce(
+    (s, c) => s + (Number(c.remaining_value) || valorPedido(c)),
     0
   );
   const noResponse = list.filter(
@@ -188,7 +218,6 @@ export async function GET(request: Request) {
   // de fato (paid_value, inclui pagamento parcial); aberto e perdido pelo
   // valor cheio do pedido. Antecipado inclui recuperação (pago no ato).
   const PERDIDO = new Set(["frustrado", "cancelado", "devolucao", "devolução", "falha na entrega"]);
-  const valorPedido = (c: (typeof list)[number]) => Number(c.order_total_value) || Number(c.total_value) || 0;
   const resumo = (lista: typeof list) => {
     const pagos = lista.filter(isPaid);
     const perdidos = lista.filter((c) => PERDIDO.has((c.status_name || "").toLowerCase()));
@@ -246,6 +275,8 @@ export async function GET(request: Request) {
     metrics: {
       total_due_today: totalDueToday,
       received_today: receivedToday,
+      received_today_count: clientesRecebidosHoje,
+      due_count: entreguesNaoPagos.length,
       scheduled_today: dueToday.length,
       pedidos_agendados_count: pedidosAgendados.length,
       pedidos_agendados_value: pedidosAgendadosValue,

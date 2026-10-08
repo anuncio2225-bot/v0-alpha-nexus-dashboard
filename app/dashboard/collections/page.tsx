@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CollectionsTabs } from "@/components/collections/collections-tabs";
-import { CollectionsKpis } from "@/components/collections/collections-kpis";
+import { CobrancaHoje, CollectionsKpis } from "@/components/collections/collections-kpis";
 import { CollectionsBoard } from "@/components/collections/collections-board";
 
 export interface CollectionFilters {
@@ -29,13 +29,10 @@ export default function CollectionsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Cobrança</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Acompanhe e recupere vendas em aberto com seu CRM de cobrança.
-          </p>
-        </div>
+      {/* Título com os números do dia ao lado (a linha tinha espaço sobrando) */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Cobrança</h1>
+        <CobrancaHoje filters={filters} />
       </div>
 
       <CollectionsTabs />

@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SensitiveValue } from "@/components/ui/sensitive-value";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { CollectionMetrics, ResumoModalidade } from "@/types";
-import { CalendarClock, ChevronDown, Wallet } from "lucide-react";
+import { CalendarClock, ChevronDown } from "lucide-react";
 import type { CollectionFilters } from "@/app/dashboard/collections/page";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -15,18 +15,20 @@ const qtd = (v: number) => new Intl.NumberFormat("pt-BR").format(v);
 const pct = (parte: number, total: number) =>
   total > 0 ? `${((parte / total) * 100).toFixed(1).replace(".", ",")}%` : "0%";
 
+// Nome curto no cartão; o completo aparece ao passar o mouse.
 const ETAPAS = [
-  { k: "agendado", label: "Total agendado", cor: "#6366f1" },
-  { k: "transito", label: "Em trânsito", cor: "#3b82f6" },
-  { k: "agencia", label: "Na agência", cor: "#f59e0b" },
-  { k: "cobranca", label: "Entregue · aguard. pgto", cor: "#f97316" },
-  { k: "pix_boleto", label: "Pix/boleto gerado", cor: "#0ea5e9" },
-  { k: "pago", label: "Pagos", cor: "#22c55e" },
-  { k: "frustrado", label: "Frustrados (AfterPay)", cor: "#ef4444" },
-  { k: "nao_pago", label: "Pix/boleto não pago", cor: "#64748b" },
+  { k: "agendado", label: "Agendado", titulo: "Total agendado (ainda não saiu)", cor: "#6366f1" },
+  { k: "transito", label: "Em trânsito", titulo: "Postado, em trânsito ou saiu para entrega", cor: "#3b82f6" },
+  { k: "agencia", label: "Na agência", titulo: "Aguardando retirada na agência", cor: "#f59e0b" },
+  { k: "cobranca", label: "Entregue", titulo: "Entregue · aguardando pagamento", cor: "#f97316" },
+  { k: "pix_boleto", label: "Pix gerado", titulo: "Pix/boleto gerado, aguardando pagamento", cor: "#0ea5e9" },
+  { k: "pago", label: "Pagos", titulo: "Pagos", cor: "#22c55e" },
+  { k: "frustrado", label: "Frustrados", titulo: "Frustrados (AfterPay)", cor: "#ef4444" },
+  { k: "nao_pago", label: "Pix não pago", titulo: "Pix/boleto não pago", cor: "#64748b" },
 ] as const;
 
-export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
+/** Métricas do CRM com os filtros da tela (o SWR divide a mesma busca entre os blocos). */
+function useMetricas(filters: CollectionFilters) {
   const query = new URLSearchParams();
   if (filters.search) query.set("search", filters.search);
   if (filters.statusIds.length > 0) query.set("status_ids", filters.statusIds.join(","));
@@ -41,7 +43,50 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
     fetcher,
     { refreshInterval: 60000 }
   );
-  const m = data?.metrics;
+  return { m: data?.metrics, isLoading };
+}
+
+const plural = (n: number, um: string, varios: string) => `${qtd(n)} ${n === 1 ? um : varios}`;
+
+/** Números do dia, na linha do título. */
+export function CobrancaHoje({ filters }: { filters: CollectionFilters }) {
+  const { m, isLoading } = useMetricas(filters);
+  return (
+    <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+      <Indicador
+        rotulo="Recebido hoje"
+        curto="Recebido hoje"
+        carregando={isLoading}
+        tom="text-success"
+        sub={m ? plural(m.received_today_count ?? 0, "pagamento", "pagamentos") : undefined}
+      >
+        <SensitiveValue>{formatCurrency(m?.received_today ?? 0)}</SensitiveValue>
+      </Indicador>
+      <Indicador
+        rotulo="A receber · entregues"
+        curto="A receber"
+        carregando={isLoading}
+        tom="text-brand"
+        sub={m ? plural(m.due_count ?? 0, "entregue sem pagar", "entregues sem pagar") : undefined}
+      >
+        <SensitiveValue>{formatCurrency(m?.total_due_today ?? 0)}</SensitiveValue>
+      </Indicador>
+      <Indicador
+        rotulo="Cobranças p/ hoje"
+        curto="Cobrar hoje"
+        carregando={isLoading}
+        tom="text-warning"
+        icone={<CalendarClock className="h-3.5 w-3.5" />}
+        sub="marcadas na agenda"
+      >
+        {qtd(m?.scheduled_today ?? 0)}
+      </Indicador>
+    </div>
+  );
+}
+
+export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
+  const { m, isLoading } = useMetricas(filters);
 
   // Recolher os números para o quadro subir — lembrado neste navegador.
   const [aberto, setAberto] = useState(true);
@@ -80,7 +125,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
         className="flex w-full items-center justify-between gap-3 text-left"
         aria-expanded={aberto}
       >
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="text-[15px] font-medium text-foreground/80">
           Resultado da cobrança
           {!aberto && m && (
             <span className="ml-2 text-xs text-muted-foreground/70">
@@ -128,7 +173,7 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
             {verAntecipado && (
               <PainelModalidade
                 titulo="Antecipado"
-                sub="pago antes de sair — inclui recuperação"
+                sub="paga antes de sair · com recuperação"
                 cor="#10b981"
                 r={an}
                 carregando={isLoading}
@@ -144,24 +189,24 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
           </div>
 
           {/* Etapas da entrega — uma faixa compacta */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 2xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
             {ETAPAS.map((e) => {
               const f = m?.funil?.[e.k];
               return (
                 <div
                   key={e.k}
-                  className="min-w-0 rounded-xl border border-[var(--border-glass)] bg-card px-3 py-2"
+                  className="min-w-0 rounded-xl border border-[var(--border-glass)] bg-card px-3 py-2.5"
                   style={{ borderLeft: `3px solid ${e.cor}` }}
                 >
-                  <p className="truncate text-[11px] text-muted-foreground">{e.label}</p>
+                  <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="truncate" title={e.titulo}>{e.label}</span>
+                    {!isLoading && <span className="shrink-0 tabular-nums">{f?.count || 0} ped.</span>}
+                  </p>
                   {isLoading ? (
                     <Skeleton className="mt-1 h-5 w-20" />
                   ) : (
-                    <p className="truncate text-sm font-semibold tabular-nums text-foreground">
+                    <p className="truncate text-base font-semibold tabular-nums text-foreground">
                       <SensitiveValue>{formatCurrency(f?.value || 0)}</SensitiveValue>
-                      <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
-                        {f?.count || 0} ped.
-                      </span>
                     </p>
                   )}
                 </div>
@@ -169,30 +214,6 @@ export function CollectionsKpis({ filters }: { filters: CollectionFilters }) {
             })}
           </div>
 
-          {/* Dia a dia da cobrança */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Indicador rotulo="A receber hoje" carregando={isLoading} tom="text-brand">
-              <SensitiveValue>{formatCurrency(m?.total_due_today ?? 0)}</SensitiveValue>
-            </Indicador>
-            <Indicador rotulo="Recebido hoje" carregando={isLoading} tom="text-success">
-              <SensitiveValue>{formatCurrency(m?.received_today ?? 0)}</SensitiveValue>
-            </Indicador>
-            <Indicador rotulo="Cobranças marcadas p/ hoje" carregando={isLoading} tom="text-warning" icone={<CalendarClock className="h-3.5 w-3.5" />}>
-              {qtd(m?.scheduled_today ?? 0)}
-            </Indicador>
-            <Indicador rotulo="Pedidos agendados" carregando={isLoading} tom="text-brand" icone={<Wallet className="h-3.5 w-3.5" />}>
-              {qtd(m?.pedidos_agendados_count ?? 0)}
-              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
-                <SensitiveValue>{formatCurrency(m?.pedidos_agendados_value ?? 0)}</SensitiveValue>
-              </span>
-            </Indicador>
-            <Indicador rotulo="Sem resposta +3d" carregando={isLoading} tom="text-destructive">
-              {qtd(m?.no_response_count ?? 0)}
-            </Indicador>
-            <Indicador rotulo="Taxa de recuperação" carregando={isLoading} tom="text-success">
-              {m ? `${m.recovery_rate.toFixed(1).replace(".", ",")}%` : "—"}
-            </Indicador>
-          </div>
         </>
       )}
     </section>
@@ -221,16 +242,16 @@ function PainelModalidade({
   const total = r?.pedidos ?? 0;
   const barra = (n: number) => `${total > 0 ? (n / total) * 100 : 0}%`;
   return (
-    <Card className="gap-0 rounded-[18px] border-[var(--border-glass)] px-4 py-3">
+    <Card className="gap-0 rounded-[18px] border-[var(--border-glass)] px-4 py-3.5 sm:px-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <p className="text-sm font-semibold text-foreground">
+        <p className="text-base font-semibold text-foreground">
           <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: cor, boxShadow: `0 0 8px ${cor}` }} />
-          {titulo} <span className="text-xs font-normal text-muted-foreground">· {sub}</span>
+          {titulo} <span className="text-sm font-normal text-muted-foreground">· {sub}</span>
         </p>
         {carregando || !r ? (
           <Skeleton className="h-4 w-32" />
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {qtd(r.pedidos)} pedido{r.pedidos !== 1 ? "s" : ""} ·{" "}
             <SensitiveValue>{formatCurrency(r.valor)}</SensitiveValue>
           </p>
@@ -238,7 +259,7 @@ function PainelModalidade({
       </div>
 
       {/* Barra: pago | em aberto | perdido (pelo número de pedidos) */}
-      <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="mt-2.5 flex h-2 overflow-hidden rounded-full bg-muted">
         <div className="h-full bg-success" style={{ width: barra(r?.pagos ?? 0) }} />
         <div className="h-full bg-sky-500/70" style={{ width: barra(r?.abertos ?? 0) }} />
         <div className="h-full bg-danger" style={{ width: barra(r?.perdidos ?? 0) }} />
@@ -268,7 +289,7 @@ function PainelModalidade({
           tom="text-danger"
         />
       </div>
-      {r && !carregando && <p className="mt-2 text-[11px] text-muted-foreground">{rodape(r)}</p>}
+      {r && !carregando && <p className="mt-2.5 text-xs text-muted-foreground">{rodape(r)}</p>}
     </Card>
   );
 }
@@ -290,21 +311,21 @@ function Bloco({
 }) {
   return (
     // Celular: uma linha (rótulo à esquerda, valor à direita). Maior: coluna.
-    <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[var(--glass-1)] px-2.5 py-2 sm:block">
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[var(--glass-1)] px-3 py-2.5 sm:block">
       <div className="min-w-0">
-        <p className="truncate text-[11px] text-muted-foreground" title={rotulo}>
+        <p className="truncate text-xs text-muted-foreground" title={rotulo}>
           {rotulo}
         </p>
-        <p className="truncate text-[11px] tabular-nums text-muted-foreground sm:hidden">{!carregando && linha}</p>
+        <p className="truncate text-xs tabular-nums text-muted-foreground sm:hidden">{!carregando && linha}</p>
       </div>
       {carregando ? (
         <Skeleton className="mt-1 h-5 w-16" />
       ) : (
         <div className="shrink-0 text-right sm:text-left">
-          <p className={cn("truncate text-[15px] font-semibold tabular-nums sm:text-base", tom)}>
+          <p className={cn("truncate text-base font-semibold tabular-nums sm:text-xl", tom)}>
             <SensitiveValue>{formatCurrency(valor)}</SensitiveValue>
           </p>
-          <p className="hidden truncate text-[11px] tabular-nums text-muted-foreground sm:block">{linha}</p>
+          <p className="hidden truncate text-xs tabular-nums text-muted-foreground sm:block">{linha}</p>
           {extra && (
             <p className="truncate text-[10px] text-muted-foreground/70">
               <SensitiveValue>{extra}</SensitiveValue>
@@ -322,23 +343,32 @@ function Indicador({
   carregando,
   tom,
   icone,
+  sub,
+  curto,
 }: {
   rotulo: string;
+  /** Rótulo do celular (três cartões de ~115 px). */
+  curto?: string;
   children: ReactNode;
   carregando: boolean;
   tom: string;
   icone?: ReactNode;
+  sub?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-[var(--border-glass)] bg-card px-3 py-2">
-      <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-        {icone}
-        {rotulo}
+    <div className="min-w-0 rounded-2xl border border-[var(--border-glass)] bg-card px-3 py-2 sm:min-w-[180px] sm:px-4 sm:py-2.5">
+      <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground sm:text-xs">
+        <span className="hidden sm:inline-flex">{icone}</span>
+        <span className="truncate sm:hidden">{curto ?? rotulo}</span>
+        <span className="hidden truncate sm:inline">{rotulo}</span>
       </p>
       {carregando ? (
-        <Skeleton className="mt-1 h-5 w-16" />
+        <Skeleton className="mt-1 h-6 w-20" />
       ) : (
-        <p className={cn("truncate text-sm font-semibold tabular-nums", tom)}>{children}</p>
+        <>
+          <p className={cn("truncate text-[15px] font-semibold tabular-nums sm:text-lg", tom)}>{children}</p>
+          {sub && <p className="hidden truncate text-[11px] text-muted-foreground sm:block">{sub}</p>}
+        </>
       )}
     </div>
   );
