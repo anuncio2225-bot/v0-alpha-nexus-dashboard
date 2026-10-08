@@ -1,11 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import {
   ArrowRight,
   Boxes,
+  ChevronDown,
   CalendarClock,
   Coins,
   Gauge,
@@ -40,6 +41,25 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
     { refreshInterval: 60000 }
   );
 
+  // Recolher o bloco inteiro — lembrado neste navegador (igual à Cobrança).
+  const [aberto, setAberto] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("dashboard:operacao") === "fechado") setAberto(false);
+    } catch {
+      // sem armazenamento: fica aberto
+    }
+  }, []);
+  const alternar = () =>
+    setAberto((v) => {
+      try {
+        localStorage.setItem("dashboard:operacao", v ? "fechado" : "aberto");
+      } catch {
+        // ignora
+      }
+      return !v;
+    });
+
   if (data?.restrito) return null;
   if (data?.error) {
     return (
@@ -66,16 +86,38 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <button type="button" onClick={alternar} aria-expanded={aberto} className="flex min-w-0 items-center gap-2 text-left">
           <span className="live-dot" />
           <h2 className="text-sm font-medium text-muted-foreground">
             Resultado da operação <span className="text-muted-foreground/60">· depois de todos os custos · {periodo}</span>
+            {!aberto && op && (
+              <span className="ml-2 text-xs text-muted-foreground/80">
+                Faturamento <SensitiveValue>{formatCurrency(op.faturamento)}</SensitiveValue> · Lucro{" "}
+                <SensitiveValue>
+                  <span className={op.lucro < 0 ? "text-danger" : "text-brand"}>{formatCurrency(op.lucro)}</span>
+                </SensitiveValue>{" "}
+                · ROI {pct(op.roi)}
+              </span>
+            )}
           </h2>
+        </button>
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/previsibilidade" className="inline-flex items-center gap-1 text-xs text-brand hover:underline">
+            Simular na Previsibilidade <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            type="button"
+            onClick={alternar}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {aberto ? "Recolher" : "Mostrar"}
+            <ChevronDown className={cn("h-4 w-4 transition-transform", aberto && "rotate-180")} />
+          </button>
         </div>
-        <Link href="/dashboard/previsibilidade" className="inline-flex items-center gap-1 text-xs text-brand hover:underline">
-          Simular na Previsibilidade <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
       </div>
+
+      {aberto && (
+      <>
 
       {/* Resultado: 5 cartões (o Investimento já está nos destaques acima).
           Celular 2+2+1, tablet 3+2 numa grade de 6, tela larga 5 iguais. */}
@@ -86,10 +128,12 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
           loading={carregando}
           icon={Coins}
           data={{
-            label: "Faturamento",
+            label: "Faturamento bruto",
             value: op?.faturamento ?? 0,
             formatted: formatCurrency(op?.faturamento ?? 0),
-            tooltip: "Valor bruto dos pedidos do período que já foram pagos (própria + afiliados)",
+            subtitle: "pedidos do período já pagos",
+            tooltip:
+              "Valor cheio que o cliente pagou, só dos pedidos FEITOS neste período que já pagaram. Diferente de \"Pagas no Período\" (acima), que conta todo pagamento que caiu no período — inclusive de pedidos antigos — e pelo valor que fica para você, já sem a taxa da plataforma.",
             color: "brand",
           }}
         />
@@ -243,6 +287,8 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
           />
         </div>
       </div>
+      </>
+      )}
     </section>
   );
 }
