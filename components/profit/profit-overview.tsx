@@ -168,22 +168,39 @@ export function ProfitOverview({
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Distribuição de Lucro
           </h3>
-          <div className="mt-4 flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              Caixa Empresa ({dist.company_reserve.percent}%)
-            </span>
-            <Money
-              value={dist.company_reserve.value}
-              className="font-semibold text-foreground"
-            />
-          </div>
-          <div className="mt-3 flex items-center justify-between px-4">
-            <span className="text-sm text-muted-foreground">
-              Restante para sócios
-            </span>
-            <Money value={dist.remaining} className="font-medium text-foreground" />
-          </div>
+          {dist.prejuizo ? (
+            <>
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+                <span className="text-sm font-medium text-foreground">
+                  Prejuízo no período — sem caixa da empresa, dividido igualmente entre os sócios
+                </span>
+                <Money value={dist.remaining} className="shrink-0 font-semibold text-destructive" />
+              </div>
+              <p className="mt-2 px-1 text-xs text-muted-foreground">
+                Caixa Empresa ({dist.company_reserve.percent}%) e a % de cada sócio voltam a valer quando o
+                resultado ficar positivo.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mt-4 flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
+                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  Caixa Empresa ({dist.company_reserve.percent}%)
+                </span>
+                <Money
+                  value={dist.company_reserve.value}
+                  className="font-semibold text-foreground"
+                />
+              </div>
+              <div className="mt-3 flex items-center justify-between px-4">
+                <span className="text-sm text-muted-foreground">
+                  Restante para sócios
+                </span>
+                <Money value={dist.remaining} className="font-medium text-foreground" />
+              </div>
+            </>
+          )}
 
           {dist.partners.length > 0 ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -194,11 +211,14 @@ export function ProfitOverview({
                 >
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <User className="h-4 w-4 text-brand" />
-                    {p.name} ({p.percent}%)
+                    {p.name} ({formatPercentBR(p.percent)})
                   </div>
                   <Money
                     value={p.value}
-                    className="mt-1 block text-xl font-bold text-foreground"
+                    className={cn(
+                      "mt-1 block text-xl font-bold",
+                      p.value < 0 ? "text-destructive" : "text-foreground"
+                    )}
                   />
                 </div>
               ))}
@@ -212,6 +232,11 @@ export function ProfitOverview({
       </Card>
     </div>
   );
+}
+
+/** "50%", "33,33%": a parte igual de 3 sócios não vira 33.333333333333336%. */
+function formatPercentBR(v: number) {
+  return `${Number(v.toFixed(2)).toLocaleString("pt-BR")}%`;
 }
 
 function SimStat({
