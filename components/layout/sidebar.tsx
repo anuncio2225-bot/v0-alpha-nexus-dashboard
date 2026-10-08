@@ -37,6 +37,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Gauge,
   Sun,
   Moon,
 } from "lucide-react";
@@ -59,6 +60,7 @@ const navItems: {
   group: string;
 }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard" , group: "Visão geral" },
+  { href: "/dashboard/previsibilidade", label: "Previsibilidade", icon: Gauge, perm: "financeiro" , group: "Visão geral" },
   { href: "/dashboard/profit", label: "Análise de Lucro", icon: TrendingUp, perm: "financeiro" , group: "Visão geral" },
   { href: "/dashboard/attendants", label: "Atendentes", icon: Users, perm: "atendentes" , group: "Vendas" },
   { href: "/dashboard/affiliation", label: "Afiliação", icon: Handshake, perm: "atendentes" , group: "Vendas" },

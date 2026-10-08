@@ -17,6 +17,7 @@ const ROUTE_PERMISSIONS: { prefix: string; perm: TeamPermissionKey; ownerOnly?: 
   { prefix: "/dashboard/attendants", perm: "atendentes" },
   { prefix: "/dashboard/affiliation", perm: "atendentes" },
   { prefix: "/dashboard/profit", perm: "financeiro" },
+  { prefix: "/dashboard/previsibilidade", perm: "financeiro" },
   { prefix: "/dashboard/stock", perm: "financeiro" },
   { prefix: "/dashboard/collections", perm: "cobranca" },
   { prefix: "/dashboard/financial", perm: "financeiro" },
