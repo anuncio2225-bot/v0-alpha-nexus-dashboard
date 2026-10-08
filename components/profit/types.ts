@@ -43,6 +43,8 @@ export interface ProfitAnalysis {
     profit: number;
   };
   distribution: {
+    /** Lucro geral negativo: sem caixa, prejuízo dividido igualmente entre os sócios. */
+    prejuizo?: boolean;
     company_reserve: { percent: number; value: number };
     remaining: number;
     partners: { id: string; name: string; percent: number; value: number }[];

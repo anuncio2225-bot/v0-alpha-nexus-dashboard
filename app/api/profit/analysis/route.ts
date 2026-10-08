@@ -342,15 +342,24 @@ export async function GET(request: Request) {
   const generalProfit = producerTotal - cashflowExits;
 
   // 2.7 Distribuição
-  const companyReserve =
-    generalProfit * (config.company_reserve_percent / 100);
+  // Regra do dono: no LUCRO vale a configuração (caixa da empresa + % de cada
+  // sócio). No PREJUÍZO não se separa caixa de um valor negativo — o prejuízo
+  // inteiro é dividido em partes iguais entre os sócios (2 sócios = 50/50).
+  const prejuizo = generalProfit < 0;
+  const companyReserve = prejuizo
+    ? 0
+    : generalProfit * (config.company_reserve_percent / 100);
   const remaining = generalProfit - companyReserve;
-  const distributionPartners = partners.map((p) => ({
-    id: p.id,
-    name: p.name,
-    percent: num(p.percent),
-    value: remaining * (num(p.percent) / 100),
-  }));
+  const parteIgual = partners.length > 0 ? 100 / partners.length : 0;
+  const distributionPartners = partners.map((p) => {
+    const percent = prejuizo ? parteIgual : num(p.percent);
+    return {
+      id: p.id,
+      name: p.name,
+      percent,
+      value: remaining * (percent / 100),
+    };
+  });
 
   return NextResponse.json({
     period: { from: fromDate, to: toDate },
@@ -399,6 +408,7 @@ export async function GET(request: Request) {
       profit: generalProfit,
     },
     distribution: {
+      prejuizo,
       company_reserve: {
         percent: config.company_reserve_percent,
         value: companyReserve,
