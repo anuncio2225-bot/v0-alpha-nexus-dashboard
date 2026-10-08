@@ -46,6 +46,10 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const saleTypes = (searchParams.get("sale_types") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => ["afterpay", "antecipado", "recuperacao"].includes(s));
 
   const today = todaySaoPaulo();
   const scope = await getTeamDataScope(supabase, user.id);
@@ -76,6 +80,7 @@ export async function GET(request: Request) {
   else if (product) clientsQuery = clientsQuery.eq("product_name", product);
   if (platforms.length > 0)
     clientsQuery = clientsQuery.in("platform_name", platforms);
+  if (saleTypes.length > 0) clientsQuery = clientsQuery.in("sale_type", saleTypes);
   if (search) {
     clientsQuery = clientsQuery.or(
       `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%`
@@ -128,14 +133,14 @@ export async function GET(request: Request) {
   const totalValue = list.reduce((s, c) => s + (Number(c.total_value) || 0), 0);
   const recoveryRate = totalValue > 0 ? (totalReceived / totalValue) * 100 : 0;
 
-  // "Agendado" = status do proprio sistema da Braip (igual ao dashboard principal).
-  // Conta clientes cujo braip_status normalizado e "Agendado".
-  const scheduledBraip = list.filter(
-    (c) => (c.braip_status || "").toLowerCase() === "agendado"
-  );
-  const scheduledBraipCount = scheduledBraip.length;
-  const scheduledBraipValue = scheduledBraip.reduce(
-    (s, c) => s + (Number(c.remaining_value) || 0),
+  // Pedidos agendados = os que estão na coluna "Agendado" do quadro, de
+  // qualquer plataforma. (O status da plataforma não serve: o Pag2Pay segue
+  // dizendo "Agendado" depois de postado, e o número não batia com o funil.)
+  const ehAgendado = (c: { status_name: string | null }) =>
+    (c.status_name || "").toLowerCase() === "agendado";
+  const pedidosAgendados = list.filter(ehAgendado);
+  const pedidosAgendadosValue = pedidosAgendados.reduce(
+    (s, c) => s + (Number(c.order_total_value) || Number(c.total_value) || 0),
     0
   );
 
@@ -178,6 +183,34 @@ export async function GET(request: Request) {
     funil[etapa].value += Number(c.order_total_value) || Number(c.total_value) || 0;
   }
 
+  // Por modalidade: o que entrou, o que está em aberto e o que se perdeu.
+  // Quantidade e % pelo número de pedidos; "recebido" é o dinheiro que entrou
+  // de fato (paid_value, inclui pagamento parcial); aberto e perdido pelo
+  // valor cheio do pedido. Antecipado inclui recuperação (pago no ato).
+  const PERDIDO = new Set(["frustrado", "cancelado", "devolucao", "devolução", "falha na entrega"]);
+  const valorPedido = (c: (typeof list)[number]) => Number(c.order_total_value) || Number(c.total_value) || 0;
+  const resumo = (lista: typeof list) => {
+    const pagos = lista.filter(isPaid);
+    const perdidos = lista.filter((c) => PERDIDO.has((c.status_name || "").toLowerCase()));
+    const abertos = lista.filter((c) => !isPaid(c) && !PERDIDO.has((c.status_name || "").toLowerCase()));
+    const recebidoAbertos = abertos.reduce((s, c) => s + (Number(c.paid_value) || 0), 0);
+    return {
+      pedidos: lista.length,
+      valor: lista.reduce((s, c) => s + valorPedido(c), 0),
+      pagos: pagos.length,
+      recebido: lista.reduce((s, c) => s + (Number(c.paid_value) || 0), 0),
+      recebido_parcial: recebidoAbertos,
+      abertos: abertos.length,
+      abertos_valor: abertos.reduce((s, c) => s + (Number(c.remaining_value) || valorPedido(c)), 0),
+      perdidos: perdidos.length,
+      perdidos_valor: perdidos.reduce((s, c) => s + valorPedido(c), 0),
+    };
+  };
+  const modalidades = {
+    afterpay: resumo(list.filter((c) => c.sale_type === "afterpay")),
+    antecipado: resumo(list.filter((c) => c.sale_type === "antecipado" || c.sale_type === "recuperacao")),
+  };
+
   // Agrupamentos
   const byStatus: Record<string, { count: number; value: number }> = {};
   const byAttendant: Record<string, { count: number; pending: number; received: number }> =
@@ -214,8 +247,9 @@ export async function GET(request: Request) {
       total_due_today: totalDueToday,
       received_today: receivedToday,
       scheduled_today: dueToday.length,
-      braip_scheduled_count: scheduledBraipCount,
-      braip_scheduled_value: scheduledBraipValue,
+      pedidos_agendados_count: pedidosAgendados.length,
+      pedidos_agendados_value: pedidosAgendadosValue,
+      modalidades,
       no_response_count: noResponse.length,
       recovery_rate: recoveryRate,
       total_clients: list.length,

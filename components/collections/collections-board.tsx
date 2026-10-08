@@ -44,6 +44,13 @@ import { ClientDrawer } from "./client-drawer";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+/** AfterPay e antecipado rodam no mesmo quadro; o filtro separa. */
+const MODALIDADES = [
+  { value: "afterpay", label: "AfterPay (agendado)", color: "#0ea5e9" },
+  { value: "antecipado", label: "Antecipado", color: "#10b981" },
+  { value: "recuperacao", label: "Recuperação", color: "#f59e0b" },
+];
+
 interface SuggestionsResponse {
   products: string[];
   attendants: { id: string | null; name: string }[];
@@ -104,6 +111,7 @@ export function CollectionsBoard({
     attendants: attendantFilters,
     products: productFilters,
     platforms: platformFilters,
+    saleTypes,
   } = filters;
   const setSearch = (v: string) =>
     onFiltersChange((p) => ({ ...p, search: v }));
@@ -115,6 +123,8 @@ export function CollectionsBoard({
     onFiltersChange((p) => ({ ...p, products: v }));
   const setPlatformFilters = (v: string[]) =>
     onFiltersChange((p) => ({ ...p, platforms: v }));
+  const setSaleTypes = (v: string[]) =>
+    onFiltersChange((p) => ({ ...p, saleTypes: v }));
 
   // Query base dos filtros (compartilhada por lista e exportacao)
   const filterQuery = new URLSearchParams();
@@ -126,13 +136,15 @@ export function CollectionsBoard({
     filterQuery.set("products", productFilters.join(","));
   if (platformFilters.length > 0)
     filterQuery.set("platforms", platformFilters.join(","));
+  if (saleTypes.length > 0) filterQuery.set("sale_types", saleTypes.join(","));
 
   const hasActiveFilters =
     !!search ||
     statusIds.length > 0 ||
     attendantFilters.length > 0 ||
     productFilters.length > 0 ||
-    platformFilters.length > 0;
+    platformFilters.length > 0 ||
+    saleTypes.length > 0;
 
   const query = new URLSearchParams(filterQuery);
   query.set("page_size", "200");
@@ -301,6 +313,13 @@ export function CollectionsBoard({
                 className="bg-card-elevated border-border pl-9"
               />
             </div>
+            <MultiSelectFilter
+              placeholder="Modalidade"
+              className="col-span-2 sm:col-span-1 sm:w-44"
+              selected={saleTypes}
+              onChange={setSaleTypes}
+              options={MODALIDADES}
+            />
             <MultiSelectFilter
               placeholder="Status"
               className="sm:w-44"

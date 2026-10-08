@@ -41,6 +41,10 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const saleTypes = (searchParams.get("sale_types") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => ["afterpay", "antecipado", "recuperacao"].includes(s));
 
   let query = supabase
     .from("collection_clients")
@@ -62,6 +66,7 @@ export async function GET(request: Request) {
   }
   if (products.length > 0) query = query.in("product_name", products);
   if (platforms.length > 0) query = query.in("platform_name", platforms);
+  if (saleTypes.length > 0) query = query.in("sale_type", saleTypes);
   if (search) {
     query = query.or(
       `name.ilike.%${search}%,phone.ilike.%${search}%,product_name.ilike.%${search}%,document.ilike.%${search}%,transaction_code.ilike.%${search}%`
