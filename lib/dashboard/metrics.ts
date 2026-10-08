@@ -438,6 +438,15 @@ export async function calcularMetricas(
     (s, t) => s + txValue(t),
     0
   );
+  // As mesmas pagas no período, separadas: pedido agendado (AfterPay) que a
+  // cliente pagou × venda antecipada (Pix/boleto/cartão antes de sair,
+  // inclui recuperação).
+  const entradasAfterpay = entradasList.filter((t) => t.sale_type === "afterpay");
+  const entradasAntecipado = entradasList.filter((t) => t.sale_type !== "afterpay");
+  const pagasPorModalidade = {
+    afterpay: { count: entradasAfterpay.length, value: safeNumber(entradasAfterpay.reduce((s, t) => s + txValue(t), 0)) },
+    antecipado: { count: entradasAntecipado.length, value: safeNumber(entradasAntecipado.reduce((s, t) => s + txValue(t), 0)) },
+  };
 
   const comissaoReal = sumCommission(pagas);
   // A receber = AfterPay vendido e ainda não pago (a caminho + em cobrança).
@@ -578,7 +587,7 @@ export async function calcularMetricas(
       subtitle: "Baseado na data de pagamento",
       value: valorEntradasCommission,
       formatted: formatCurrency(valorEntradasCommission),
-      tooltip: `${entradasList.length} pagamento(s) recebido(s) no período (por data de pagamento)`,
+      tooltip: `${entradasList.length} pagamento(s) no período (por data de pagamento): ${pagasPorModalidade.afterpay.count} de pedidos agendados (${formatCurrency(pagasPorModalidade.afterpay.value)}) + ${pagasPorModalidade.antecipado.count} antecipados (${formatCurrency(pagasPorModalidade.antecipado.value)})`,
       color: "success",
     },
     comissaoReal: {
@@ -865,6 +874,7 @@ export async function calcularMetricas(
     products,
     financialBreakdown,
     operationalFunnel,
+    pagasPorModalidade,
   };
 
   return metrics;

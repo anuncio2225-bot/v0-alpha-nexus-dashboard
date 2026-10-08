@@ -318,6 +318,22 @@ export default function DashboardPage() {
           loading={isLoading}
           itemClassName="col-span-2 sm:col-span-1 lg:col-span-3 xl:col-span-1"
           trend={dailyData.map((d) => d.pagas)}
+          partes={
+            data?.pagasPorModalidade
+              ? [
+                  {
+                    rotulo: `Agendadas · ${data.pagasPorModalidade.afterpay.count}`,
+                    valor: formatCurrency(data.pagasPorModalidade.afterpay.value),
+                    cor: "#60a5fa",
+                  },
+                  {
+                    rotulo: `Antecipadas · ${data.pagasPorModalidade.antecipado.count}`,
+                    valor: formatCurrency(data.pagasPorModalidade.antecipado.value),
+                    cor: "#10b981",
+                  },
+                ]
+              : undefined
+          }
         />
         <KpiCard
           data={{ ...(kpis?.agendadas || { label: "Agendadas", value: 0, formatted: "R$ 0,00" }), subtitle: periodo, color: "info" as const }}

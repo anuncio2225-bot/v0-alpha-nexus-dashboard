@@ -208,6 +208,10 @@ export async function POST(request: Request) {
       next_collection_date: body.next_collection_date || null,
       tracking_code: body.tracking_code || null,
       notes: body.notes || null,
+      // Antecipado (padrão) ou AfterPay pago à mão; recuperação também vale.
+      sale_type: ["afterpay", "antecipado", "recuperacao"].includes(body.sale_type) ? body.sale_type : "antecipado",
+      // Já nasce pago: o dia do pagamento é hoje (entra no "Recebido hoje").
+      payment_date: (statusName || "").trim().toLowerCase() === "pago" ? new Date().toISOString() : null,
     })
     .select()
     .single();

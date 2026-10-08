@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { CollectionStatus, CollectionPlatform } from "@/types";
 
 interface Attendant {
@@ -44,6 +45,12 @@ interface NewClientDialogProps {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+
+const TIPOS_VENDA = [
+  { valor: "antecipado" as const, rotulo: "Venda antecipada", dica: "Pagou antes de enviar" },
+  { valor: "afterpay" as const, rotulo: "Pedido agendado", dica: "AfterPay que a cliente pagou no Pix" },
+];
+
 export function NewClientDialog({
   open,
   onOpenChange,
@@ -65,6 +72,8 @@ export function NewClientDialog({
   const attendantOptions = suggestions?.attendants || [];
   const paymentMethods = suggestions?.payment_methods || [];
 
+  const [saleType, setSaleType] = useState<"antecipado" | "afterpay">("antecipado");
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -83,6 +92,7 @@ export function NewClientDialog({
     }
 
     const payload = {
+      sale_type: saleType,
       name: fd.get("name"),
       phone: fd.get("phone") || null,
       email: fd.get("email") || null,
@@ -109,6 +119,7 @@ export function NewClientDialog({
       toast.success("Cliente adicionado");
       setAttendantValue("");
       setPaymentMethod("");
+      setSaleType("antecipado");
       onOpenChange(false);
       onCreated();
     } catch {
@@ -127,6 +138,31 @@ export function NewClientDialog({
           <DialogTitle>Novo Cliente de Cobrança</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Pix pago à mão: venda antecipada de verdade ou um pedido agendado
+              (AfterPay) que a cliente pagou antes de chegar. O Dashboard conta
+              cada um no seu lugar (Antecipadas × Agendadas pagas). */}
+          <div className="space-y-2">
+            <Label>Tipo da venda</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {TIPOS_VENDA.map((t) => (
+                <button
+                  key={t.valor}
+                  type="button"
+                  onClick={() => setSaleType(t.valor)}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-left transition-colors",
+                    saleType === t.valor
+                      ? "border-brand/60 bg-brand/10"
+                      : "border-border bg-card-elevated hover:border-brand/30"
+                  )}
+                  aria-pressed={saleType === t.valor}
+                >
+                  <span className="block text-sm font-medium text-foreground">{t.rotulo}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">{t.dica}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="name">Nome *</Label>
             <Input id="name" name="name" required className="bg-card-elevated border-border" />

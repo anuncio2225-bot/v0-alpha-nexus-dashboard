@@ -565,6 +565,11 @@ export interface DashboardMetrics {
   products: ProductOption[];
   financialBreakdown: { label: string; value: number; color: string }[];
   operationalFunnel: { label: string; value: number; color: string }[];
+  /** Pagas no período (data do pagamento): pedido agendado × antecipado (com recuperação). */
+  pagasPorModalidade?: {
+    afterpay: { count: number; value: number };
+    antecipado: { count: number; value: number };
+  };
 }
 
 // ============================================================================
@@ -778,8 +783,12 @@ export interface CollectionMetrics {
     "agendado" | "transito" | "agencia" | "cobranca" | "pix_boleto" | "pago" | "frustrado" | "nao_pago",
     { count: number; value: number }
   >;
+  /** A receber: AfterPay entregue e ainda não pago (o que falta). */
   total_due_today: number;
+  due_count?: number;
+  /** Recebido hoje (Brasília): quitado hoje pela plataforma ou à mão + parciais de hoje. */
   received_today: number;
+  received_today_count?: number;
   scheduled_today: number;
   /** AfterPay no status "Agendado" (qualquer plataforma). */
   pedidos_agendados_count: number;

@@ -9,7 +9,6 @@ import {
   CalendarClock,
   Coins,
   Gauge,
-  Megaphone,
   Package,
   Percent,
   Receipt,
@@ -78,10 +77,12 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
         </Link>
       </div>
 
-      {/* Resultado: 6 cartões do mesmo tamanho */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
+      {/* Resultado: 5 cartões (o Investimento já está nos destaques acima).
+          Celular 2+2+1, tablet 3+2 numa grade de 6, tela larga 5 iguais. */}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-6 sm:gap-3 xl:grid-cols-5">
         <KpiCard
           compact
+          itemClassName="sm:col-span-3 xl:col-span-1"
           loading={carregando}
           icon={Coins}
           data={{
@@ -94,18 +95,7 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
         />
         <KpiCard
           compact
-          loading={carregando}
-          icon={Megaphone}
-          data={{
-            label: "Investimento",
-            value: c?.investimento ?? 0,
-            formatted: formatCurrency(c?.investimento ?? 0),
-            tooltip: "Anúncios do período com o imposto da Meta (mesma conta do cartão Investimento)",
-            color: "warning",
-          }}
-        />
-        <KpiCard
-          compact
+          itemClassName="sm:col-span-3 xl:col-span-1"
           loading={carregando}
           icon={Receipt}
           data={{
@@ -118,6 +108,7 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
         />
         <KpiCard
           compact
+          itemClassName="sm:col-span-2 xl:col-span-1"
           loading={carregando}
           icon={Zap}
           data={{
@@ -130,6 +121,7 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
         />
         <KpiCard
           compact
+          itemClassName="sm:col-span-2 xl:col-span-1"
           loading={carregando}
           icon={Percent}
           data={{
@@ -142,6 +134,7 @@ export function OperacaoRealSection({ from, to, periodo }: { from: string; to: s
         />
         <KpiCard
           compact
+          itemClassName="col-span-2 sm:col-span-2 xl:col-span-1"
           loading={carregando}
           icon={TrendingUp}
           data={{

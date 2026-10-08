@@ -300,11 +300,12 @@ export function CollectionsBoard({
   return (
     <div className="space-y-4">
       {/* Filtros e acoes */}
-      <Card className="border-border bg-card p-4">
-        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-          {/* Celular: busca em cima e os 4 filtros dois a dois */}
-          <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-            <div className="relative col-span-2 flex-1 sm:max-w-xs">
+      <Card className="border-border bg-card p-3">
+        {/* Uma linha só quando cabe: busca, filtros e, à direita, as ações.
+            Celular: busca em cima e os filtros dois a dois. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:contents">
+            <div className="relative col-span-2 sm:w-56 sm:flex-none xl:w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -315,14 +316,14 @@ export function CollectionsBoard({
             </div>
             <MultiSelectFilter
               placeholder="Modalidade"
-              className="col-span-2 sm:col-span-1 sm:w-44"
+              className="col-span-2 sm:col-span-1 sm:w-40"
               selected={saleTypes}
               onChange={setSaleTypes}
               options={MODALIDADES}
             />
             <MultiSelectFilter
               placeholder="Status"
-              className="sm:w-44"
+              className="sm:w-40"
               selected={statusIds}
               onChange={setStatusIds}
               options={statuses.map((s) => ({
@@ -333,7 +334,7 @@ export function CollectionsBoard({
             />
             <MultiSelectFilter
               placeholder="Atendente"
-              className="sm:w-44"
+              className="sm:w-40"
               selected={attendantFilters}
               onChange={setAttendantFilters}
               options={attendants.map((a) => ({
@@ -343,7 +344,7 @@ export function CollectionsBoard({
             />
             <MultiSelectFilter
               placeholder="Produto"
-              className="sm:w-44"
+              className="sm:w-40"
               selected={productFilters}
               onChange={setProductFilters}
               options={products.map((p) => ({
@@ -353,7 +354,7 @@ export function CollectionsBoard({
             />
             <MultiSelectFilter
               placeholder="Plataforma"
-              className="sm:w-44"
+              className="sm:w-40"
               selected={platformFilters}
               onChange={setPlatformFilters}
               options={platforms.map((p) => ({
@@ -362,7 +363,7 @@ export function CollectionsBoard({
               }))}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <div className="flex rounded-lg border border-border p-0.5">
               <Button
                 variant="ghost"
@@ -401,9 +402,10 @@ export function CollectionsBoard({
               onClick={handleImport}
               disabled={importing}
               className="border-border"
+              title="Importar do webhook"
             >
               <Download className="mr-2 h-4 w-4" />
-              {importing ? "Importando..." : "Importar do Webhook"}
+              {importing ? "Importando..." : "Importar"}
             </Button>
             )}
             <Button onClick={() => setNewOpen(true)} className="bg-brand hover:bg-brand/90">
