@@ -31,7 +31,7 @@ export async function investimentoDoPeriodo(
     ),
     supabase
       .from("meta_ad_accounts")
-      .select("account_id, apply_meta_tax, contar_desde, contar_ate")
+      .select("account_id, apply_meta_tax, pausas")
       .eq("user_id", ownerId)
       .eq("is_active", true),
     supabase.from("settings").select("ads_tax_percentage").eq("user_id", ownerId).maybeSingle(),

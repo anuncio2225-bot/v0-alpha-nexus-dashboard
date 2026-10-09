@@ -296,10 +296,10 @@ export async function calcularMetricas(
   // do periodo (por dia). NUNCA altera/insere dados aqui (somente leitura).
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, apply_meta_tax, contar_desde, contar_ate")
+    .select("account_id, apply_meta_tax, pausas")
     .eq("user_id", ownerId)
     .eq("is_active", true);
-  // Janela "contar a partir de / até" de cada conta (Integrações).
+  // Pausas do "Calcular gasto" de cada conta (Integrações).
   const contaNoDia = filtroJanelaDasContas(activeMetaAccounts);
 
   const activeMetaIds = srcFilter ? [] : (activeMetaAccounts || []).map((a) => a.account_id);

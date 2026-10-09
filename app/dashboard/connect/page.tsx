@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, todaySP } from "@/lib/utils";
 import {
   Check,
   X,
@@ -39,6 +39,8 @@ import {
   type DateRangeValue,
 } from "@/components/meta-date-range-picker";
 
+import type { Pausa } from "@/lib/meta/janela-conta";
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface AdAccount {
@@ -55,8 +57,7 @@ interface AdAccount {
   isActive: boolean;
   iofPercent: number;
   applyMetaTax: boolean;
-  contarDesde: string | null;
-  contarAte: string | null;
+  pausas: Pausa[];
 }
 
 interface MetaConnection {
@@ -90,11 +91,9 @@ export default function ConnectPage() {
   const [metaTaxByAccount, setMetaTaxByAccount] = useState<
     Record<string, boolean>
   >({});
-  // Janela de contagem por conta: só o gasto entre essas datas entra no
-  // investimento (vazio = sem limite). account_id -> { desde, ate }
-  const [janelaByAccount, setJanelaByAccount] = useState<
-    Record<string, { desde: string; ate: string }>
-  >({});
+  // "Calcular gasto" por conta: pausas em que o gasto não entra na conta.
+  // account_id -> pausas (a última sem "ate" = desligada agora)
+  const [pausasByAccount, setPausasByAccount] = useState<Record<string, Pausa[]>>({});
 
   // Formulario de nova conexao (System User Token)
   const [token, setToken] = useState("");
@@ -143,12 +142,10 @@ export default function ConnectPage() {
         }
         return next;
       });
-      setJanelaByAccount((prev) => {
+      setPausasByAccount((prev) => {
         const next = { ...prev };
         for (const a of accounts) {
-          if (next[a.id] === undefined) {
-            next[a.id] = { desde: a.contarDesde || "", ate: a.contarAte || "" };
-          }
+          if (next[a.id] === undefined) next[a.id] = a.pausas || [];
         }
         return next;
       });
@@ -245,8 +242,7 @@ export default function ConnectPage() {
             ...a,
             iofPercent: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
             applyMetaTax: metaTaxByAccount[a.id] !== false,
-            contarDesde: janelaByAccount[a.id]?.desde || null,
-            contarAte: janelaByAccount[a.id]?.ate || null,
+            pausas: pausasByAccount[a.id] || [],
           };
         });
       await fetch("/api/meta/accounts", {
@@ -733,43 +729,16 @@ export default function ConnectPage() {
                                 </Label>
                               </div>
 
-                              {/* Contar só o gasto entre estas datas (vazio = sem limite).
-                                  O que fica fora continua guardado e volta se mudar. */}
-                              <div className="flex items-center gap-1.5" title="Só o gasto entre estas datas entra no investimento. Vazio = sem limite.">
-                                <Label htmlFor={`desde-${account.id}`} className="text-xs text-muted-foreground">
-                                  Contar de
-                                </Label>
-                                <Input
-                                  id={`desde-${account.id}`}
-                                  type="date"
-                                  value={janelaByAccount[account.id]?.desde ?? ""}
-                                  onChange={(e) =>
-                                    setJanelaByAccount((prev) => ({
-                                      ...prev,
-                                      [account.id]: { desde: e.target.value, ate: prev[account.id]?.ate ?? "" },
-                                    }))
-                                  }
-                                  disabled={!checked}
-                                  className="h-8 w-[136px] text-xs"
-                                />
-                                <Label htmlFor={`ate-${account.id}`} className="text-xs text-muted-foreground">
-                                  até
-                                </Label>
-                                <Input
-                                  id={`ate-${account.id}`}
-                                  type="date"
-                                  value={janelaByAccount[account.id]?.ate ?? ""}
-                                  min={janelaByAccount[account.id]?.desde || undefined}
-                                  onChange={(e) =>
-                                    setJanelaByAccount((prev) => ({
-                                      ...prev,
-                                      [account.id]: { desde: prev[account.id]?.desde ?? "", ate: e.target.value },
-                                    }))
-                                  }
-                                  disabled={!checked}
-                                  className="h-8 w-[136px] text-xs"
-                                />
-                              </div>
+                              {/* Calcular gasto: desligou, para de contar a partir do dia
+                                  escolhido (padrão hoje); ligou, volta a contar a partir de hoje. */}
+                              <CalcularGasto
+                                id={account.id}
+                                pausas={pausasByAccount[account.id] || []}
+                                disabled={!checked}
+                                onChange={(pausas) =>
+                                  setPausasByAccount((prev) => ({ ...prev, [account.id]: pausas }))
+                                }
+                              />
 
                               <Badge
                                 variant="outline"
@@ -847,6 +816,89 @@ export default function ConnectPage() {
           </Link>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Calcular gasto (liga/desliga por conta)                                     */
+/* -------------------------------------------------------------------------- */
+
+const diaBR = (d: string) => d.split("-").reverse().slice(0, 2).join("/");
+const menosUmDia = (d: string) => {
+  const t = new Date(`${d}T12:00:00Z`);
+  t.setUTCDate(t.getUTCDate() - 1);
+  return t.toISOString().slice(0, 10);
+};
+
+function CalcularGasto({
+  id,
+  pausas,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  pausas: Pausa[];
+  disabled?: boolean;
+  onChange: (p: Pausa[]) => void;
+}) {
+  const aberta = pausas.find((p) => !p.ate) || null;
+  const ligado = !aberta;
+  const fechadas = pausas.filter((p) => p.ate);
+
+  const alternar = (v: boolean) => {
+    const hoje = todaySP();
+    if (!v) {
+      // Desligar: o gasto para de contar a partir de hoje (dá para trocar o dia).
+      onChange([...fechadas, { desde: hoje, ate: null }]);
+    } else if (aberta) {
+      // Ligar: a pausa termina ontem e o gasto volta a contar a partir de hoje.
+      const ate = menosUmDia(hoje);
+      const fechada = { desde: aberta.desde, ate };
+      onChange(aberta.desde && ate < aberta.desde ? fechadas : [...fechadas, fechada]);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Switch id={`gasto-${id}`} checked={ligado} onCheckedChange={alternar} disabled={disabled} />
+      <Label htmlFor={`gasto-${id}`} className="text-xs text-muted-foreground">
+        {ligado ? "Calculando gasto" : "Gasto desligado"}
+      </Label>
+      {!ligado && aberta && (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          desde
+          <Input
+            type="date"
+            value={aberta.desde ?? ""}
+            max={todaySP()}
+            onChange={(e) =>
+              e.target.value && onChange([...fechadas, { desde: e.target.value, ate: null }])
+            }
+            disabled={disabled}
+            className="h-7 w-[132px] text-xs"
+            aria-label="Parar de contar a partir de"
+          />
+        </span>
+      )}
+      {fechadas.length > 0 && (
+        <span className="text-[11px] text-muted-foreground/80">
+          · fora da conta:{" "}
+          {fechadas
+            .map((p) => (p.desde ? `${diaBR(p.desde)} a ${diaBR(p.ate as string)}` : `até ${diaBR(p.ate as string)}`))
+            .join(", ")}
+          {!disabled && (
+            <button
+              type="button"
+              onClick={() => onChange(aberta ? [aberta] : [])}
+              className="ml-1.5 underline-offset-2 hover:text-foreground hover:underline"
+              title="Volta a contar o gasto desses dias"
+            >
+              voltar a contar
+            </button>
+          )}
+        </span>
+      )}
     </div>
   );
 }

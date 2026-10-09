@@ -223,7 +223,7 @@ export async function GET(request: Request) {
 
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, apply_meta_tax, contar_desde, contar_ate")
+    .select("account_id, apply_meta_tax, pausas")
     .eq("user_id", userId)
     .eq("is_active", true);
   const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
