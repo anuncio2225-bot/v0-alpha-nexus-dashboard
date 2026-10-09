@@ -7,7 +7,7 @@
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (35):
+-- Migrações registradas no banco (38):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -43,6 +43,9 @@
 --   20261005132623  equipe_le_regras_comissao
 --   20261008013342  previsibilidade
 --   20261009182522  meta_janela_conta
+--   20261009182547  conta_dolar_tier2_desde_0810
+--   20261009192038  meta_pausas_conta
+--   20261009192100  conta_dolar_tier2_outro_login_para_0810
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -331,6 +334,7 @@ create table public.meta_ad_accounts (
   apply_meta_tax boolean default true not null,
   contar_desde date,
   contar_ate date,
+  pausas jsonb default '[]'::jsonb not null,
   constraint meta_ad_accounts_pkey PRIMARY KEY (id),
   constraint meta_ad_accounts_user_account_unique UNIQUE (user_id, account_id)
 );

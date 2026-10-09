@@ -34,10 +34,10 @@ export async function GET(request: Request) {
     // Contas ativas do usuario (so consideramos essas nos calculos)
     const { data: activeAccounts } = await supabase
       .from("meta_ad_accounts")
-      .select("account_id, account_name, currency, business_name, contar_desde, contar_ate")
+      .select("account_id, account_name, currency, business_name, pausas")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
-    // Dias fora da janela "contar a partir de / até" da conta não entram.
+    // Dias em que a conta estava com "Calcular gasto" desligado não entram.
     const contaNoDia = filtroJanelaDasContas(activeAccounts);
 
     const activeIds = (activeAccounts || []).map((a) => a.account_id);
