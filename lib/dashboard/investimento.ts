@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { filtroJanelaDasContas } from "@/lib/meta/janela-conta";
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -30,7 +31,7 @@ export async function investimentoDoPeriodo(
     ),
     supabase
       .from("meta_ad_accounts")
-      .select("account_id, apply_meta_tax")
+      .select("account_id, apply_meta_tax, contar_desde, contar_ate")
       .eq("user_id", ownerId)
       .eq("is_active", true),
     supabase.from("settings").select("ads_tax_percentage").eq("user_id", ownerId).maybeSingle(),
@@ -51,7 +52,9 @@ export async function investimentoDoPeriodo(
         .gte("date", dateFrom)
         .lte("date", dateTo)
     );
+    const contaNoDia = filtroJanelaDasContas(contas);
     for (const row of perf || []) {
+      if (!contaNoDia(row.ad_account_id, row.date as string)) continue;
       const spend = num(row.spend);
       meta += spend;
       if (isentas.has(row.ad_account_id)) metaIsento += spend;

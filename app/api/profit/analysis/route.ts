@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { carregarVersoes, diaSP, versaoDoDia, type VersaoCustos } from "@/lib/profit/versoes";
 import { resolveKitUnits } from "@/lib/stock/kit";
+import { filtroJanelaDasContas } from "@/lib/meta/janela-conta";
 
 /**
  * ANÁLISE DE LUCRO (somente leitura).
@@ -222,10 +223,11 @@ export async function GET(request: Request) {
 
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, apply_meta_tax")
+    .select("account_id, apply_meta_tax, contar_desde, contar_ate")
     .eq("user_id", userId)
     .eq("is_active", true);
   const activeMetaIds = (activeMetaAccounts || []).map((a) => a.account_id);
+  const contaNoDia = filtroJanelaDasContas(activeMetaAccounts);
   // Contas ISENTAS do imposto da Meta (só conversão/IOF, sem ads_tax).
   const exemptMetaIds = new Set(
     (activeMetaAccounts || [])
@@ -245,6 +247,7 @@ export async function GET(request: Request) {
       .gte("date", fromDate)
       .lte("date", toDate));
     (metaPerf || []).forEach((row) => {
+      if (!contaNoDia(row.ad_account_id, row.date as string)) return;
       const spend = num(row.spend);
       metaSpendTotal += spend;
       if (exemptMetaIds.has(row.ad_account_id)) metaExemptSpend += spend;

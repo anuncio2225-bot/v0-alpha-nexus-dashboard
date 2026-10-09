@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { filtroJanelaDasContas } from "@/lib/meta/janela-conta";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -33,9 +34,11 @@ export async function GET(request: Request) {
     // Contas ativas do usuario (so consideramos essas nos calculos)
     const { data: activeAccounts } = await supabase
       .from("meta_ad_accounts")
-      .select("account_id, account_name, currency, business_name")
+      .select("account_id, account_name, currency, business_name, contar_desde, contar_ate")
       .eq("user_id", await getEffectiveUserId(supabase, user.id))
       .eq("is_active", true);
+    // Dias fora da janela "contar a partir de / até" da conta não entram.
+    const contaNoDia = filtroJanelaDasContas(activeAccounts);
 
     const activeIds = (activeAccounts || []).map((a) => a.account_id);
     // Mapa id -> metadados da conta (nome, moeda e BM) para o relatório.
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const rows = data || [];
+    const rows = (data || []).filter((r) => contaNoDia(r.ad_account_id, r.date));
 
     // Totais
     const totals = rows.reduce(

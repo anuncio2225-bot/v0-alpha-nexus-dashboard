@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/team/scope";
 import { NextResponse } from "next/server";
+import { dataOuNull } from "@/lib/meta/janela-conta";
 import {
   fetchAdAccounts,
   MetaApiError,
@@ -37,7 +38,7 @@ export async function GET() {
   // Contas já salvas (para marcar seleção/ativas e trazer o IOF configurado).
   const { data: savedAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, is_active, iof_percent, apply_meta_tax")
+    .select("account_id, is_active, iof_percent, apply_meta_tax, contar_desde, contar_ate")
     .eq("user_id", effectiveId);
   const savedMap = new Map(
     (savedAccounts || []).map((a) => [a.account_id, a])
@@ -67,6 +68,9 @@ export async function GET() {
           iofPercent: Number(saved?.iof_percent ?? 0),
           // default true: conta nova entra no imposto da Meta (comportamento atual)
           applyMetaTax: saved?.apply_meta_tax ?? true,
+          // Janela de contagem (vazio = sem limite)
+          contarDesde: saved?.contar_desde ?? null,
+          contarAte: saved?.contar_ate ?? null,
         });
       }
       // conexão OK: reflete status
@@ -142,6 +146,8 @@ export async function PUT(request: Request) {
           connectionId?: string | null;
           iofPercent?: number;
           applyMetaTax?: boolean;
+          contarDesde?: string | null;
+          contarAte?: string | null;
         }) => ({
           user_id: scopedId,
           account_id: acc.id,
@@ -158,6 +164,8 @@ export async function PUT(request: Request) {
               : 0,
           // se não vier no payload, mantém true (não isenta) por padrão
           apply_meta_tax: acc.applyMetaTax !== false,
+          contar_desde: dataOuNull(acc.contarDesde),
+          contar_ate: dataOuNull(acc.contarAte),
           is_active: true,
           updated_at: new Date().toISOString(),
         })
