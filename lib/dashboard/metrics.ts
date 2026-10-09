@@ -17,6 +17,7 @@ import type {
   ProductOption,
 } from "@/types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { filtroJanelaDasContas } from "@/lib/meta/janela-conta";
 
 type Tx = {
   status: string | null;
@@ -295,9 +296,11 @@ export async function calcularMetricas(
   // do periodo (por dia). NUNCA altera/insere dados aqui (somente leitura).
   const { data: activeMetaAccounts } = await supabase
     .from("meta_ad_accounts")
-    .select("account_id, apply_meta_tax")
+    .select("account_id, apply_meta_tax, contar_desde, contar_ate")
     .eq("user_id", ownerId)
     .eq("is_active", true);
+  // Janela "contar a partir de / até" de cada conta (Integrações).
+  const contaNoDia = filtroJanelaDasContas(activeMetaAccounts);
 
   const activeMetaIds = srcFilter ? [] : (activeMetaAccounts || []).map((a) => a.account_id);
   // Contas ISENTAS do imposto da Meta (apply_meta_tax = false): o gasto delas
@@ -323,6 +326,7 @@ export async function calcularMetricas(
       .lte("date", dateTo));
 
     (metaPerf || []).forEach((row) => {
+      if (!contaNoDia(row.ad_account_id, row.date)) return;
       const spend = safeNumber(row.spend);
       metaSpendTotal += spend;
       if (exemptMetaIds.has(row.ad_account_id)) metaExemptSpend += spend;

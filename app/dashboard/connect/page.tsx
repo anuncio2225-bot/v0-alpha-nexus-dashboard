@@ -55,6 +55,8 @@ interface AdAccount {
   isActive: boolean;
   iofPercent: number;
   applyMetaTax: boolean;
+  contarDesde: string | null;
+  contarAte: string | null;
 }
 
 interface MetaConnection {
@@ -87,6 +89,11 @@ export default function ConnectPage() {
   // Imposto da Meta por conta (account_id -> aplica sim/não). true = não isenta.
   const [metaTaxByAccount, setMetaTaxByAccount] = useState<
     Record<string, boolean>
+  >({});
+  // Janela de contagem por conta: só o gasto entre essas datas entra no
+  // investimento (vazio = sem limite). account_id -> { desde, ate }
+  const [janelaByAccount, setJanelaByAccount] = useState<
+    Record<string, { desde: string; ate: string }>
   >({});
 
   // Formulario de nova conexao (System User Token)
@@ -132,6 +139,15 @@ export default function ConnectPage() {
         for (const a of accounts) {
           if (next[a.id] === undefined) {
             next[a.id] = String(a.iofPercent ?? 0);
+          }
+        }
+        return next;
+      });
+      setJanelaByAccount((prev) => {
+        const next = { ...prev };
+        for (const a of accounts) {
+          if (next[a.id] === undefined) {
+            next[a.id] = { desde: a.contarDesde || "", ate: a.contarAte || "" };
           }
         }
         return next;
@@ -229,6 +245,8 @@ export default function ConnectPage() {
             ...a,
             iofPercent: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
             applyMetaTax: metaTaxByAccount[a.id] !== false,
+            contarDesde: janelaByAccount[a.id]?.desde || null,
+            contarAte: janelaByAccount[a.id]?.ate || null,
           };
         });
       await fetch("/api/meta/accounts", {
@@ -713,6 +731,44 @@ export default function ConnectPage() {
                                     ? "Imposto Meta"
                                     : "Isenta"}
                                 </Label>
+                              </div>
+
+                              {/* Contar só o gasto entre estas datas (vazio = sem limite).
+                                  O que fica fora continua guardado e volta se mudar. */}
+                              <div className="flex items-center gap-1.5" title="Só o gasto entre estas datas entra no investimento. Vazio = sem limite.">
+                                <Label htmlFor={`desde-${account.id}`} className="text-xs text-muted-foreground">
+                                  Contar de
+                                </Label>
+                                <Input
+                                  id={`desde-${account.id}`}
+                                  type="date"
+                                  value={janelaByAccount[account.id]?.desde ?? ""}
+                                  onChange={(e) =>
+                                    setJanelaByAccount((prev) => ({
+                                      ...prev,
+                                      [account.id]: { desde: e.target.value, ate: prev[account.id]?.ate ?? "" },
+                                    }))
+                                  }
+                                  disabled={!checked}
+                                  className="h-8 w-[136px] text-xs"
+                                />
+                                <Label htmlFor={`ate-${account.id}`} className="text-xs text-muted-foreground">
+                                  até
+                                </Label>
+                                <Input
+                                  id={`ate-${account.id}`}
+                                  type="date"
+                                  value={janelaByAccount[account.id]?.ate ?? ""}
+                                  min={janelaByAccount[account.id]?.desde || undefined}
+                                  onChange={(e) =>
+                                    setJanelaByAccount((prev) => ({
+                                      ...prev,
+                                      [account.id]: { desde: prev[account.id]?.desde ?? "", ate: e.target.value },
+                                    }))
+                                  }
+                                  disabled={!checked}
+                                  className="h-8 w-[136px] text-xs"
+                                />
                               </div>
 
                               <Badge

@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-08 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-09 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (34):
+-- Migrações registradas no banco (35):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -42,6 +42,7 @@
 --   20261003172152  seed_cobrar_afterpay
 --   20261005132623  equipe_le_regras_comissao
 --   20261008013342  previsibilidade
+--   20261009182522  meta_janela_conta
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico
@@ -328,6 +329,8 @@ create table public.meta_ad_accounts (
   connection_id uuid,
   iof_percent numeric default 0 not null,
   apply_meta_tax boolean default true not null,
+  contar_desde date,
+  contar_ate date,
   constraint meta_ad_accounts_pkey PRIMARY KEY (id),
   constraint meta_ad_accounts_user_account_unique UNIQUE (user_id, account_id)
 );
