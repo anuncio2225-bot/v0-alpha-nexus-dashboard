@@ -56,6 +56,8 @@ export async function atualizarRastreiosPag2Pay(limite = 35, prazoMs = 50_000): 
     .select("*")
     .eq("gateway", "pag2pay")
     .not("tracking_code", "is", null)
+    // Venda transferida para outra conta não é acompanhada aqui.
+    .or("origin_type.is.null,origin_type.neq.transferida")
     // AfterPay em andamento e também vendas PAGAS recentes (antecipado:
     // pagou antes, mas a entrega ainda precisa ser acompanhada).
     .or(

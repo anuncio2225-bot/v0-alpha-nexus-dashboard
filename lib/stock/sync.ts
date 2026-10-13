@@ -169,12 +169,14 @@ export async function syncStockForTransactionId(
     const { data: tx } = await supabase
       .from("transactions")
       .select(
-        "id, status, sale_type, plan_name, product_name, customer_name, payment_date, sale_date, created_at"
+        "id, status, sale_type, plan_name, product_name, customer_name, payment_date, sale_date, created_at, origin_type"
       )
       .eq("id", transactionId)
       .eq("user_id", userId)
       .maybeSingle();
     if (!tx) return;
+    // Venda transferida para outra conta: o estoque é o da outra conta.
+    if (tx.origin_type === "transferida") return;
     const kits = await fetchKits(supabase, userId);
     await syncStockForTransaction(
       supabase,
