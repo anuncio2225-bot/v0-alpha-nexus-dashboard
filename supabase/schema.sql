@@ -1,13 +1,13 @@
 -- ============================================================================
 -- RETRATO DA ESTRUTURA DO BANCO DE PRODUÇÃO (schema public) — somente estrutura, sem dados.
--- Gerado a partir do catálogo do Postgres em 2026-10-09 (PostgreSQL 17.6).
+-- Gerado a partir do catálogo do Postgres em 2026-10-13 (PostgreSQL 17.6).
 -- Projeto Supabase: vkheedwuoppvodkqovgv.
 --
 -- Por que existe: o v0 aplicou mudanças direto no Supabase e parte delas nunca virou
 -- arquivo em scripts/. Este arquivo é a fonte de verdade do que EXISTE hoje.
 -- Mudanças novas vão em supabase/migrations/ — e este retrato é regerado depois.
 --
--- Migrações registradas no banco (38):
+-- Migrações registradas no banco (39):
 --   20260509211846  create_monthly_tax_config
 --   20260610020300  meta_ads_upgrade_007
 --   20260610020734  meta_ad_accounts_unique_user_account
@@ -46,6 +46,7 @@
 --   20261009182547  conta_dolar_tier2_desde_0810
 --   20261009192038  meta_pausas_conta
 --   20261009192100  conta_dolar_tier2_outro_login_para_0810
+--   20261013171015  payt_reembolso_marcado_como_pago
 -- ============================================================================
 
 -- Aplicadas pelo SQL Editor (fora da tabela acima): 20260923130000_fechar_acesso_publico

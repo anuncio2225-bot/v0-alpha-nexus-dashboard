@@ -217,6 +217,17 @@ export function normalizeGeneric(
     ])
   );
 
+  // Payt: o "status" principal acompanha o ENVIO (tracking_received,
+  // forwarded…) e o do pagamento vem em transaction.payment_status. Venda
+  // reembolsada chegava como "código de rastreio recebido" e ficava PAGA no
+  // painel. Reembolso, estorno ou cancelamento no pagamento passa na frente.
+  const rawPagamento = safeString(pickFirst(payload, ["transaction.payment_status"]));
+  const pagamentoDesfeito =
+    !!rawPagamento &&
+    !!GENERIC_STATUS_MAP[rawPagamento.toLowerCase().trim()] &&
+    ["devolvido", "cancelado"].includes(normalizeStatus(rawPagamento));
+  const statusFinal = pagamentoDesfeito ? rawPagamento : rawStatus;
+
   const totalValue = parseValue(
     pickFirst(payload, [
       "transaction.total_price",
@@ -437,9 +448,9 @@ export function normalizeGeneric(
     gateway,
     external_id: externalId || `${gateway}_${Date.now()}`,
     event_type: eventType,
-    status: normalizeStatus(rawStatus),
-    status_code: rawStatus || undefined,
-    original_status: rawStatus || undefined,
+    status: normalizeStatus(statusFinal),
+    status_code: statusFinal || undefined,
+    original_status: statusFinal || undefined,
 
     product_name: productName || undefined,
     product_id: productId || undefined,

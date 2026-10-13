@@ -451,7 +451,7 @@ export async function processWebhook(
       const { data: prev } = await supabase
         .from("transactions")
         .select(
-          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em, src, origin_type"
+          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em, src, origin_type, amount, total_value, product_price, commission, affiliate_commission, producer_commission"
         )
         .eq("user_id", userId)
         .eq("gateway", event.gateway)
@@ -479,6 +479,22 @@ export async function processWebhook(
           "src",
         ] as const) {
           if (!tx[k] && prev[k]) tx[k] = prev[k];
+        }
+        // Aviso só de envio/rastreio às vezes vem com os valores ZERADOS (Payt).
+        // Venda que continua valendo não perde comissão nem valor por isso;
+        // em reembolso/cancelamento o zero é real e fica.
+        if (event.status !== "devolvido" && event.status !== "cancelado") {
+          for (const k of [
+            "amount",
+            "total_value",
+            "paid_value",
+            "product_price",
+            "commission",
+            "affiliate_commission",
+            "producer_commission",
+          ] as const) {
+            if (!(Number(tx[k]) > 0) && Number(prev[k]) > 0) tx[k] = prev[k];
+          }
         }
         // Pago à mão na Cobrança (ex.: AfterPay adiantado por fora): o gateway
         // ainda acha que está em aberto e pode mandar aguardando/frustrado.
