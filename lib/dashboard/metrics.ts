@@ -9,6 +9,7 @@ import {
   getCampaignScore,
   safeNumber,
 } from "@/lib/utils";
+import { CATEGORIA_AJUSTE_PLATAFORMA } from "@/types";
 import type {
   DashboardMetrics,
   DailyData,
@@ -447,10 +448,35 @@ export async function calcularMetricas(
   // inclui recuperação).
   const entradasAfterpay = entradasList.filter((t) => t.sale_type === "afterpay");
   const entradasAntecipado = entradasList.filter((t) => t.sale_type !== "afterpay");
+  // Taxas/acertos da plataforma fora da venda (reembolso, saque, link pago
+  // por fora): lançados no Fluxo de Caixa como "Ajuste de plataforma".
+  // Saída desconta e entrada soma nas Pagas no Período. Membro limitado a
+  // um atendente não vê (é da operação inteira).
+  const { data: ajustesRaw } = srcFilter
+    ? { data: [] as { type: string; amount: number }[] }
+    : await fetchAll(
+        supabase
+          .from("cashflow")
+          .select("type, amount")
+          .eq("user_id", ownerId)
+          .eq("category", CATEGORIA_AJUSTE_PLATAFORMA)
+          .gte("date", from)
+          .lte("date", to)
+      );
+  const ajustesLista = (ajustesRaw || []) as { type: string; amount: number }[];
+  const valorAjustes = safeNumber(
+    ajustesLista.reduce(
+      (s, a) => s + (a.type === "income" ? 1 : -1) * Math.abs(safeNumber(a.amount)),
+      0
+    )
+  );
   const pagasPorModalidade = {
     afterpay: { count: entradasAfterpay.length, value: safeNumber(entradasAfterpay.reduce((s, t) => s + txValue(t), 0)) },
     antecipado: { count: entradasAntecipado.length, value: safeNumber(entradasAntecipado.reduce((s, t) => s + txValue(t), 0)) },
+    ajustes: { count: ajustesLista.length, value: valorAjustes },
   };
+  // O que entrou de fato = vendas pagas no período + ajustes da plataforma.
+  const valorEntradas = safeNumber(valorEntradasCommission + valorAjustes);
 
   const comissaoReal = sumCommission(pagas);
   // A receber = AfterPay vendido e ainda não pago (a caminho + em cobrança).
@@ -526,7 +552,7 @@ export async function calcularMetricas(
 
   const lucro = safeNumber(receitaBase - investimentoComImposto);
   // Lucro realizado = o que de fato entrou (pagamentos no período) - investimento.
-  const lucroRealizado = safeNumber(valorEntradasCommission - investimentoComImposto);
+  const lucroRealizado = safeNumber(valorEntradas - investimentoComImposto);
 
   const cpa = safeNumber(
     quantidadeBase > 0 ? investimentoComImposto / quantidadeBase : 0
@@ -589,9 +615,9 @@ export async function calcularMetricas(
     entradasHoje: {
       label: "Pagas no Período",
       subtitle: "Baseado na data de pagamento",
-      value: valorEntradasCommission,
-      formatted: formatCurrency(valorEntradasCommission),
-      tooltip: `${entradasList.length} pagamento(s) no período (por data de pagamento): ${pagasPorModalidade.afterpay.count} de pedidos agendados (${formatCurrency(pagasPorModalidade.afterpay.value)}) + ${pagasPorModalidade.antecipado.count} antecipados (${formatCurrency(pagasPorModalidade.antecipado.value)})`,
+      value: valorEntradas,
+      formatted: formatCurrency(valorEntradas),
+      tooltip: `${entradasList.length} pagamento(s) no período (por data de pagamento): ${pagasPorModalidade.afterpay.count} de pedidos agendados (${formatCurrency(pagasPorModalidade.afterpay.value)}) + ${pagasPorModalidade.antecipado.count} antecipados (${formatCurrency(pagasPorModalidade.antecipado.value)})${ajustesLista.length > 0 ? ` ${valorAjustes < 0 ? "−" : "+"} ${formatCurrency(Math.abs(valorAjustes))} de taxas/ajustes da plataforma (Fluxo de Caixa)` : ""}`,
       color: "success",
     },
     comissaoReal: {
@@ -654,7 +680,7 @@ export async function calcularMetricas(
       label: "Lucro Realizado",
       value: lucroRealizado,
       formatted: formatCurrency(lucroRealizado),
-      tooltip: `${formatCurrency(valorEntradasCommission)} pagos no período - ${formatCurrency(investimentoComImposto)}`,
+      tooltip: `${formatCurrency(valorEntradas)} pagos no período - ${formatCurrency(investimentoComImposto)}`,
       color: lucroRealizado >= 0 ? "success" : "danger",
     },
     taxaFrustracao: {
