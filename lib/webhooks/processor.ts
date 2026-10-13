@@ -443,11 +443,15 @@ export async function processWebhook(
     //  - uma venda já PAGA não volta para agendado/aguardando por causa de um
     //    evento antigo reenviado.
     let estadoAnterior: EstadoVenda | null = null;
+    // Venda TRANSFERIDA para outra conta (origin_type = 'transferida'): fica
+    // guardada aqui, mas fora de todos os cálculos, do CRM, do estoque e dos
+    // avisos. O evento novo só atualiza o registro — não a traz de volta.
+    let transferida = false;
     try {
       const { data: prev } = await supabase
         .from("transactions")
         .select(
-          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em, src"
+          "status, payment_date, paid_value, tracking_code, tracking_url, shipping_status, shipping_company, payment_link, address_full, pago_manual_em, src, origin_type"
         )
         .eq("user_id", userId)
         .eq("gateway", event.gateway)
@@ -455,6 +459,10 @@ export async function processWebhook(
         .maybeSingle();
 
       if (prev) {
+        if (prev.origin_type === "transferida") {
+          transferida = true;
+          tx.origin_type = "transferida";
+        }
         estadoAnterior = {
           status: prev.status ?? null,
           shipping_status: prev.shipping_status ?? null,
@@ -531,6 +539,14 @@ export async function processWebhook(
         error: upsertError.message,
         action: "error",
       };
+    }
+
+    if (transferida) {
+      if (logRowId) {
+        await supabase.from("webhook_logs").update({ status: "processed" }).eq("id", logRowId);
+      }
+      console.log("[v0] Venda transferida para outra conta: só atualizado o registro", upserted?.id);
+      return { success: true, message: "transferida", transaction_id: upserted?.id, action: "updated" };
     }
 
     // ARCHITECTURE RULE: webhook NEVER feeds the cashflow table automatically.
