@@ -569,6 +569,8 @@ export interface DashboardMetrics {
   pagasPorModalidade?: {
     afterpay: { count: number; value: number };
     antecipado: { count: number; value: number };
+    /** Lançamentos "Ajuste de plataforma" do Fluxo de Caixa no período (entrada − saída). */
+    ajustes?: { count: number; value: number };
   };
 }
 
@@ -639,8 +641,17 @@ export const CASHFLOW_PAYMENT_METHODS = [
   { value: "reserva_investimento", label: "Reserva de Investimento" },
 ] as const;
 
+/**
+ * Taxas e acertos da plataforma que não vêm no aviso da venda (taxa de
+ * reembolso, tarifa de saque/antecipação, diferença de link pago por fora).
+ * Lançado no Fluxo de Caixa com esta categoria, entra nas "Pagas no Período"
+ * do Dashboard: saída desconta, entrada soma.
+ */
+export const CATEGORIA_AJUSTE_PLATAFORMA = "Ajuste de plataforma";
+
 // Default expense categories
 export const DEFAULT_EXPENSE_CATEGORIES = [
+  "Ajuste de plataforma",
   "Trafego Pago",
   "Ferramenta",
   "Equipe",
@@ -654,6 +665,7 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
 // Default income categories
 export const DEFAULT_INCOME_CATEGORIES = [
   "Venda",
+  "Ajuste de plataforma",
   "Comissoes",
   "Salario",
   "Freelance",
