@@ -508,6 +508,13 @@ export async function processWebhook(
           tx.status = "pago";
           tx.payment_date = prev.payment_date;
           tx.paid_value = prev.paid_value;
+          // Quitada à mão: o valor que entrou foi acertado pelo dono (ex.: parte
+          // no link, parte no Pix). O aviso do gateway não o regrava.
+          if (pagoManual) {
+            for (const k of ["commission", "affiliate_commission", "producer_commission", "total_value", "amount"] as const) {
+              if (prev[k] !== null && prev[k] !== undefined) tx[k] = prev[k];
+            }
+          }
           event.status = "pago";
           event.payment_date = prev.payment_date || undefined;
         }

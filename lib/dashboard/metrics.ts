@@ -450,9 +450,12 @@ export async function calcularMetricas(
   const entradasAntecipado = entradasList.filter((t) => t.sale_type !== "afterpay");
   // Taxas/acertos da plataforma fora da venda (reembolso, saque, link pago
   // por fora): lançados no Fluxo de Caixa como "Ajuste de plataforma".
-  // Saída desconta e entrada soma nas Pagas no Período. Membro limitado a
-  // um atendente não vê (é da operação inteira).
-  const { data: ajustesRaw } = srcFilter
+  // Saída desconta e entrada soma nas Pagas no Período. São da conta
+  // inteira (não têm produto nem modalidade): com filtro de produto ou de
+  // modalidade não entram — senão a visão de uma plataforma leva taxa de
+  // outra. Membro limitado a um atendente também não vê.
+  const semFiltro = productFilters.length === 0 && modes.length === 0;
+  const { data: ajustesRaw } = srcFilter || !semFiltro
     ? { data: [] as { type: string; amount: number }[] }
     : await fetchAll(
         supabase
