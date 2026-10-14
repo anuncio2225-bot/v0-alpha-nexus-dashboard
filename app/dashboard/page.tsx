@@ -331,15 +331,6 @@ export default function DashboardPage() {
                     valor: formatCurrency(data.pagasPorModalidade.antecipado.value),
                     cor: "#10b981",
                   },
-                  ...(data.pagasPorModalidade.ajustes && data.pagasPorModalidade.ajustes.count > 0
-                    ? [
-                        {
-                          rotulo: "Taxas/ajustes",
-                          valor: `${data.pagasPorModalidade.ajustes.value < 0 ? "−" : "+"} ${formatCurrency(Math.abs(data.pagasPorModalidade.ajustes.value))}`,
-                          cor: "#f43f5e",
-                        },
-                      ]
-                    : []),
                 ]
               : undefined
           }
