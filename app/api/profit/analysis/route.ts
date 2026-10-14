@@ -304,6 +304,16 @@ export async function GET(request: Request) {
     return s + Math.abs(num(row.amount));
   }, 0);
 
+  // Entradas "Ajuste de plataforma" (ex.: Pix recebido fora da plataforma de
+  // um pedido quitado em duas partes) somam no Lucro Geral — as saídas da
+  // mesma categoria já descontam acima, como qualquer saída do caixa.
+  const ajustesEntrada = (cashflowRaw || []).reduce((s, row) => {
+    if ((row.type || "").toLowerCase() !== "income") return s;
+    if ((row.category || "").trim().toLowerCase() !== "ajuste de plataforma") return s;
+    if (row.include_in_profit === false) return s;
+    return s + Math.abs(num(row.amount));
+  }, 0);
+
   // ---- CÁLCULOS ----
 
   // 2.2 Simulação como afiliado (só das vendas próprias)
@@ -342,7 +352,7 @@ export async function GET(request: Request) {
   const producerTotal = internalProfit + affProfit;
 
   // 2.6 Lucro geral
-  const generalProfit = producerTotal - cashflowExits;
+  const generalProfit = producerTotal - cashflowExits + ajustesEntrada;
 
   // 2.7 Distribuição
   // Regra do dono: no LUCRO vale a configuração (caixa da empresa + % de cada
