@@ -650,8 +650,10 @@ export const CASHFLOW_PAYMENT_METHODS = [
 export const CATEGORIA_AJUSTE_PLATAFORMA = "Ajuste de plataforma";
 
 // Default expense categories
+// "Ajuste de plataforma" fica por ÚLTIMO nas duas listas: o formulário vem
+// marcado com a primeira categoria, e essa mexe nas Pagas no Período — não
+// pode ser escolhida sem querer (um reembolso entrou como ajuste em 15/10).
 export const DEFAULT_EXPENSE_CATEGORIES = [
-  "Ajuste de plataforma",
   "Trafego Pago",
   "Ferramenta",
   "Equipe",
@@ -660,17 +662,18 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   "Cartao",
   "Operacional",
   "Outros",
+  "Ajuste de plataforma",
 ] as const;
 
 // Default income categories
 export const DEFAULT_INCOME_CATEGORIES = [
   "Venda",
-  "Ajuste de plataforma",
   "Comissoes",
   "Salario",
   "Freelance",
   "Investimentos",
   "Outros",
+  "Ajuste de plataforma",
 ] as const;
 
 // ============================================================
